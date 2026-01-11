@@ -6,3 +6,5 @@ export const config = new DocumentBuilder()
   .setVersion('1.0')
   .addTag('Taskforge')
   .build();
+
+export const SWAGGER_ENDPOINT = '/api';

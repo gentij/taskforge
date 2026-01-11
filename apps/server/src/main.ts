@@ -6,7 +6,9 @@ import {
 } from '@nestjs/platform-fastify';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { config as SwaggerConfig } from './bootstrap/swagger';
+import { SWAGGER_ENDPOINT, config as SwaggerConfig } from './bootstrap/swagger';
+import { ConfigService } from '@nestjs/config';
+import { Env } from './config/env';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -14,12 +16,20 @@ async function bootstrap() {
     new FastifyAdapter(),
   );
 
+  app.setGlobalPrefix('v1/api/');
+
+  const configService: ConfigService<Env> = app.get(ConfigService);
+
   const openApiDoc = SwaggerModule.createDocument(app, SwaggerConfig);
 
   const documentFactory = () =>
     SwaggerModule.createDocument(app, cleanupOpenApiDoc(openApiDoc));
-  SwaggerModule.setup('api', app, documentFactory);
+  SwaggerModule.setup(SWAGGER_ENDPOINT, app, documentFactory);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(configService.get('PORT'));
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -19,9 +19,8 @@ import {
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { validateEnv } from './config/env';
+import { HealthModule } from './health/health.module';
 
 @Catch(HttpException)
 class HttpExceptionFilter extends BaseExceptionFilter {
@@ -46,10 +45,9 @@ class HttpExceptionFilter extends BaseExceptionFilter {
       isGlobal: true,
       validate: validateEnv,
     }),
+    HealthModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_PIPE,
       useClass: ZodValidationPipe,
