@@ -9,7 +9,7 @@ export class HealthController {
 
   @ApiOkResponse({ type: HealthResDto })
   @Get('/')
-  health(): HealthResDto {
+  health(): Promise<HealthResDto> {
     return this.healthService.health();
   }
 }

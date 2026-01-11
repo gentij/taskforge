@@ -36,7 +36,7 @@ const envSchema = z.object({
     .string()
     .min(32, 'TASKFORGE_ADMIN_TOKEN must be at least 32 characters'),
 
-  VERSION: z.string(),
+  VERSION: z.string().default('0.1.0'),
 });
 
 export function validateEnv(env: NodeJS.ProcessEnv) {

@@ -23,6 +23,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { validateEnv } from './config/env';
 import { HealthModule } from './health/health.module';
 import { CoreModule } from './core/core.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Catch(HttpException)
 class HttpExceptionFilter extends BaseExceptionFilter {
@@ -49,6 +50,7 @@ class HttpExceptionFilter extends BaseExceptionFilter {
     }),
     LoggerModule.forRoot(),
     CoreModule,
+    PrismaModule,
     HealthModule,
   ],
   providers: [

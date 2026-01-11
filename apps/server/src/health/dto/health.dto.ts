@@ -1,15 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { DbHealthDto } from 'src/prisma/dto/prisma.dto';
 
 export class HealthResDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'ok', enum: ['ok', 'degraded'] })
   status: 'ok' | 'degraded';
 
-  @ApiProperty()
+  @ApiProperty({ example: '0.1.0' })
   version: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 123.45 })
   uptime: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2026-01-11T23:25:00.000Z' })
   timestamp: string;
+
+  @ApiProperty({ type: DbHealthDto })
+  db: DbHealthDto;
 }
