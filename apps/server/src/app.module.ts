@@ -1,9 +1,4 @@
 import {
-  ZodValidationPipe,
-  ZodSerializerInterceptor,
-  ZodSerializationException,
-} from 'nestjs-zod';
-import {
   APP_PIPE,
   APP_INTERCEPTOR,
   APP_FILTER,
@@ -18,9 +13,16 @@ import {
   Catch,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import {
+  ZodValidationPipe,
+  ZodSerializerInterceptor,
+  ZodSerializationException,
+} from 'nestjs-zod';
+import { LoggerModule } from 'nestjs-pino';
 
 import { validateEnv } from './config/env';
 import { HealthModule } from './health/health.module';
+import { CoreModule } from './core/core.module';
 
 @Catch(HttpException)
 class HttpExceptionFilter extends BaseExceptionFilter {
@@ -45,6 +47,8 @@ class HttpExceptionFilter extends BaseExceptionFilter {
       isGlobal: true,
       validate: validateEnv,
     }),
+    LoggerModule.forRoot(),
+    CoreModule,
     HealthModule,
   ],
   providers: [

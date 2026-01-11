@@ -6,6 +6,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { SwaggerModule } from '@nestjs/swagger';
 import helmet from '@fastify/helmet';
+import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
 import { SWAGGER_ENDPOINT, config as SwaggerConfig } from './bootstrap/swagger';
@@ -18,15 +19,18 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
-    { cors: { methods } },
+    { cors: { methods }, bufferLogs: true },
   );
-
-  app.setGlobalPrefix('v1/api/');
-  await app.register(helmet);
-
   const configService: ConfigService<Env> = app.get(ConfigService);
 
-  SwaggerConfig.info.version = configService.get('VERSION')!;
+  const version: string = configService.get('VERSION')!;
+
+  app.setGlobalPrefix(`v${version}/api`);
+  await app.register(helmet);
+  app.useLogger(app.get(Logger));
+  app.enableShutdownHooks();
+
+  SwaggerConfig.info.version = version;
 
   const openApiDoc = SwaggerModule.createDocument(app, SwaggerConfig);
 
