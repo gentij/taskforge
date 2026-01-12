@@ -12,8 +12,8 @@ import { AppModule } from './app.module';
 import { SWAGGER_ENDPOINT, config as SwaggerConfig } from './bootstrap/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Env } from './config/env';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { AllExceptionsFilter } from './common/interceptors/all-exceptions.filter';
+import { ResponseInterceptor } from './common/interceptors/response/response.interceptor';
+import { AllExceptionsFilter } from './common/interceptors/all-exceptions/all-exceptions.filter';
 
 const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 

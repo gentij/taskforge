@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { HealthResDto } from './dto/health.dto';
-import { ApiEnvelope } from 'src/common/swagger/api-envelope.decorator';
+import { ApiEnvelope } from 'src/common/swagger/envelope/api-envelope.decorator';
 
 @Controller('health')
 export class HealthController {

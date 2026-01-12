@@ -1,7 +1,7 @@
 import { applyDecorators, Type } from '@nestjs/common';
 import { ApiExtraModels, ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
-import { ApiResponseDto } from '../dto/api-response.dto';
-import { ApiErrorResponseDto } from '../dto/api-error.dto';
+import { ApiResponseDto } from '../../dto/api-response.dto';
+import { ApiErrorResponseDto } from '../../dto/api-error.dto';
 import {
   EnvelopeError,
   errorDecorators,
