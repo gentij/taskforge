@@ -1,13 +1,13 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { HealthResDto } from './dto/health.dto';
-import { ApiOkResponse } from '@nestjs/swagger';
+import { ApiEnvelope } from 'src/common/swagger/api-envelope.decorator';
 
 @Controller('health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
-  @ApiOkResponse({ type: HealthResDto })
+  @ApiEnvelope(HealthResDto, { description: 'Service Health' })
   @Get('/')
   health(): Promise<HealthResDto> {
     return this.healthService.health();

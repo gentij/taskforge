@@ -15,7 +15,6 @@ export class HealthService {
 
     return {
       status: 'ok',
-      timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: this.configService.get('VERSION', '0.1.0'),
       db: dbOk,

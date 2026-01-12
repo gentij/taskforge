@@ -11,9 +11,6 @@ export class HealthResDto {
   @ApiProperty({ example: 123.45 })
   uptime: number;
 
-  @ApiProperty({ example: '2026-01-11T23:25:00.000Z' })
-  timestamp: string;
-
   @ApiProperty({ type: DbHealthDto })
   db: DbHealthDto;
 }

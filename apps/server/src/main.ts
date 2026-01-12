@@ -12,6 +12,8 @@ import { AppModule } from './app.module';
 import { SWAGGER_ENDPOINT, config as SwaggerConfig } from './bootstrap/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Env } from './config/env';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { AllExceptionsFilter } from './common/interceptors/all-exceptions.filter';
 
 const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -29,6 +31,8 @@ async function bootstrap() {
   await app.register(helmet);
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   SwaggerConfig.info.version = version;
 

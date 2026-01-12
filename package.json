@@ -1,9 +1,8 @@
 {
-	
-  "scripts": {
-    "prepare": "husky"
-  },
-
+	"scripts": {
+		"prepare": "husky",
+		"start:dev": "cd ./apps/server && pnpm run start:dev"
+	},
 	"devDependencies": {
 		"husky": "^9.1.7",
 		"lint-staged": "^16.2.7"
