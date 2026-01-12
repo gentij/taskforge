@@ -7,6 +7,8 @@ import {
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { DbHealthDto } from './dto/prisma.dto';
+import { ConfigService } from '@nestjs/config';
+import { Env } from 'src/config/env';
 
 @Injectable()
 export class PrismaService
@@ -15,7 +17,7 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     const adapter = new PrismaPg({
       connectionString: process.env.DATABASE_URL!,
     });
@@ -38,9 +40,21 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    await this.$connect();
+    const db = await this.healthInfo();
 
-    this.logger.log('Connected to PostgreSQL via Prisma');
+    if (db.ok) {
+      this.logger.log(`Connected to PostgreSQL (latency ${db.latencyMs}ms)`);
+      return;
+    }
+
+    this.logger.error(
+      `PostgreSQL NOT reachable: ${db.error ?? 'unknown error'}`,
+    );
+
+    const failFast = this.configService.get<Env['NODE_ENV']>('NODE_ENV');
+    if (failFast === 'production') {
+      throw new Error(`Database unavailable: ${db.error ?? 'unknown error'}`);
+    }
   }
 
   async onModuleDestroy() {

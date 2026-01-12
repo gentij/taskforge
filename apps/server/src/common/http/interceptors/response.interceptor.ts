@@ -32,7 +32,6 @@ export class ResponseInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       map((data: unknown) => {
-        // Don’t double wrap
         if (isEnvelope(data) && ('data' in data || 'error' in data)) {
           return data;
         }
