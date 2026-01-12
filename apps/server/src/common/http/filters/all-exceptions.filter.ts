@@ -7,10 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { ErrorDetail } from './all-exceptions.types';
+import { ZodValidationException } from 'nestjs-zod';
+import { ZodError } from 'zod';
+import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import {
   isHttpExceptionResponseObject,
-  isObjectRecord,
   isStringArray,
   toStringSafe,
 } from 'src/lib/utils/util';
@@ -25,49 +26,48 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = ctx.getResponse<FastifyReply>();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let code = 'INTERNAL_ERROR';
-    let message = 'Something went wrong';
-    let details: ErrorDetail[] | undefined;
+    let code: string = ErrorDefinitions.COMMON.INTERNAL_ERROR.code;
+    let message: string = ErrorDefinitions.COMMON.INTERNAL_ERROR.message;
+    let details: unknown;
+
+    if (exception instanceof ZodValidationException) {
+      const zodError = exception.getZodError();
+      if (zodError instanceof ZodError) {
+        this.logger.warn(`Zod validation failed: ${zodError.message}`);
+        details = zodError.issues.map((i) => ({
+          field: i.path.join('.'),
+          message: i.message,
+        }));
+        code = ErrorDefinitions.COMMON.VALIDATION_ERROR.code;
+        message = ErrorDefinitions.COMMON.VALIDATION_ERROR.message;
+        statusCode = exception.getStatus?.() ?? HttpStatus.BAD_REQUEST;
+      }
+    }
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
+      const response = exception.getResponse();
 
-      const response = exception.getResponse(); // unknown-ish
       if (isHttpExceptionResponseObject(response)) {
-        // ValidationPipe: { message: string[], error: 'Bad Request', statusCode: 400 }
         if (isStringArray(response.message)) {
-          code = 'VALIDATION_ERROR';
-          message = 'Request validation failed';
+          code = ErrorDefinitions.COMMON.VALIDATION_ERROR.code;
+          message = ErrorDefinitions.COMMON.VALIDATION_ERROR.message;
           details = response.message.map((m) => ({ message: m }));
         } else {
           if (typeof response.code === 'string') code = response.code;
           if (typeof response.message === 'string') message = response.message;
-          if (Array.isArray(response.details)) {
-            // best-effort normalize details
-            details = response.details
-              .map((d): ErrorDetail | null => {
-                if (!isObjectRecord(d)) return null;
-                const msg =
-                  typeof d.message === 'string' ? d.message : undefined;
-                if (!msg) return null;
-                const field = typeof d.field === 'string' ? d.field : undefined;
-                return { field, message: msg };
-              })
-              .filter((x): x is ErrorDetail => x !== null);
-          }
+          if (typeof response.details !== 'undefined')
+            details = response.details;
         }
       } else if (typeof response === 'string') {
-        // Sometimes getResponse() is a string
-        code = 'HTTP_ERROR';
+        code = ErrorDefinitions.COMMON.BAD_REQUEST.code;
         message = response;
       } else {
-        code = 'HTTP_ERROR';
+        code = ErrorDefinitions.COMMON.BAD_REQUEST.code;
         message = exception.message;
       }
     } else if (exception instanceof Error) {
-      // Don’t leak internals to client, but do log them.
       this.logger.error(exception.message, exception.stack);
-      // keep generic message/code for client
     } else {
       this.logger.error(`Non-Error thrown: ${toStringSafe(exception)}`);
     }
@@ -80,7 +80,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error: {
         code,
         message,
-        ...(details ? { details } : {}),
+        ...(typeof details !== 'undefined' ? { details } : {}),
       },
       meta: { requestId: req.id },
     });

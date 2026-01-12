@@ -1,4 +1,4 @@
-import { HttpExceptionResponseObject } from 'src/common/interceptors/all-exceptions/all-exceptions.types';
+import { HttpExceptionResponseObject } from 'src/common/http/filters/all-exceptions.types';
 
 export function isObjectRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;

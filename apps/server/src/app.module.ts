@@ -1,4 +1,4 @@
-import { APP_PIPE, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
+import { APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ZodValidationPipe, ZodSerializerInterceptor } from 'nestjs-zod';
@@ -8,7 +8,6 @@ import { validateEnv } from './config/env';
 import { HealthModule } from './health/health.module';
 import { CoreModule } from './core/core.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { HttpExceptionFilter } from './common/interceptors/http/http-exception.interceptor';
 
 @Module({
   imports: [
@@ -29,10 +28,6 @@ import { HttpExceptionFilter } from './common/interceptors/http/http-exception.i
     {
       provide: APP_INTERCEPTOR,
       useClass: ZodSerializerInterceptor,
-    },
-    {
-      provide: APP_FILTER,
-      useClass: HttpExceptionFilter,
     },
   ],
 })

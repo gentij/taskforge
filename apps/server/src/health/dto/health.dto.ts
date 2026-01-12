@@ -14,3 +14,18 @@ export class HealthResDto {
   @ApiProperty({ type: DbHealthDto })
   db: DbHealthDto;
 }
+
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
+
+export const HealthReqSchema = z.object({
+  status: z.enum(['ok', 'degraded']),
+  version: z.string(),
+  uptime: z.number(),
+  timestamp: z.string(),
+  db: z.object({
+    ok: z.boolean(),
+  }),
+});
+
+export class HealthReqDto extends createZodDto(HealthReqSchema) {}
