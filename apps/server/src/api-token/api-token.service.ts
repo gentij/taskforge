@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ApiTokenRepository } from './api-token.repository';
 import { ApiToken } from '@prisma/client';
+import { AppError } from 'src/common/http/errors/ app-error';
+import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 
 @Injectable()
 export class ApiTokenService {
@@ -26,7 +28,9 @@ export class ApiTokenService {
     const token = await this.repo.findByHash(tokenHash);
 
     if (!token) return null;
-    if (token.revokedAt) return null;
+
+    if (token.revokedAt)
+      throw AppError.unauthorized(ErrorDefinitions.AUTH.REVOKED_TOKEN);
 
     void this.repo.updateLastUsed(token.id).catch(() => undefined);
 

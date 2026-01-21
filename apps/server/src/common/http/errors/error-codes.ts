@@ -31,6 +31,21 @@ export const ErrorDefinitions = {
     CONFLICT: { code: 'CONFLICT', message: 'Conflict' },
   },
 
+  AUTH: {
+    MISSING_BEARER_TOKEN: {
+      code: 'AUTH_MISSING_BEARER_TOKEN',
+      message: 'Missing Authorization bearer token',
+    },
+    INVALID_TOKEN: {
+      code: 'AUTH_INVALID_TOKEN',
+      message: 'Invalid API token',
+    },
+    REVOKED_TOKEN: {
+      code: 'AUTH_REVOKED_TOKEN',
+      message: 'API token has been revoked',
+    },
+  },
+
   WORKFLOW: {
     NOT_FOUND: {
       code: 'WORKFLOW_NOT_FOUND',
