@@ -28,6 +28,7 @@ export const ErrorDefinitions = {
       code: 'BAD_REQUEST',
       message: 'Bad request.',
     },
+    CONFLICT: { code: 'CONFLICT', message: 'Conflict' },
   },
 
   WORKFLOW: {

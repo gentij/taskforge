@@ -15,6 +15,7 @@ import {
   isStringArray,
   toStringSafe,
 } from 'src/lib/utils/util';
+import { mapPrismaError } from '../errors/prisma-errors.lib';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -70,6 +71,29 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error(exception.message, exception.stack);
     } else {
       this.logger.error(`Non-Error thrown: ${toStringSafe(exception)}`);
+    }
+
+    const prismaMapped = mapPrismaError(exception);
+
+    if (prismaMapped) {
+      statusCode = prismaMapped.statusCode;
+      code = prismaMapped.code;
+      message = prismaMapped.message;
+      details = prismaMapped.details;
+
+      res.status(statusCode).send({
+        ok: false as const,
+        statusCode,
+        path: req.url,
+        timestamp: new Date().toISOString(),
+        error: {
+          code,
+          message,
+          ...(typeof details !== 'undefined' ? { details } : {}),
+        },
+        meta: { requestId: req.id },
+      });
+      return;
     }
 
     res.status(statusCode).send({
