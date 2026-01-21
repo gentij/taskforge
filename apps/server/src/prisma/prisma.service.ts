@@ -8,7 +8,6 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { DbHealthDto } from './dto/prisma.dto';
 import { ConfigService } from '@nestjs/config';
-import { Env } from 'src/config/env';
 
 @Injectable()
 export class PrismaService
@@ -27,9 +26,16 @@ export class PrismaService
 
   async healthInfo(): Promise<DbHealthDto> {
     const start = Date.now();
-
-    await this.$queryRaw`SELECT 1`;
-    return { ok: true, latencyMs: Date.now() - start };
+    try {
+      await this.$queryRaw`SELECT 1`;
+      return { ok: true, latencyMs: Date.now() - start };
+    } catch (e) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - start,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
   }
 
   async onModuleInit() {
@@ -43,11 +49,6 @@ export class PrismaService
     this.logger.error(
       `PostgreSQL NOT reachable: ${db.error ?? 'unknown error'}`,
     );
-
-    const failFast = this.configService.get<Env['NODE_ENV']>('NODE_ENV');
-    if (failFast === 'production') {
-      throw new Error(`Database unavailable: ${db.error ?? 'unknown error'}`);
-    }
   }
 
   async onModuleDestroy() {

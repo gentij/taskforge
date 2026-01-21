@@ -1,19 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
-import { HealthResDto } from './dto/health.dto';
 import { ConfigService } from '@nestjs/config';
+import { mockHealthResponse } from 'test/health/health.mocks';
 
 describe('HealthController', () => {
   let controller: HealthController;
   let service: HealthService;
-
-  const mockHealthResponse: HealthResDto = {
-    status: 'ok',
-    version: 'test',
-    uptime: 1,
-    timestamp: new Date().toISOString(),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -37,10 +30,10 @@ describe('HealthController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('should call HealthService.health()', () => {
+  it('should call HealthService.health()', async () => {
     const healthSpy = jest.spyOn(service, 'health');
 
-    controller.health();
+    await controller.health();
 
     expect(healthSpy).toHaveBeenCalledTimes(1);
   });

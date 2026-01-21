@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../../src/app.module';
 
 import {
   FastifyAdapter,
@@ -36,7 +36,10 @@ describe('Health (e2e)', () => {
         status: 'ok',
         version: expect.any(String) as string,
         uptime: expect.any(Number) as number,
-        timestamp: expect.any(String) as string,
+        db: {
+          latencyMs: expect.any(Number) as number,
+          ok: true,
+        },
       }),
     );
   });
