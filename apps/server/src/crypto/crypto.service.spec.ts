@@ -1,0 +1,33 @@
+import { CryptoService } from './crypto.service';
+
+describe('CryptoService', () => {
+  let service: CryptoService;
+
+  beforeEach(() => {
+    service = new CryptoService();
+  });
+
+  it('generateApiToken() returns token with tf_ prefix and hex payload', () => {
+    const token = service.generateApiToken();
+
+    expect(token.startsWith('tf_')).toBe(true);
+
+    const payload = token.slice(3);
+    expect(payload).toMatch(/^[0-9a-f]+$/);
+    expect(payload.length).toBe(64);
+  });
+
+  it('generateApiToken() produces different values', () => {
+    const a = service.generateApiToken();
+    const b = service.generateApiToken();
+    expect(a).not.toBe(b);
+  });
+
+  it('hashApiToken() returns stable sha256 hex digest', () => {
+    const hash = service.hashApiToken('tf_test_token');
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+
+    const hash2 = service.hashApiToken('tf_test_token');
+    expect(hash).toBe(hash2);
+  });
+});

@@ -26,6 +26,7 @@ export class PrismaService
 
   async healthInfo(): Promise<DbHealthDto> {
     const start = Date.now();
+
     try {
       await this.$queryRaw`SELECT 1`;
       return { ok: true, latencyMs: Date.now() - start };

@@ -6,76 +6,12 @@ datasource db {
   provider = "postgresql"
 }
 
-enum WorkflowRunStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
-}
-
-enum StepRunStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
-}
-
-model Workflow {
-  id        String   @id @default(cuid())
-  name      String
-  isActive  Boolean  @default(true)
-  // Store workflow definition as JSON (triggers + steps)
-  definition Json
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  runs WorkflowRun[]
-}
-
-model WorkflowRun {
-  id         String            @id @default(cuid())
-  workflowId String
-  workflow   Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-
-  status     WorkflowRunStatus @default(QUEUED)
-
-  // Optional metadata: who triggered it, payload, etc.
-  input      Json?
-  output     Json?
-  error      String?
-
-  createdAt  DateTime          @default(now())
-  startedAt  DateTime?
-  finishedAt DateTime?
-
-  steps      StepRun[]
-
-  @@index([workflowId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model StepRun {
-  id           String        @id @default(cuid())
-  workflowRunId String
-  workflowRun  WorkflowRun   @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
-
-  // Which step inside the workflow definition this corresponds to
-  stepKey      String
-  status       StepRunStatus @default(QUEUED)
-
-  input        Json?
-  output       Json?
-  error        String?
-
-  attempts     Int           @default(0)
-
-  createdAt    DateTime      @default(now())
-  startedAt    DateTime?
-  finishedAt   DateTime?
-
-  @@index([workflowRunId])
-  @@index([status])
-  @@unique([workflowRunId, stepKey])
+model ApiToken {
+  id         String   @id @default(cuid())
+  name       String
+  tokenHash  String   @unique
+  scopes     String[]
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
 }
