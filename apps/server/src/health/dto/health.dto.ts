@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 import { ApiProperty } from '@nestjs/swagger';
 import { DbHealthDto } from 'src/prisma/dto/prisma.dto';
 
@@ -14,9 +16,6 @@ export class HealthResDto {
   @ApiProperty({ type: DbHealthDto })
   db: DbHealthDto;
 }
-
-import { z } from 'zod';
-import { createZodDto } from 'nestjs-zod';
 
 export const HealthReqSchema = z.object({
   status: z.enum(['ok', 'degraded']),
