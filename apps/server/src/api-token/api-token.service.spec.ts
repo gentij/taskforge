@@ -11,6 +11,7 @@ import {
   createRevokedApiTokenFixture,
   createApiTokenListFixture,
 } from 'test/api-token/api-token.service.mock';
+import { AppError } from 'src/common/http/errors/ app-error';
 
 describe('ApiTokenService', () => {
   let service: ApiTokenService;
@@ -79,7 +80,7 @@ describe('ApiTokenService', () => {
       expect(repo.updateLastUsed).not.toHaveBeenCalled();
     });
 
-    it('returns null if token is revoked', async () => {
+    it('throws unauthorized if token is revoked', async () => {
       repo.findByHash.mockResolvedValue(
         createRevokedApiTokenFixture({
           id: 't1',
@@ -87,8 +88,9 @@ describe('ApiTokenService', () => {
         }),
       );
 
-      const result = await service.validateTokenHash('hash');
-      expect(result).toBeNull();
+      await expect(service.validateTokenHash('hash')).rejects.toBeInstanceOf(
+        AppError,
+      );
       expect(repo.updateLastUsed).not.toHaveBeenCalled();
     });
 

@@ -10,9 +10,10 @@ import {
 
 export const ApiEnvelope = <TModel extends Type<unknown>>(
   model: TModel,
-  opts?: { description?: string; errors?: EnvelopeError[] },
+  opts?: { description?: string; errors?: EnvelopeError[]; isArray?: boolean },
 ): MethodDecorator & ClassDecorator => {
   const errors = opts?.errors ?? [400, 500];
+  const isArray = opts?.isArray ?? false;
 
   const errorDecs: Array<MethodDecorator> = errors.map((code) =>
     errorDecorators[code]({
@@ -30,6 +31,10 @@ export const ApiEnvelope = <TModel extends Type<unknown>>(
     }),
   );
 
+  const dataSchema = isArray
+    ? { type: 'array', items: { $ref: getSchemaPath(model) } }
+    : { $ref: getSchemaPath(model) };
+
   return applyDecorators(
     ApiExtraModels(ApiResponseDto, ApiErrorResponseDto, model),
 
@@ -38,7 +43,7 @@ export const ApiEnvelope = <TModel extends Type<unknown>>(
       schema: {
         allOf: [
           { $ref: getSchemaPath(ApiResponseDto) },
-          { properties: { data: { $ref: getSchemaPath(model) } } },
+          { properties: { data: dataSchema } },
         ],
       },
     }),

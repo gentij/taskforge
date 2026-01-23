@@ -15,3 +15,15 @@ model ApiToken {
   lastUsedAt DateTime?
   revokedAt  DateTime?
 }
+
+model Workflow {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([createdAt])
+}

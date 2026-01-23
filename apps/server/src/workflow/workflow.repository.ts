@@ -1,0 +1,24 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import type { Prisma, Workflow } from '@prisma/client';
+
+@Injectable()
+export class WorkflowRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  create(data: Prisma.WorkflowCreateInput): Promise<Workflow> {
+    return this.prisma.workflow.create({ data });
+  }
+
+  findMany(): Promise<Workflow[]> {
+    return this.prisma.workflow.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  findById(id: string): Promise<Workflow | null> {
+    return this.prisma.workflow.findUnique({ where: { id } });
+  }
+
+  update(id: string, data: Prisma.WorkflowUpdateInput): Promise<Workflow> {
+    return this.prisma.workflow.update({ where: { id }, data });
+  }
+}

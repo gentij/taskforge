@@ -1,0 +1,26 @@
+import type { Workflow } from '@prisma/client';
+
+type WorkflowOverrides = Partial<Workflow>;
+
+export const createWorkflowFixture = (
+  overrides: WorkflowOverrides = {},
+): Workflow => {
+  const now = new Date('2026-01-23T10:00:00.000Z');
+
+  return {
+    id: 'wf_1',
+    name: 'Deploy on Release',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+};
+
+export const createWorkflowListFixture = (count = 3): Workflow[] =>
+  Array.from({ length: count }, (_, i) =>
+    createWorkflowFixture({
+      id: `wf_${i + 1}`,
+      name: `Workflow ${i + 1}`,
+    }),
+  );

@@ -1,0 +1,27 @@
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+export const WorkflowResSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isActive: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export class WorkflowResDto extends createZodDto(WorkflowResSchema) {}
+
+export const CreateWorkflowReqSchema = z.object({
+  name: z.string().min(1).max(120),
+});
+export class CreateWorkflowReqDto extends createZodDto(
+  CreateWorkflowReqSchema,
+) {}
+
+export const UpdateWorkflowReqSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  isActive: z.boolean().optional(),
+});
+export class UpdateWorkflowReqDto extends createZodDto(
+  UpdateWorkflowReqSchema,
+) {}

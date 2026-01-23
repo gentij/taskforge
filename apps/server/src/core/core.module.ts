@@ -4,9 +4,10 @@ import { ApiTokenModule } from 'src/api-token/api-token.module';
 import { AuthBootstrapService } from './auth-bootstrap.service';
 import { CryptoModule } from 'src/crypto/crypto.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { WorkflowModule } from 'src/workflow/workflow.module';
 
 @Module({
-  imports: [ApiTokenModule, CryptoModule, AuthModule],
+  imports: [ApiTokenModule, CryptoModule, AuthModule, WorkflowModule],
   providers: [AppLifecycleService, AuthBootstrapService],
   exports: [ApiTokenModule],
 })
