@@ -22,6 +22,7 @@ model Workflow {
   isActive  Boolean  @default(true)
 
   versions  WorkflowVersion[] @relation("WorkflowVersions")
+  triggers  Trigger[]
 
   latestVersionId String? @unique
   latestVersion   WorkflowVersion? @relation("WorkflowLatestVersion", fields: [latestVersionId], references: [id])
@@ -31,6 +32,31 @@ model Workflow {
 
   @@index([isActive])
   @@index([createdAt])
+}
+
+enum TriggerType {
+  MANUAL
+  WEBHOOK
+  CRON
+}
+
+model Trigger {
+  id         String      @id @default(cuid())
+  workflowId String
+  type       TriggerType
+  name       String?
+  isActive   Boolean     @default(true)
+
+  config     Json        @default("{}")
+
+  workflow   Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([workflowId])
+  @@index([type])
+  @@index([isActive])
 }
 
 model WorkflowVersion {
