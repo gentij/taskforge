@@ -1,0 +1,147 @@
+/* eslint-disable
+  @typescript-eslint/no-unsafe-assignment,
+  @typescript-eslint/no-unsafe-member-access
+*/
+
+import { Test } from '@nestjs/testing';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import {
+  FastifyAdapter,
+  type NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+
+import { WorkflowVersionController } from 'src/workflow-version/workflow-version.controller';
+import { WorkflowVersionService } from 'src/workflow-version/workflow-version.service';
+import { WorkflowVersionRepository } from 'src/workflow-version/workflow-version.repository';
+import { WorkflowRepository } from 'src/workflow/workflow.repository';
+
+import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
+import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
+import { AllowAuthGuard } from 'test/utils/allow-auth.guard';
+
+import {
+  createWorkflowVersionRepositoryMock,
+  type WorkflowVersionRepositoryMock,
+} from 'test/workflow-version/workflow-version.repository.mock';
+import {
+  createWorkflowVersionFixture,
+  createWorkflowVersionListFixture,
+} from 'test/workflow-version/workflow-version.fixtures';
+import {
+  createWorkflowRepositoryMock,
+  type WorkflowRepositoryMock,
+} from 'test/workflow/workflow.repository.mock';
+import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
+
+describe('WorkflowVersion (e2e)', () => {
+  let app: NestFastifyApplication;
+  let repo: WorkflowVersionRepositoryMock;
+  let workflowRepo: WorkflowRepositoryMock;
+
+  beforeEach(async () => {
+    repo = createWorkflowVersionRepositoryMock();
+    workflowRepo = createWorkflowRepositoryMock();
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [WorkflowVersionController],
+      providers: [
+        WorkflowVersionService,
+        { provide: WorkflowVersionRepository, useValue: repo },
+        { provide: WorkflowRepository, useValue: workflowRepo },
+
+        { provide: APP_PIPE, useClass: ZodValidationPipe },
+        { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+        { provide: APP_FILTER, useClass: AllExceptionsFilter },
+
+        { provide: APP_GUARD, useClass: AllowAuthGuard },
+        { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
+
+    await app.init();
+    await app.getHttpAdapter().getInstance().ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('GET /workflows/:workflowId/versions -> 200 + data array', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    const list = createWorkflowVersionListFixture(2);
+
+    workflowRepo.findById.mockResolvedValue(wf);
+    repo.findManyByWorkflow.mockResolvedValue(list);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/workflows/wf_1/versions',
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data).toHaveLength(2);
+  });
+
+  it('GET /workflows/:workflowId/versions/:version -> 200 when found', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    const version = createWorkflowVersionFixture({
+      workflowId: 'wf_1',
+      version: 1,
+    });
+
+    workflowRepo.findById.mockResolvedValue(wf);
+    repo.findByWorkflowAndVersion.mockResolvedValue(version);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/workflows/wf_1/versions/1',
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.version).toBe(1);
+  });
+
+  it('GET /workflows/:workflowId/versions -> 404 when workflow missing', async () => {
+    workflowRepo.findById.mockResolvedValue(null);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/workflows/missing/versions',
+    });
+
+    expect(res.statusCode).toBe(404);
+
+    const body = res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error).toBeDefined();
+  });
+
+  it('GET /workflows/:workflowId/versions/:version -> 404 when version missing', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    workflowRepo.findById.mockResolvedValue(wf);
+    repo.findByWorkflowAndVersion.mockResolvedValue(null);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/workflows/wf_1/versions/9',
+    });
+
+    expect(res.statusCode).toBe(404);
+
+    const body = res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error).toBeDefined();
+  });
+});

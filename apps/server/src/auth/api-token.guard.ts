@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 
 import { ApiTokenService } from 'src/api-token/api-token.service';
-import { AppError } from 'src/common/http/errors/ app-error';
+import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { CryptoService } from 'src/crypto/crypto.service';
 

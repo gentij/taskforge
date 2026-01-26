@@ -11,6 +11,7 @@ export const createWorkflowFixture = (
     id: 'wf_1',
     name: 'Deploy on Release',
     isActive: true,
+    latestVersionId: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

@@ -8,6 +8,6 @@ import { WorkflowService } from './workflow.service';
   imports: [PrismaModule],
   controllers: [WorkflowController],
   providers: [WorkflowService, WorkflowRepository],
-  exports: [WorkflowService],
+  exports: [WorkflowService, WorkflowRepository],
 })
 export class WorkflowModule {}

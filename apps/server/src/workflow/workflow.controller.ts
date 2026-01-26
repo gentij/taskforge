@@ -7,6 +7,10 @@ import {
   UpdateWorkflowReqDto,
   WorkflowResDto,
 } from './dto/workflow.dto';
+import {
+  CreateWorkflowVersionReqDto,
+  WorkflowVersionResDto,
+} from 'src/workflow-version/dto/workflow-version.dto';
 
 @ApiTags('Workflows')
 @ApiBearerAuth('bearer')
@@ -49,5 +53,17 @@ export class WorkflowController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: UpdateWorkflowReqDto) {
     return this.service.update(id, body);
+  }
+
+  @ApiEnvelope(WorkflowVersionResDto, {
+    description: 'Create workflow version',
+    errors: [401, 404, 500],
+  })
+  @Post(':id/versions')
+  createVersion(
+    @Param('id') id: string,
+    @Body() body: CreateWorkflowVersionReqDto,
+  ) {
+    return this.service.createVersion(id, body.definition);
   }
 }

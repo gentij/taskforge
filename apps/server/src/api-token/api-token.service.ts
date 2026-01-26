@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ApiTokenRepository } from './api-token.repository';
 import { ApiToken } from '@prisma/client';
-import { AppError } from 'src/common/http/errors/ app-error';
+import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 
 @Injectable()

@@ -55,6 +55,10 @@ export const ErrorDefinitions = {
       code: 'WORKFLOW_INVALID_STATE',
       message: 'Invalid workflow state',
     },
+    VERSION_NOT_FOUND: {
+      code: 'WORKFLOW_VERSION_NOT_FOUND',
+      message: 'Workflow version not found',
+    },
   },
 
   STEP: {

@@ -21,9 +21,32 @@ model Workflow {
   name      String
   isActive  Boolean  @default(true)
 
+  versions  WorkflowVersion[] @relation("WorkflowVersions")
+
+  latestVersionId String? @unique
+  latestVersion   WorkflowVersion? @relation("WorkflowLatestVersion", fields: [latestVersionId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([isActive])
+  @@index([createdAt])
+}
+
+model WorkflowVersion {
+  id         String   @id @default(cuid())
+
+  workflowId String
+  workflow   Workflow @relation("WorkflowVersions", fields: [workflowId], references: [id], onDelete: Cascade)
+
+  version    Int
+  definition Json
+
+  createdAt  DateTime @default(now())
+
+  latestFor  Workflow? @relation("WorkflowLatestVersion")
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
   @@index([createdAt])
 }

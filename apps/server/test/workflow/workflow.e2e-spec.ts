@@ -14,6 +14,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { WorkflowController } from 'src/workflow/workflow.controller';
 import { WorkflowService } from 'src/workflow/workflow.service';
 import { WorkflowRepository } from 'src/workflow/workflow.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter'; // <-- adjust path to your file
 
@@ -25,21 +26,29 @@ import {
   createWorkflowFixture,
   createWorkflowListFixture,
 } from 'test/workflow/workflow.fixtures';
+import { createWorkflowVersionFixture } from 'test/workflow-version/workflow-version.fixtures';
 import { AllowAuthGuard } from 'test/utils/allow-auth.guard';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
 
 describe('Workflow (e2e)', () => {
   let app: NestFastifyApplication;
   let repo: WorkflowRepositoryMock;
+  let prisma: {
+    $transaction: jest.Mock<Promise<unknown>, [(tx: any) => unknown]>;
+  };
 
   beforeEach(async () => {
     repo = createWorkflowRepositoryMock();
+    prisma = {
+      $transaction: jest.fn<Promise<unknown>, [(tx: any) => unknown]>(),
+    };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [WorkflowController],
       providers: [
         WorkflowService,
         { provide: WorkflowRepository, useValue: repo },
+        { provide: PrismaService, useValue: prisma },
 
         { provide: APP_PIPE, useClass: ZodValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
@@ -64,7 +73,29 @@ describe('Workflow (e2e)', () => {
 
   it('POST /workflows -> 201 + ok:true + data', async () => {
     const created = createWorkflowFixture({ id: 'wf_new', name: 'My WF' });
-    repo.create.mockResolvedValue(created);
+    const version = createWorkflowVersionFixture({
+      workflowId: created.id,
+      version: 1,
+      definition: { steps: [] },
+    });
+    const updated = createWorkflowFixture({
+      id: created.id,
+      name: 'My WF',
+      latestVersionId: version.id,
+    });
+
+    const tx = {
+      workflow: {
+        create: jest.fn().mockResolvedValue(created),
+        update: jest.fn().mockResolvedValue(updated),
+      },
+      workflowVersion: {
+        create: jest.fn().mockResolvedValue(version),
+        findFirst: jest.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation((cb) => Promise.resolve(cb(tx)));
 
     const res = await app.inject({
       method: 'POST',
@@ -78,8 +109,9 @@ describe('Workflow (e2e)', () => {
 
     expect(body.ok).toBe(true);
     expect(body.data.name).toBe('My WF');
-
-    expect(repo.create).toHaveBeenCalledWith({ name: 'My WF' });
+    expect(tx.workflow.create).toHaveBeenCalledWith({
+      data: { name: 'My WF' },
+    });
   });
 
   it('GET /workflows -> 200 + data array', async () => {
@@ -153,6 +185,44 @@ describe('Workflow (e2e)', () => {
     expect(body.data.name).toBe('New');
 
     expect(repo.update).toHaveBeenCalledWith('wf_1', { name: 'New' });
+  });
+
+  it('POST /workflows/:id/versions -> 201 creates a new version', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    const version = createWorkflowVersionFixture({
+      id: 'wfv_2',
+      workflowId: 'wf_1',
+      version: 2,
+      definition: { steps: [{ id: 's1' }] },
+    });
+
+    repo.findById.mockResolvedValue(wf);
+
+    const tx = {
+      workflow: {
+        create: jest.fn(),
+        update: jest.fn().mockResolvedValue(wf),
+      },
+      workflowVersion: {
+        findFirst: jest.fn().mockResolvedValue({ version: 1 }),
+        create: jest.fn().mockResolvedValue(version),
+      },
+    };
+
+    prisma.$transaction.mockImplementation((cb) => Promise.resolve(cb(tx)));
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/workflows/wf_1/versions',
+      payload: { definition: version.definition },
+    });
+
+    expect(res.statusCode).toBe(201);
+
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.version).toBe(2);
+    expect(body.data.workflowId).toBe('wf_1');
   });
 
   it('POST /workflows -> 400 validation error when name missing', async () => {

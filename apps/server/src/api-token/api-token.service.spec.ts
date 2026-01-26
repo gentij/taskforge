@@ -11,7 +11,7 @@ import {
   createRevokedApiTokenFixture,
   createApiTokenListFixture,
 } from 'test/api-token/api-token.service.mock';
-import { AppError } from 'src/common/http/errors/ app-error';
+import { AppError } from 'src/common/http/errors/app-error';
 
 describe('ApiTokenService', () => {
   let service: ApiTokenService;

@@ -5,9 +5,16 @@ import { AuthBootstrapService } from './auth-bootstrap.service';
 import { CryptoModule } from 'src/crypto/crypto.module';
 import { AuthModule } from 'src/auth/auth.module';
 import { WorkflowModule } from 'src/workflow/workflow.module';
+import { WorkflowVersionModule } from 'src/workflow-version/workflow-version.module';
 
 @Module({
-  imports: [ApiTokenModule, CryptoModule, AuthModule, WorkflowModule],
+  imports: [
+    ApiTokenModule,
+    CryptoModule,
+    AuthModule,
+    WorkflowModule,
+    WorkflowVersionModule,
+  ],
   providers: [AppLifecycleService, AuthBootstrapService],
   exports: [ApiTokenModule],
 })
