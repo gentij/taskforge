@@ -6,6 +6,7 @@ import { CryptoModule } from 'src/crypto/crypto.module';
 import { AuthModule } from 'src/auth/auth.module';
 import { WorkflowModule } from 'src/workflow/workflow.module';
 import { WorkflowVersionModule } from 'src/workflow-version/workflow-version.module';
+import { TriggerModule } from 'src/trigger/trigger.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { WorkflowVersionModule } from 'src/workflow-version/workflow-version.mod
     AuthModule,
     WorkflowModule,
     WorkflowVersionModule,
+    TriggerModule,
   ],
   providers: [AppLifecycleService, AuthBootstrapService],
   exports: [ApiTokenModule],

@@ -61,6 +61,13 @@ export const ErrorDefinitions = {
     },
   },
 
+  TRIGGER: {
+    NOT_FOUND: {
+      code: 'TRIGGER_NOT_FOUND',
+      message: 'Trigger not found',
+    },
+  },
+
   STEP: {
     NOT_FOUND: {
       code: 'STEP_NOT_FOUND',
