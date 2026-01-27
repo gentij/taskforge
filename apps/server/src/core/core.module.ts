@@ -10,6 +10,7 @@ import { TriggerModule } from 'src/trigger/trigger.module';
 import { EventModule } from 'src/event/event.module';
 import { WorkflowRunModule } from 'src/workflow-run/workflow-run.module';
 import { StepRunModule } from 'src/step-run/step-run.module';
+import { SecretModule } from 'src/secret/secret.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { StepRunModule } from 'src/step-run/step-run.module';
     EventModule,
     WorkflowRunModule,
     StepRunModule,
+    SecretModule,
   ],
   providers: [AppLifecycleService, AuthBootstrapService],
   exports: [ApiTokenModule],

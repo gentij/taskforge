@@ -89,6 +89,13 @@ export const ErrorDefinitions = {
     },
   },
 
+  SECRET: {
+    NOT_FOUND: {
+      code: 'SECRET_NOT_FOUND',
+      message: 'Secret not found',
+    },
+  },
+
   STEP: {
     NOT_FOUND: {
       code: 'STEP_NOT_FOUND',
