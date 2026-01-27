@@ -51,12 +51,30 @@ model Trigger {
 
   workflow   Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
+  events     Event[]
+
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   @@index([workflowId])
   @@index([type])
   @@index([isActive])
+}
+
+model Event {
+  id         String   @id @default(cuid())
+  triggerId  String
+  type       String?
+  externalId String?
+  payload    Json     @default("{}")
+  receivedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  trigger    Trigger  @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+
+  @@index([triggerId])
+  @@index([receivedAt])
+  @@unique([triggerId, externalId])
 }
 
 model WorkflowVersion {

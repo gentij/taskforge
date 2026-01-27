@@ -68,6 +68,13 @@ export const ErrorDefinitions = {
     },
   },
 
+  EVENT: {
+    NOT_FOUND: {
+      code: 'EVENT_NOT_FOUND',
+      message: 'Event not found',
+    },
+  },
+
   STEP: {
     NOT_FOUND: {
       code: 'STEP_NOT_FOUND',

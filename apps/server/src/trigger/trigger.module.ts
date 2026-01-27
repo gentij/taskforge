@@ -9,6 +9,6 @@ import { TriggerService } from './trigger.service';
   imports: [PrismaModule, WorkflowModule],
   controllers: [TriggerController],
   providers: [TriggerService, TriggerRepository],
-  exports: [TriggerService],
+  exports: [TriggerService, TriggerRepository],
 })
 export class TriggerModule {}
