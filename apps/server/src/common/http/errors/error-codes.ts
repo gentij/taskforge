@@ -75,6 +75,13 @@ export const ErrorDefinitions = {
     },
   },
 
+  WORKFLOW_RUN: {
+    NOT_FOUND: {
+      code: 'WORKFLOW_RUN_NOT_FOUND',
+      message: 'Workflow run not found',
+    },
+  },
+
   STEP: {
     NOT_FOUND: {
       code: 'STEP_NOT_FOUND',

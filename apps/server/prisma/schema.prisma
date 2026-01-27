@@ -23,6 +23,7 @@ model Workflow {
 
   versions  WorkflowVersion[] @relation("WorkflowVersions")
   triggers  Trigger[]
+  runs      WorkflowRun[]
 
   latestVersionId String? @unique
   latestVersion   WorkflowVersion? @relation("WorkflowLatestVersion", fields: [latestVersionId], references: [id])
@@ -52,6 +53,7 @@ model Trigger {
   workflow   Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   events     Event[]
+  runs       WorkflowRun[]
 
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -71,10 +73,45 @@ model Event {
   createdAt  DateTime @default(now())
 
   trigger    Trigger  @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  run        WorkflowRun?
 
   @@index([triggerId])
   @@index([receivedAt])
   @@unique([triggerId, externalId])
+}
+
+enum WorkflowRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model WorkflowRun {
+  id                String            @id @default(cuid())
+  workflowId        String
+  workflowVersionId String
+  triggerId         String?
+  eventId           String?           @unique
+  status            WorkflowRunStatus @default(QUEUED)
+  input             Json              @default("{}")
+  output            Json?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+
+  workflow          Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion   WorkflowVersion   @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  trigger           Trigger?          @relation(fields: [triggerId], references: [id], onDelete: SetNull)
+  event             Event?            @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([workflowId])
+  @@index([workflowVersionId])
+  @@index([triggerId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model WorkflowVersion {
@@ -82,6 +119,8 @@ model WorkflowVersion {
 
   workflowId String
   workflow   Workflow @relation("WorkflowVersions", fields: [workflowId], references: [id], onDelete: Cascade)
+
+  runs       WorkflowRun[]
 
   version    Int
   definition Json
