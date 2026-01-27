@@ -9,6 +9,7 @@ import { WorkflowVersionModule } from 'src/workflow-version/workflow-version.mod
 import { TriggerModule } from 'src/trigger/trigger.module';
 import { EventModule } from 'src/event/event.module';
 import { WorkflowRunModule } from 'src/workflow-run/workflow-run.module';
+import { StepRunModule } from 'src/step-run/step-run.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { WorkflowRunModule } from 'src/workflow-run/workflow-run.module';
     TriggerModule,
     EventModule,
     WorkflowRunModule,
+    StepRunModule,
   ],
   providers: [AppLifecycleService, AuthBootstrapService],
   exports: [ApiTokenModule],

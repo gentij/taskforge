@@ -82,6 +82,13 @@ export const ErrorDefinitions = {
     },
   },
 
+  STEP_RUN: {
+    NOT_FOUND: {
+      code: 'STEP_RUN_NOT_FOUND',
+      message: 'Step run not found',
+    },
+  },
+
   STEP: {
     NOT_FOUND: {
       code: 'STEP_NOT_FOUND',

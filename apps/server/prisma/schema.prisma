@@ -87,6 +87,13 @@ enum WorkflowRunStatus {
   FAILED
 }
 
+enum StepRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 model WorkflowRun {
   id                String            @id @default(cuid())
   workflowId        String
@@ -104,6 +111,8 @@ model WorkflowRun {
   trigger           Trigger?          @relation(fields: [triggerId], references: [id], onDelete: SetNull)
   event             Event?            @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
+  stepRuns          StepRun[]
+
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -112,6 +121,32 @@ model WorkflowRun {
   @@index([triggerId])
   @@index([status])
   @@index([createdAt])
+}
+
+model StepRun {
+  id            String        @id @default(cuid())
+  workflowRunId String
+  stepKey       String
+  status        StepRunStatus @default(QUEUED)
+  attempt       Int           @default(0)
+  input         Json          @default("{}")
+  output        Json?
+  error         Json?
+  logs          Json?
+  lastErrorAt   DateTime?
+  durationMs    Int?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  workflowRun   WorkflowRun   @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([workflowRunId])
+  @@index([status])
+  @@index([createdAt])
+  @@unique([workflowRunId, stepKey])
 }
 
 model WorkflowVersion {

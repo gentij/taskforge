@@ -9,6 +9,6 @@ import { WorkflowRunService } from './workflow-run.service';
   imports: [PrismaModule, WorkflowModule],
   controllers: [WorkflowRunController],
   providers: [WorkflowRunService, WorkflowRunRepository],
-  exports: [WorkflowRunService],
+  exports: [WorkflowRunService, WorkflowRunRepository],
 })
 export class WorkflowRunModule {}
