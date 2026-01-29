@@ -4,13 +4,13 @@ export {
   HttpStepDefinitionSchema,
   StepDefinitionSchema,
   WorkflowDefinitionSchema,
-} from './workflow-definition.js';
+} from './workflow-definition';
 export type {
   HttpMethod,
   HttpRequestSpec,
   HttpStepDefinition,
   StepDefinition,
   WorkflowDefinition,
-} from './workflow-definition.js';
-export { StepRunJobPayloadSchema } from './step-run-job.js';
-export type { StepRunJobPayload } from './step-run-job.js';
+} from './workflow-definition';
+export { StepRunJobPayloadSchema } from './step-run-job';
+export type { StepRunJobPayload } from './step-run-job';

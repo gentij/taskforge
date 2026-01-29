@@ -193,7 +193,15 @@ describe('Workflow (e2e)', () => {
       id: 'wfv_2',
       workflowId: 'wf_1',
       version: 2,
-      definition: { steps: [{ id: 's1' }] },
+      definition: {
+        steps: [
+          {
+            key: 's1',
+            type: 'http',
+            request: { method: 'GET', url: 'https://example.com' },
+          },
+        ],
+      },
     });
 
     repo.findById.mockResolvedValue(wf);

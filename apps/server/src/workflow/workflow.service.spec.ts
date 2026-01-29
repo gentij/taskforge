@@ -137,7 +137,15 @@ describe('WorkflowService', () => {
       id: 'wfv_2',
       workflowId: 'wf_1',
       version: 2,
-      definition: { steps: [{ id: 'step-1' }] },
+      definition: {
+        steps: [
+          {
+            key: 'step-1',
+            type: 'http',
+            request: { method: 'GET', url: 'https://example.com' },
+          },
+        ],
+      },
     });
 
     const tx: PrismaTxMock = {

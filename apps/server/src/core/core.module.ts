@@ -11,6 +11,7 @@ import { EventModule } from 'src/event/event.module';
 import { WorkflowRunModule } from 'src/workflow-run/workflow-run.module';
 import { StepRunModule } from 'src/step-run/step-run.module';
 import { SecretModule } from 'src/secret/secret.module';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { SecretModule } from 'src/secret/secret.module';
     WorkflowRunModule,
     StepRunModule,
     SecretModule,
+    QueueModule,
   ],
   providers: [AppLifecycleService, AuthBootstrapService],
   exports: [ApiTokenModule],
