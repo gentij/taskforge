@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Workflow, WorkflowVersion } from '@prisma/client';
+import { WorkflowDefinitionSchema } from '@taskforge/contracts';
 import { WorkflowRepository } from './workflow.repository';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -41,6 +42,8 @@ export class WorkflowService {
   ): Promise<WorkflowVersion> {
     await this.get(workflowId);
 
+    const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
+
     return this.prisma.$transaction(async (tx) => {
       const latest = await tx.workflowVersion.findFirst({
         where: { workflowId },
@@ -54,7 +57,7 @@ export class WorkflowService {
         data: {
           workflowId,
           version: nextVersion,
-          definition: definition as Prisma.InputJsonValue,
+          definition: normalizedDefinition as Prisma.InputJsonValue,
         },
       });
 

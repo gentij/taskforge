@@ -1,11 +1,12 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { WorkflowDefinitionSchema } from '@taskforge/contracts';
 
 export const WorkflowVersionResSchema = z.object({
   id: z.string(),
   workflowId: z.string(),
   version: z.number().int().positive(),
-  definition: z.unknown(),
+  definition: WorkflowDefinitionSchema,
   createdAt: z.string().datetime(),
 });
 export class WorkflowVersionResDto extends createZodDto(
@@ -13,7 +14,7 @@ export class WorkflowVersionResDto extends createZodDto(
 ) {}
 
 export const CreateWorkflowVersionReqSchema = z.object({
-  definition: z.unknown().default({ steps: [] }),
+  definition: WorkflowDefinitionSchema,
 });
 export class CreateWorkflowVersionReqDto extends createZodDto(
   CreateWorkflowVersionReqSchema,
