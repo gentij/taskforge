@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ApiTokenService } from './api-token.service';
-import { ApiTokenRepository } from './api-token.repository';
+import { ApiTokenRepository } from '@taskforge/db-access';
 import {
   createApiTokenRepositoryMock,
   ApiTokenRepositoryMock,

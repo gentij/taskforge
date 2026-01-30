@@ -1,7 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { WorkflowVersionService } from './workflow-version.service';
-import { WorkflowVersionRepository } from './workflow-version.repository';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
+import {
+  WorkflowVersionRepository,
+  WorkflowRepository,
+} from '@taskforge/db-access';
 import {
   createWorkflowVersionRepositoryMock,
   type WorkflowVersionRepositoryMock,

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { WorkflowModule } from 'src/workflow/workflow.module';
 import { WorkflowVersionController } from './workflow-version.controller';
-import { WorkflowVersionRepository } from './workflow-version.repository';
+import { WorkflowVersionRepository } from '@taskforge/db-access';
 import { WorkflowVersionService } from './workflow-version.service';
 
 @Module({

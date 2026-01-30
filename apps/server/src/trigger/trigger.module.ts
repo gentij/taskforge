@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { WorkflowModule } from 'src/workflow/workflow.module';
 import { TriggerController } from './trigger.controller';
-import { TriggerRepository } from './trigger.repository';
+import { TriggerRepository } from '@taskforge/db-access';
 import { TriggerService } from './trigger.service';
 
 @Module({

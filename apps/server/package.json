@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@taskforge/contracts": "workspace:*",
+    "@taskforge/db-access": "workspace:*",
     "@taskforge/queue-config": "workspace:*",
     "@nestjs/bullmq": "^11.0.1",
     "@nestjs/common": "^11.0.1",

@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, WorkflowRun } from '@prisma/client';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
+import {
+  WorkflowRepository,
+  WorkflowRunRepository,
+} from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
-import { WorkflowRunRepository } from './workflow-run.repository';
 
 @Injectable()
 export class WorkflowRunService {

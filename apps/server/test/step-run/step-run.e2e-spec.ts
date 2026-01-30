@@ -13,8 +13,6 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { StepRunController } from 'src/step-run/step-run.controller';
 import { StepRunService } from 'src/step-run/step-run.service';
-import { StepRunRepository } from 'src/step-run/step-run.repository';
-import { WorkflowRunRepository } from 'src/workflow-run/workflow-run.repository';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
@@ -33,6 +31,7 @@ import {
   type WorkflowRunRepositoryMock,
 } from 'test/workflow-run/workflow-run.repository.mock';
 import { createWorkflowRunFixture } from 'test/workflow-run/workflow-run.fixtures';
+import { StepRunRepository, WorkflowRunRepository } from '@taskforge/db-access';
 
 describe('StepRun (e2e)', () => {
   let app: NestFastifyApplication;

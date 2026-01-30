@@ -38,6 +38,9 @@ importers:
       '@taskforge/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@taskforge/db-access':
+        specifier: workspace:*
+        version: link:../../packages/db-access
       '@taskforge/queue-config':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -174,6 +177,9 @@ importers:
       '@taskforge/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@taskforge/db-access':
+        specifier: workspace:*
+        version: link:../../packages/db-access
       '@taskforge/queue-config':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -260,6 +266,25 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/db-access:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.1
+        version: 11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@prisma/adapter-pg':
+        specifier: ^7.2.0
+        version: 7.3.0
+      '@prisma/client':
+        specifier: ^7.2.0
+        version: 7.3.0(prisma@7.3.0(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.7
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

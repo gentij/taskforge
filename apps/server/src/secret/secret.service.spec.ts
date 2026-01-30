@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { SecretService } from './secret.service';
-import { SecretRepository } from './secret.repository';
+import { SecretRepository } from '@taskforge/db-access';
 import {
   createSecretRepositoryMock,
   type SecretRepositoryMock,

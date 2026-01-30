@@ -13,7 +13,6 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { SecretController } from 'src/secret/secret.controller';
 import { SecretService } from 'src/secret/secret.service';
-import { SecretRepository } from 'src/secret/secret.repository';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
@@ -27,6 +26,7 @@ import {
   createSecretFixture,
   createSecretListFixture,
 } from 'test/secret/secret.fixtures';
+import { SecretRepository } from '@taskforge/db-access';
 
 describe('Secret (e2e)', () => {
   let app: NestFastifyApplication;

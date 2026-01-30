@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { SecretController } from './secret.controller';
-import { SecretRepository } from './secret.repository';
+import { SecretRepository } from '@taskforge/db-access';
 import { SecretService } from './secret.service';
 
 @Module({

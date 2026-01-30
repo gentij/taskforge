@@ -13,9 +13,6 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { EventController } from 'src/event/event.controller';
 import { EventService } from 'src/event/event.service';
-import { EventRepository } from 'src/event/event.repository';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
-import { TriggerRepository } from 'src/trigger/trigger.repository';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
@@ -39,6 +36,11 @@ import {
   type TriggerRepositoryMock,
 } from 'test/trigger/trigger.repository.mock';
 import { createTriggerFixture } from 'test/trigger/trigger.fixtures';
+import {
+  EventRepository,
+  TriggerRepository,
+  WorkflowRepository,
+} from '@taskforge/db-access';
 
 describe('Event (e2e)', () => {
   let app: NestFastifyApplication;

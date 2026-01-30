@@ -3,7 +3,7 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { WorkflowModule } from 'src/workflow/workflow.module';
 import { TriggerModule } from 'src/trigger/trigger.module';
 import { EventController } from './event.controller';
-import { EventRepository } from './event.repository';
+import { EventRepository } from '@taskforge/db-access';
 import { EventService } from './event.service';
 
 @Module({

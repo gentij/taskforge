@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { WorkflowVersionRepository } from './workflow-version.repository';
+import {
+  WorkflowVersionRepository,
+  WorkflowRepository,
+} from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
 import { AppError } from 'src/common/http/errors/app-error';
 
 @Injectable()

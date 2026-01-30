@@ -1,5 +1,4 @@
-import { PrismaService } from './prisma.service';
-import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '@taskforge/db-access';
 import {
   createPrismaServiceMock,
   PrismaServiceMock,
@@ -14,17 +13,27 @@ describe('PrismaService', () => {
   let service: PrismaService;
   let prismaMock: PrismaServiceMock;
 
-  const configServiceMock = { get: jest.fn() } as unknown as ConfigService;
+  const originalEnv = process.env;
 
   beforeEach(() => {
     jest.resetAllMocks();
+    process.env = {
+      ...originalEnv,
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+    };
 
     prismaMock = createPrismaServiceMock();
-    service = new PrismaService(configServiceMock);
+    service = new PrismaService({
+      get: () => 'postgresql://test:test@localhost:5432/test',
+    });
 
     const client = service as unknown as PrismaClientLike;
     client.$queryRaw = prismaMock.$queryRaw;
     client.$disconnect = prismaMock.$disconnect;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it('healthInfo returns ok=true when SELECT 1 succeeds', async () => {

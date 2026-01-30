@@ -6,8 +6,6 @@ import {
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { DbHealthDto } from './dto/prisma.dto';
-import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PrismaService
@@ -16,15 +14,19 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor(private readonly configService: ConfigService) {
+  constructor() {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is required');
+    }
     const adapter = new PrismaPg({
-      connectionString: process.env.DATABASE_URL!,
+      connectionString,
     });
 
     super({ adapter });
   }
 
-  async healthInfo(): Promise<DbHealthDto> {
+  async healthInfo() {
     const start = Date.now();
 
     try {
@@ -40,21 +42,15 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    const db = await this.healthInfo();
-
-    if (db.ok) {
-      this.logger.log(`Connected to PostgreSQL (latency ${db.latencyMs}ms)`);
-      return;
+    try {
+      await this.$queryRaw`SELECT 1`;
+      this.logger.log('Connected to PostgreSQL');
+    } catch (error) {
+      this.logger.error(`PostgreSQL NOT reachable: ${error}`);
     }
-
-    this.logger.error(
-      `PostgreSQL NOT reachable: ${db.error ?? 'unknown error'}`,
-    );
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
-
-    this.logger.log('Disconnected from PostgreSQL');
   }
 }

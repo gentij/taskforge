@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { WorkflowService } from './workflow.service';
-import { WorkflowRepository } from './workflow.repository';
+import { WorkflowRepository, PrismaService } from '@taskforge/db-access';
 import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,
@@ -10,7 +10,6 @@ import {
   createWorkflowListFixture,
 } from 'test/workflow/workflow.fixtures';
 import { createWorkflowVersionFixture } from 'test/workflow-version/workflow-version.fixtures';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { AppError } from 'src/common/http/errors/app-error';
 import {
   createPrismaServiceMock,

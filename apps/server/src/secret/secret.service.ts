@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Secret } from '@prisma/client';
-import { SecretRepository } from './secret.repository';
+import { SecretRepository } from '@taskforge/db-access';
 import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 

@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Event } from '@prisma/client';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
-import { TriggerRepository } from 'src/trigger/trigger.repository';
+import {
+  WorkflowRepository,
+  TriggerRepository,
+  EventRepository,
+} from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
-import { EventRepository } from './event.repository';
 
 @Injectable()
 export class EventService {

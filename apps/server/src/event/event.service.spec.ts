@@ -1,6 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { EventService } from './event.service';
-import { EventRepository } from './event.repository';
+import {
+  EventRepository,
+  WorkflowRepository,
+  TriggerRepository,
+} from '@taskforge/db-access';
 import {
   createEventRepositoryMock,
   type EventRepositoryMock,
@@ -13,8 +17,6 @@ import {
   createTriggerRepositoryMock,
   type TriggerRepositoryMock,
 } from 'test/trigger/trigger.repository.mock';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
-import { TriggerRepository } from 'src/trigger/trigger.repository';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
 import { createTriggerFixture } from 'test/trigger/trigger.fixtures';
 import {

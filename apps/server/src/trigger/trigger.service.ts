@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Trigger } from '@prisma/client';
-import { TriggerRepository } from './trigger.repository';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
+import { TriggerRepository, WorkflowRepository } from '@taskforge/db-access';
 import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 

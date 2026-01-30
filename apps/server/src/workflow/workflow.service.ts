@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Workflow, WorkflowVersion } from '@prisma/client';
 import { WorkflowDefinitionSchema } from '@taskforge/contracts';
-import { WorkflowRepository } from './workflow.repository';
+import { WorkflowRepository, PrismaService } from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { AppError } from 'src/common/http/errors/app-error';
 
 @Injectable()

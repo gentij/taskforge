@@ -1,6 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { WorkflowRunService } from './workflow-run.service';
-import { WorkflowRunRepository } from './workflow-run.repository';
+import {
+  WorkflowRunRepository,
+  WorkflowRepository,
+} from '@taskforge/db-access';
 import {
   createWorkflowRunRepositoryMock,
   type WorkflowRunRepositoryMock,
@@ -9,7 +12,6 @@ import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,
 } from 'test/workflow/workflow.repository.mock';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
 import {
   createWorkflowRunFixture,

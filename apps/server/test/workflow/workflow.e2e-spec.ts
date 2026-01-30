@@ -13,8 +13,6 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { WorkflowController } from 'src/workflow/workflow.controller';
 import { WorkflowService } from 'src/workflow/workflow.service';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter'; // <-- adjust path to your file
 
@@ -29,6 +27,7 @@ import {
 import { createWorkflowVersionFixture } from 'test/workflow-version/workflow-version.fixtures';
 import { AllowAuthGuard } from 'test/utils/allow-auth.guard';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
+import { PrismaService, WorkflowRepository } from '@taskforge/db-access';
 
 describe('Workflow (e2e)', () => {
   let app: NestFastifyApplication;

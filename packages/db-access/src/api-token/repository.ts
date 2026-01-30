@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../prisma.service';
 import { ApiToken } from '@prisma/client';
-import { CreateApiTokenInput } from './api-token.types';
+
+export type CreateApiTokenInput = {
+  name: string;
+  tokenHash: string;
+  scopes?: string[];
+};
 
 @Injectable()
 export class ApiTokenRepository {

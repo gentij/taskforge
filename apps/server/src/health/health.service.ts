@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { HealthResDto } from './dto/health.dto';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '@taskforge/db-access';
 
 @Injectable()
 export class HealthService {

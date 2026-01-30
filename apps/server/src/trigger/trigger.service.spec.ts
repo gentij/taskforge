@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { TriggerService } from './trigger.service';
-import { TriggerRepository } from './trigger.repository';
+import { TriggerRepository, WorkflowRepository } from '@taskforge/db-access';
 import {
   createTriggerRepositoryMock,
   type TriggerRepositoryMock,
@@ -13,7 +13,6 @@ import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,
 } from 'test/workflow/workflow.repository.mock';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
 import { AppError } from 'src/common/http/errors/app-error';
 

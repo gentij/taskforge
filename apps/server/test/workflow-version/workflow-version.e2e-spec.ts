@@ -13,8 +13,6 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { WorkflowVersionController } from 'src/workflow-version/workflow-version.controller';
 import { WorkflowVersionService } from 'src/workflow-version/workflow-version.service';
-import { WorkflowVersionRepository } from 'src/workflow-version/workflow-version.repository';
-import { WorkflowRepository } from 'src/workflow/workflow.repository';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
@@ -33,6 +31,10 @@ import {
   type WorkflowRepositoryMock,
 } from 'test/workflow/workflow.repository.mock';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
+import {
+  WorkflowRepository,
+  WorkflowVersionRepository,
+} from '@taskforge/db-access';
 
 describe('WorkflowVersion (e2e)', () => {
   let app: NestFastifyApplication;
