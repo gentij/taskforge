@@ -17,6 +17,10 @@ export class WorkflowVersionRepository {
     });
   }
 
+  findById(id: string): Promise<WorkflowVersion | null> {
+    return this.prisma.workflowVersion.findUnique({ where: { id } });
+  }
+
   findByWorkflowAndVersion(
     workflowId: string,
     version: number,
