@@ -27,4 +27,19 @@ export class WorkflowRunRepository {
   ): Promise<WorkflowRun> {
     return this.prisma.workflowRun.update({ where: { id }, data });
   }
+
+  async markRunningIfQueued(id: string): Promise<boolean> {
+    const result = await this.prisma.workflowRun.updateMany({
+      where: {
+        id,
+        status: 'QUEUED',
+      },
+      data: {
+        status: 'RUNNING',
+        startedAt: new Date(),
+      },
+    });
+
+    return result.count > 0;
+  }
 }

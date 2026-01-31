@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WorkflowController } from './workflow.controller';
 import { WorkflowService } from './workflow.service';
+import { OrchestrationService } from 'src/core/orchestration.service';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
 import { createWorkflowVersionFixture } from 'test/workflow-version/workflow-version.fixtures';
 
@@ -20,6 +21,12 @@ describe('WorkflowController', () => {
             get: jest.fn(),
             update: jest.fn(),
             createVersion: jest.fn(),
+          },
+        },
+        {
+          provide: OrchestrationService,
+          useValue: {
+            startWorkflow: jest.fn(),
           },
         },
       ],

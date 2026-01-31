@@ -51,6 +51,18 @@ describe('WorkflowService', () => {
     });
 
     const tx: PrismaTxMock = {
+      trigger: {
+        create: jest.fn().mockResolvedValue({
+          id: 'tr_manual',
+          workflowId: wf.id,
+          type: 'MANUAL',
+          name: 'Manual',
+          isActive: true,
+          config: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      },
       workflow: {
         create: jest.fn().mockResolvedValue(wf),
         update: jest.fn().mockResolvedValue(updated),
@@ -68,6 +80,19 @@ describe('WorkflowService', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.workflow.create).toHaveBeenCalledWith({
       data: { name: 'My WF' },
+    });
+
+    const triggerCreate = tx.trigger?.create;
+    if (!triggerCreate) throw new Error('Expected trigger.create to exist');
+
+    expect(triggerCreate).toHaveBeenCalledWith({
+      data: {
+        workflowId: wf.id,
+        type: 'MANUAL',
+        name: 'Manual',
+        isActive: true,
+        config: {},
+      },
     });
     expect(tx.workflowVersion.create).toHaveBeenCalledWith({
       data: {

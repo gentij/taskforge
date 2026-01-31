@@ -8,12 +8,18 @@ import {
   TriggerResDto,
   UpdateTriggerReqDto,
 } from './dto/trigger.dto';
+import { OrchestrationService } from 'src/core/orchestration.service';
+import { WorkflowService } from 'src/workflow/workflow.service';
 
 @ApiTags('Triggers')
 @ApiBearerAuth('bearer')
 @Controller('workflows/:workflowId/triggers')
 export class TriggerController {
-  constructor(private readonly service: TriggerService) {}
+  constructor(
+    private readonly service: TriggerService,
+    private readonly orchestrationService: OrchestrationService,
+    private readonly workflowService: WorkflowService,
+  ) {}
 
   @ApiEnvelope(TriggerResDto, {
     description: 'Create trigger',
@@ -70,5 +76,36 @@ export class TriggerController {
           ? undefined
           : (body.config as Prisma.InputJsonValue),
     });
+  }
+
+  @ApiTags('Triggers')
+  @Post(':id/webhook')
+  async handleWebhook(
+    @Param('workflowId') workflowId: string,
+    @Param('id') triggerId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const trigger = await this.service.get(workflowId, triggerId);
+
+    if (!trigger.isActive) {
+      return { status: 'trigger_inactive' };
+    }
+
+    const workflow = await this.workflowService.get(workflowId);
+
+    if (!workflow.latestVersionId) {
+      throw new Error('Workflow has no versions');
+    }
+
+    await this.orchestrationService.startWorkflow({
+      workflowId,
+      workflowVersionId: workflow.latestVersionId,
+      triggerId,
+      eventType: 'WEBHOOK',
+      eventPayload: body,
+      input: body,
+    });
+
+    return { status: 'accepted' };
   }
 }

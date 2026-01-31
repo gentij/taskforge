@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { WorkflowRepository } from '@taskforge/db-access';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { OrchestrationModule } from 'src/core/orchestration.module';
 import { WorkflowController } from './workflow.controller';
 import { WorkflowService } from './workflow.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, OrchestrationModule],
   controllers: [WorkflowController],
   providers: [WorkflowService, WorkflowRepository],
   exports: [WorkflowService, WorkflowRepository],

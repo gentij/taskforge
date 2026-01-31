@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TriggerController } from './trigger.controller';
 import { TriggerService } from './trigger.service';
+import { OrchestrationService } from 'src/core/orchestration.service';
+import { WorkflowService } from 'src/workflow/workflow.service';
 import { createTriggerFixture } from 'test/trigger/trigger.fixtures';
 
 describe('TriggerController', () => {
@@ -18,6 +20,18 @@ describe('TriggerController', () => {
             list: jest.fn(),
             get: jest.fn(),
             update: jest.fn(),
+          },
+        },
+        {
+          provide: OrchestrationService,
+          useValue: {
+            startWorkflow: jest.fn(),
+          },
+        },
+        {
+          provide: WorkflowService,
+          useValue: {
+            get: jest.fn(),
           },
         },
       ],

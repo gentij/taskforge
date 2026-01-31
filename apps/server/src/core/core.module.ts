@@ -12,6 +12,7 @@ import { WorkflowRunModule } from 'src/workflow-run/workflow-run.module';
 import { StepRunModule } from 'src/step-run/step-run.module';
 import { SecretModule } from 'src/secret/secret.module';
 import { QueueModule } from 'src/queue/queue.module';
+import { OrchestrationModule } from './orchestration.module';
 
 @Module({
   imports: [
@@ -26,8 +27,9 @@ import { QueueModule } from 'src/queue/queue.module';
     StepRunModule,
     SecretModule,
     QueueModule,
+    OrchestrationModule,
   ],
   providers: [AppLifecycleService, AuthBootstrapService],
-  exports: [ApiTokenModule],
+  exports: [ApiTokenModule, OrchestrationModule],
 })
 export class CoreModule {}

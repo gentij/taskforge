@@ -20,9 +20,17 @@ export class StepRunQueueService {
   ) {}
 
   async enqueueHttpStepRun(payload: StepRunJobPayload, options?: JobsOptions) {
+    return this.enqueueStepRun('http', payload, options);
+  }
+
+  async enqueueStepRun(
+    stepType: string,
+    payload: StepRunJobPayload,
+    options?: JobsOptions,
+  ) {
     const normalized = StepRunJobPayloadSchema.parse(payload);
 
-    return this.queue.add('http', normalized, {
+    return this.queue.add(stepType, normalized, {
       jobId: normalized.stepRunId,
       attempts: DEFAULT_ATTEMPTS,
       backoff: { type: 'exponential', delay: DEFAULT_BACKOFF_DELAY_MS },

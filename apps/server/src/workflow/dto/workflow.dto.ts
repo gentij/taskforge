@@ -25,3 +25,9 @@ export const UpdateWorkflowReqSchema = z.object({
 export class UpdateWorkflowReqDto extends createZodDto(
   UpdateWorkflowReqSchema,
 ) {}
+
+export const RunWorkflowResSchema = z.object({
+  workflowRunId: z.string(),
+  status: z.string(),
+});
+export class RunWorkflowResDto extends createZodDto(RunWorkflowResSchema) {}

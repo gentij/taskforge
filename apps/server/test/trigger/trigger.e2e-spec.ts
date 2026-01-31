@@ -13,6 +13,8 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { TriggerController } from 'src/trigger/trigger.controller';
 import { TriggerService } from 'src/trigger/trigger.service';
+import { OrchestrationService } from 'src/core/orchestration.service';
+import { WorkflowService } from 'src/workflow/workflow.service';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
@@ -46,6 +48,14 @@ describe('Trigger (e2e)', () => {
       controllers: [TriggerController],
       providers: [
         TriggerService,
+        {
+          provide: OrchestrationService,
+          useValue: { startWorkflow: jest.fn() },
+        },
+        {
+          provide: WorkflowService,
+          useValue: { get: jest.fn() },
+        },
         { provide: TriggerRepository, useValue: repo },
         { provide: WorkflowRepository, useValue: workflowRepo },
 
@@ -67,7 +77,7 @@ describe('Trigger (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('POST /workflows/:workflowId/triggers -> 201 creates trigger', async () => {

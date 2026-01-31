@@ -1,7 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { StepRunRepository, WorkflowVersionRepository } from '@taskforge/db-access';
+import {
+  StepRunRepository,
+  WorkflowRunRepository,
+  WorkflowVersionRepository,
+} from '@taskforge/db-access';
 import { StepRunJobPayload } from '@taskforge/contracts';
 import { ExecutorRegistry } from '../executors/executor-registry';
 
@@ -11,6 +15,7 @@ export class StepRunProcessor extends WorkerHost {
 
   constructor(
     private readonly stepRunRepository: StepRunRepository,
+    private readonly workflowRunRepository: WorkflowRunRepository,
     private readonly workflowVersionRepository: WorkflowVersionRepository,
     private readonly executorRegistry: ExecutorRegistry,
   ) {
@@ -23,6 +28,8 @@ export class StepRunProcessor extends WorkerHost {
     this.logger.log(`Processing step ${stepKey} for run ${workflowRunId} (jobId: ${job.id})`);
 
     try {
+      await this.workflowRunRepository.markRunningIfQueued(workflowRunId);
+
       await this.stepRunRepository.update(stepRunId, {
         status: 'RUNNING',
         startedAt: new Date(),
@@ -65,6 +72,8 @@ export class StepRunProcessor extends WorkerHost {
       });
 
       this.logger.log(`Step ${stepKey} completed successfully (${durationMs}ms)`);
+
+      await this.checkWorkflowCompletion(workflowRunId, stepRunId);
     } catch (error) {
       this.logger.error(
         `Step ${stepKey} failed: ${error instanceof Error ? error.message : 'unknown error'}`,
@@ -79,8 +88,31 @@ export class StepRunProcessor extends WorkerHost {
         },
       });
 
-      // Re-throw to let BullMQ handle retry logic
+      await this.checkWorkflowCompletion(workflowRunId, stepRunId);
+
       throw error;
     }
+  }
+
+  private async checkWorkflowCompletion(
+    workflowRunId: string,
+    completedStepRunId: string,
+  ): Promise<void> {
+    void completedStepRunId;
+
+    const siblingSteps = await this.stepRunRepository.findManyByWorkflowRun(workflowRunId);
+
+    const allDone = siblingSteps.every((s) => s.status === 'SUCCEEDED' || s.status === 'FAILED');
+    if (!allDone) return;
+
+    const hasFailure = siblingSteps.some((s) => s.status === 'FAILED');
+    const finalStatus = hasFailure ? 'FAILED' : 'SUCCEEDED';
+
+    await this.workflowRunRepository.update(workflowRunId, {
+      status: finalStatus,
+      finishedAt: new Date(),
+    });
+
+    this.logger.log(`WorkflowRun ${workflowRunId} completed with status: ${finalStatus}`);
   }
 }

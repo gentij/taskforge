@@ -6,17 +6,22 @@ import {
   CreateWorkflowReqDto,
   UpdateWorkflowReqDto,
   WorkflowResDto,
+  RunWorkflowResDto,
 } from './dto/workflow.dto';
 import {
   CreateWorkflowVersionReqDto,
   WorkflowVersionResDto,
 } from 'src/workflow-version/dto/workflow-version.dto';
+import { OrchestrationService } from 'src/core/orchestration.service';
 
 @ApiTags('Workflows')
 @ApiBearerAuth('bearer')
 @Controller('workflows')
 export class WorkflowController {
-  constructor(private readonly service: WorkflowService) {}
+  constructor(
+    private readonly service: WorkflowService,
+    private readonly orchestrationService: OrchestrationService,
+  ) {}
 
   @ApiEnvelope(WorkflowResDto, {
     description: 'Create workflow',
@@ -65,5 +70,30 @@ export class WorkflowController {
     @Body() body: CreateWorkflowVersionReqDto,
   ) {
     return this.service.createVersion(id, body.definition);
+  }
+
+  @ApiEnvelope(RunWorkflowResDto, {
+    description: 'Start workflow manually',
+    errors: [401, 404, 500],
+  })
+  @Post(':id/run')
+  async runManual(
+    @Param('id') workflowId: string,
+    @Body() body?: Record<string, unknown>,
+  ) {
+    const workflow = await this.service.get(workflowId);
+
+    if (!workflow.latestVersionId) {
+      throw new Error('Workflow has no versions');
+    }
+
+    const { workflowRunId } = await this.orchestrationService.startWorkflow({
+      workflowId,
+      workflowVersionId: workflow.latestVersionId,
+      eventType: 'MANUAL',
+      input: body,
+    });
+
+    return { workflowRunId, status: 'QUEUED' };
   }
 }

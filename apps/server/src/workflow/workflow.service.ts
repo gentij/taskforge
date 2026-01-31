@@ -18,6 +18,16 @@ export class WorkflowService {
         data: { name },
       });
 
+      await tx.trigger.create({
+        data: {
+          workflowId: workflow.id,
+          type: 'MANUAL',
+          name: 'Manual',
+          isActive: true,
+          config: {},
+        },
+      });
+
       const v1 = await tx.workflowVersion.create({
         data: {
           workflowId: workflow.id,

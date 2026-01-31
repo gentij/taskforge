@@ -13,6 +13,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 
 import { WorkflowController } from 'src/workflow/workflow.controller';
 import { WorkflowService } from 'src/workflow/workflow.service';
+import { OrchestrationService } from 'src/core/orchestration.service';
 
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter'; // <-- adjust path to your file
 
@@ -46,6 +47,10 @@ describe('Workflow (e2e)', () => {
       controllers: [WorkflowController],
       providers: [
         WorkflowService,
+        {
+          provide: OrchestrationService,
+          useValue: { startWorkflow: jest.fn() },
+        },
         { provide: WorkflowRepository, useValue: repo },
         { provide: PrismaService, useValue: prisma },
 
@@ -67,7 +72,7 @@ describe('Workflow (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('POST /workflows -> 201 + ok:true + data', async () => {
@@ -84,6 +89,18 @@ describe('Workflow (e2e)', () => {
     });
 
     const tx = {
+      trigger: {
+        create: jest.fn().mockResolvedValue({
+          id: 'tr_manual',
+          workflowId: created.id,
+          type: 'MANUAL',
+          name: 'Manual',
+          isActive: true,
+          config: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      },
       workflow: {
         create: jest.fn().mockResolvedValue(created),
         update: jest.fn().mockResolvedValue(updated),

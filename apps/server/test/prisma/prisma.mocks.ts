@@ -15,6 +15,21 @@ export const createPrismaServiceMock = (): PrismaServiceMock => ({
 });
 
 export type PrismaTxMock = {
+  trigger?: {
+    create: jest.Mock;
+    findFirst?: jest.Mock;
+  };
+  event?: {
+    create: jest.Mock;
+  };
+  workflowRun?: {
+    create: jest.Mock;
+    update?: jest.Mock;
+  };
+  stepRun?: {
+    create?: jest.Mock;
+    updateMany?: jest.Mock;
+  };
   workflow: {
     create: jest.Mock;
     update: jest.Mock;
@@ -22,5 +37,6 @@ export type PrismaTxMock = {
   workflowVersion: {
     create: jest.Mock;
     findFirst: jest.Mock;
+    findUniqueOrThrow?: jest.Mock;
   };
 };
