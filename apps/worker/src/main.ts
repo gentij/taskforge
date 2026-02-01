@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from 'nestjs-pino';
+import { Logger } from '@nestjs/common';
 
 import { AppModule } from './app.module';
 
@@ -8,9 +8,7 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
-  const logger = app.get(Logger);
-  app.useLogger(logger);
-
+  const logger = new Logger('WorkerBootstrap');
   logger.log('Taskforge Worker started');
 
   app.enableShutdownHooks();

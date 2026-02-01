@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { STEP_RUN_QUEUE_NAME, QueueConfigModule } from '@taskforge/queue-config';
 import { PrismaModule } from './prisma/prisma.module';
@@ -13,6 +14,10 @@ import { StepRunProcessor } from './processors/step-run.processor';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
     PrismaModule,
     QueueConfigModule,
     BullModule.registerQueue({ name: STEP_RUN_QUEUE_NAME }),

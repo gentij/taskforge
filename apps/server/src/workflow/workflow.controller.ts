@@ -6,6 +6,7 @@ import {
   CreateWorkflowReqDto,
   UpdateWorkflowReqDto,
   WorkflowResDto,
+  RunWorkflowReqDto,
   RunWorkflowResDto,
 } from './dto/workflow.dto';
 import {
@@ -79,7 +80,7 @@ export class WorkflowController {
   @Post(':id/run')
   async runManual(
     @Param('id') workflowId: string,
-    @Body() body?: Record<string, unknown>,
+    @Body() body: RunWorkflowReqDto,
   ) {
     const workflow = await this.service.get(workflowId);
 
