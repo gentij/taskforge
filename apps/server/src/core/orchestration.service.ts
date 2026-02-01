@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@taskforge/db-access';
 import { StepRunJobPayload, WorkflowDefinition } from '@taskforge/contracts';
 
@@ -27,6 +27,13 @@ export class OrchestrationService {
     eventExternalId?: string;
     eventPayload?: Record<string, unknown>;
     input?: Record<string, unknown>;
+    overrides?: Record<
+      string,
+      {
+        query?: Record<string, string | number | boolean>;
+        body?: unknown;
+      }
+    >;
   }): Promise<{ workflowRunId: string; stepRunIds: string[] }> {
     const {
       workflowId,
@@ -36,6 +43,7 @@ export class OrchestrationService {
       eventExternalId,
       eventPayload,
       input,
+      overrides,
     } = params;
 
     this.logger.log(
@@ -61,17 +69,6 @@ export class OrchestrationService {
           },
         });
 
-        const workflowRun = await tx.workflowRun.create({
-          data: {
-            workflowId,
-            workflowVersionId,
-            triggerId: triggerIdToUse,
-            eventId: event.id,
-            status: 'QUEUED',
-            input: (input ?? {}) as unknown as Prisma.InputJsonValue,
-          },
-        });
-
         const workflowVersion = await tx.workflowVersion.findUniqueOrThrow({
           where: { id: workflowVersionId },
         });
@@ -79,6 +76,27 @@ export class OrchestrationService {
         const definition =
           workflowVersion.definition as unknown as WorkflowDefinition;
         const steps = definition.steps ?? [];
+
+        const overridesToPersist = this.pickAndNormalizeOverridesForSteps(
+          steps,
+          overrides,
+        );
+
+        const workflowRunData: Prisma.WorkflowRunUncheckedCreateInput = {
+          workflowId,
+          workflowVersionId,
+          triggerId: triggerIdToUse,
+          eventId: event.id,
+          status: 'QUEUED',
+          input: (input ?? {}) as unknown as Prisma.InputJsonValue,
+          overrides: overridesToPersist
+            ? (overridesToPersist as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
+        };
+
+        const workflowRun = await tx.workflowRun.create({
+          data: workflowRunData,
+        });
 
         if (steps.length === 0) {
           await tx.workflowRun.update({
@@ -94,18 +112,25 @@ export class OrchestrationService {
         }
 
         const createdStepRuns = await Promise.all(
-          steps.map((step) =>
-            tx.stepRun.create({
-              data: {
-                workflowRunId: workflowRun.id,
-                stepKey: step.key,
-                status: 'QUEUED',
-                attempt: 0,
-                input: (input ?? {}) as unknown as Prisma.InputJsonValue,
-              },
+          steps.map((step) => {
+            const stepRunData: Prisma.StepRunUncheckedCreateInput = {
+              workflowRunId: workflowRun.id,
+              stepKey: step.key,
+              status: 'QUEUED',
+              attempt: 0,
+              input: (input ?? {}) as unknown as Prisma.InputJsonValue,
+              requestOverride: overridesToPersist?.[step.key]
+                ? (overridesToPersist[
+                    step.key
+                  ] as unknown as Prisma.InputJsonValue)
+                : Prisma.DbNull,
+            };
+
+            return tx.stepRun.create({
+              data: stepRunData,
               select: { id: true, stepKey: true },
-            }),
-          ),
+            });
+          }),
         );
 
         const stepRunIds = createdStepRuns.map((sr) => sr.id);
@@ -120,6 +145,7 @@ export class OrchestrationService {
               stepKey: sr.stepKey,
               workflowVersionId,
               input: input ?? {},
+              requestOverride: overridesToPersist?.[step.key],
             },
           };
         });
@@ -210,5 +236,49 @@ export class OrchestrationService {
     });
 
     return created.id;
+  }
+
+  private pickAndNormalizeOverridesForSteps(
+    steps: Array<{ key: string }>,
+    overrides:
+      | Record<
+          string,
+          { query?: Record<string, string | number | boolean>; body?: unknown }
+        >
+      | undefined,
+  ): Record<
+    string,
+    { query?: Record<string, string | number | boolean>; body?: unknown }
+  > | null {
+    if (!overrides) return null;
+
+    const picked: Record<
+      string,
+      { query?: Record<string, string | number | boolean>; body?: unknown }
+    > = {};
+
+    for (const step of steps) {
+      const raw = overrides[step.key];
+      if (!raw) continue;
+
+      const normalized: {
+        query?: Record<string, string | number | boolean>;
+        body?: unknown;
+      } = {};
+
+      if (raw.query && Object.keys(raw.query).length > 0) {
+        normalized.query = raw.query;
+      }
+
+      if (raw.body !== undefined) {
+        normalized.body = raw.body;
+      }
+
+      if (normalized.query !== undefined || normalized.body !== undefined) {
+        picked[step.key] = normalized;
+      }
+    }
+
+    return Object.keys(picked).length > 0 ? picked : null;
   }
 }

@@ -52,8 +52,14 @@ export class StepRunProcessor extends WorkerHost {
 
       const executor = this.executorRegistry.get(stepDef.type);
 
+      const request = this.applyHttpOverrides(
+        stepDef.type,
+        stepDef.request,
+        job.data.requestOverride,
+      );
+
       const output = await executor.execute({
-        request: stepDef.request,
+        request,
         input,
       });
 
@@ -114,5 +120,33 @@ export class StepRunProcessor extends WorkerHost {
     });
 
     this.logger.log(`WorkflowRun ${workflowRunId} completed with status: ${finalStatus}`);
+  }
+
+  private applyHttpOverrides(
+    stepType: string,
+    baseRequest: unknown,
+    requestOverride: StepRunJobPayload['requestOverride'],
+  ): unknown {
+    if (stepType !== 'http' || !requestOverride) return baseRequest;
+
+    if (typeof baseRequest !== 'object' || baseRequest === null) return baseRequest;
+
+    const base = baseRequest as Record<string, unknown>;
+    const merged: Record<string, unknown> = { ...base };
+
+    if (requestOverride.query && typeof merged.query === 'object' && merged.query !== null) {
+      merged.query = {
+        ...(merged.query as Record<string, unknown>),
+        ...requestOverride.query,
+      };
+    } else if (requestOverride.query) {
+      merged.query = requestOverride.query;
+    }
+
+    if (requestOverride.body !== undefined) {
+      merged.body = requestOverride.body;
+    }
+
+    return merged;
   }
 }

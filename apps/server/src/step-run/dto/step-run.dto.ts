@@ -15,6 +15,7 @@ export const StepRunResSchema = z.object({
   status: StepRunStatusSchema,
   attempt: z.number().int(),
   input: z.unknown(),
+  requestOverride: z.unknown().nullable(),
   output: z.unknown().nullable(),
   error: z.unknown().nullable(),
   logs: z.unknown().nullable(),

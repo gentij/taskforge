@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 
 import { PrismaService } from '@taskforge/db-access';
+import { Prisma } from '@prisma/client';
 import { StepRunQueueService } from 'src/queue/step-run-queue.service';
 import { OrchestrationService } from './orchestration.service';
 import {
@@ -42,8 +43,20 @@ describe('OrchestrationService', () => {
       stepRun: {
         create: jest
           .fn()
-          .mockResolvedValueOnce({ id: 'sr_1', stepKey: 'step_1' })
-          .mockResolvedValueOnce({ id: 'sr_2', stepKey: 'step_2' }),
+          .mockImplementationOnce((args: unknown) => {
+            const createArgs = args as { data: { stepKey: string } };
+            return {
+              id: 'sr_1',
+              stepKey: createArgs.data.stepKey,
+            };
+          })
+          .mockImplementationOnce((args: unknown) => {
+            const createArgs = args as { data: { stepKey: string } };
+            return {
+              id: 'sr_2',
+              stepKey: createArgs.data.stepKey,
+            };
+          }),
         updateMany: jest.fn(),
       },
       workflow: {
@@ -73,6 +86,9 @@ describe('OrchestrationService', () => {
       workflowVersionId: 'wfv_1',
       eventType: 'MANUAL',
       input: { hello: 'world' },
+      overrides: {
+        step_1: { body: { content: 'dynamic' } },
+      },
     });
 
     expect(result).toEqual({
@@ -100,6 +116,7 @@ describe('OrchestrationService', () => {
           workflowVersionId: string;
           triggerId?: string;
           eventId?: string;
+          overrides?: unknown;
         };
       }) => unknown
     >;
@@ -110,18 +127,51 @@ describe('OrchestrationService', () => {
     expect(workflowRunCreateArgs.data.workflowVersionId).toBe('wfv_1');
     expect(workflowRunCreateArgs.data.triggerId).toBe('tr_manual');
     expect(workflowRunCreateArgs.data.eventId).toBe('ev_1');
+    expect(workflowRunCreateArgs.data.overrides).toEqual({
+      step_1: { body: { content: 'dynamic' } },
+    });
 
     expect(tx.stepRun?.create).toHaveBeenCalledTimes(2);
+
+    expect(tx.stepRun?.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stepKey: 'step_1',
+          requestOverride: { body: { content: 'dynamic' } },
+        }) as unknown,
+      }),
+    );
+    expect(tx.stepRun?.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stepKey: 'step_2',
+          requestOverride: Prisma.DbNull,
+        }) as unknown,
+      }),
+    );
+
     expect(enqueueStepRun).toHaveBeenCalledTimes(2);
     expect(enqueueStepRun).toHaveBeenNthCalledWith(
       1,
       'http',
-      expect.objectContaining({ stepRunId: 'sr_1', stepKey: 'step_1' }),
+      expect.objectContaining({
+        stepRunId: 'sr_1',
+        stepKey: 'step_1',
+        requestOverride: {
+          body: { content: 'dynamic' },
+        },
+      }),
     );
     expect(enqueueStepRun).toHaveBeenNthCalledWith(
       2,
       'http',
-      expect.objectContaining({ stepRunId: 'sr_2', stepKey: 'step_2' }),
+      expect.objectContaining({
+        stepRunId: 'sr_2',
+        stepKey: 'step_2',
+        requestOverride: undefined,
+      }),
     );
   });
 

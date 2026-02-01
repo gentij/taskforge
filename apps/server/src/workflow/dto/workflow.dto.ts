@@ -32,8 +32,17 @@ export const RunWorkflowResSchema = z.object({
 });
 export class RunWorkflowResDto extends createZodDto(RunWorkflowResSchema) {}
 
-export const RunWorkflowReqSchema = z
-  .record(z.string(), z.unknown())
-  .optional()
-  .default({});
+export const RunWorkflowOverrideSchema = z
+  .object({
+    query: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .optional(),
+    body: z.unknown().optional(),
+  })
+  .strict();
+
+export const RunWorkflowReqSchema = z.object({
+  input: z.record(z.string(), z.unknown()).default({}),
+  overrides: z.record(z.string(), RunWorkflowOverrideSchema).default({}),
+});
 export class RunWorkflowReqDto extends createZodDto(RunWorkflowReqSchema) {}

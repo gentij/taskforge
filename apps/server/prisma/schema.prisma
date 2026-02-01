@@ -113,6 +113,7 @@ model WorkflowRun {
   eventId           String?           @unique
   status            WorkflowRunStatus @default(QUEUED)
   input             Json              @default("{}")
+  overrides         Json?
   output            Json?
   startedAt         DateTime?
   finishedAt        DateTime?
@@ -141,6 +142,7 @@ model StepRun {
   status        StepRunStatus @default(QUEUED)
   attempt       Int           @default(0)
   input         Json          @default("{}")
+  requestOverride Json?
   output        Json?
   error         Json?
   logs          Json?

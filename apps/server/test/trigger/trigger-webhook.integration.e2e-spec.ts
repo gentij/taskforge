@@ -92,7 +92,14 @@ describe('Trigger Webhook (integration e2e)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/workflows/wf_1/triggers/tr_1/webhook',
-      payload: { hello: 'world' },
+      payload: {
+        input: { hello: 'world' },
+        overrides: {
+          step_1: {
+            body: { content: 'dynamic' },
+          },
+        },
+      },
     });
 
     expect(res.statusCode).toBe(201);
@@ -106,6 +113,12 @@ describe('Trigger Webhook (integration e2e)', () => {
         workflowVersionId: 'wfv_1',
         triggerId: 'tr_1',
         eventType: 'WEBHOOK',
+        input: { hello: 'world' },
+        overrides: {
+          step_1: {
+            body: { content: 'dynamic' },
+          },
+        },
       }),
     );
   });

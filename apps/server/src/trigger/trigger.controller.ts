@@ -10,6 +10,7 @@ import {
 } from './dto/trigger.dto';
 import { OrchestrationService } from 'src/core/orchestration.service';
 import { WorkflowService } from 'src/workflow/workflow.service';
+import { RunWorkflowReqDto } from 'src/workflow/dto/workflow.dto';
 
 @ApiTags('Triggers')
 @ApiBearerAuth('bearer')
@@ -83,8 +84,11 @@ export class TriggerController {
   async handleWebhook(
     @Param('workflowId') workflowId: string,
     @Param('id') triggerId: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: RunWorkflowReqDto,
   ) {
+    const input = body.input ?? {};
+    const overrides = body.overrides ?? {};
+
     const trigger = await this.service.get(workflowId, triggerId);
 
     if (!trigger.isActive) {
@@ -102,8 +106,9 @@ export class TriggerController {
       workflowVersionId: workflow.latestVersionId,
       triggerId,
       eventType: 'WEBHOOK',
-      eventPayload: body,
-      input: body,
+      eventPayload: input,
+      input,
+      overrides,
     });
 
     return { status: 'accepted' };

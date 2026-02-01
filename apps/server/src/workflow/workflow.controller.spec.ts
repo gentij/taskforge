@@ -8,6 +8,7 @@ import { createWorkflowVersionFixture } from 'test/workflow-version/workflow-ver
 describe('WorkflowController', () => {
   let controller: WorkflowController;
   let service: WorkflowService;
+  let orchestrationService: OrchestrationService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -34,6 +35,8 @@ describe('WorkflowController', () => {
 
     controller = module.get<WorkflowController>(WorkflowController);
     service = module.get<WorkflowService>(WorkflowService);
+    orchestrationService =
+      module.get<OrchestrationService>(OrchestrationService);
   });
 
   it('create() calls WorkflowService.create()', async () => {
@@ -82,6 +85,37 @@ describe('WorkflowController', () => {
     ).resolves.toBe(version);
     expect(createVersionSpy).toHaveBeenCalledWith('wf_1', {
       steps: [],
+    });
+  });
+
+  it('runManual() calls OrchestrationService.startWorkflow() with input + overrides', async () => {
+    const wf = createWorkflowFixture({
+      id: 'wf_1',
+      latestVersionId: 'wfv_1',
+    });
+    jest.spyOn(service, 'get').mockResolvedValue(wf);
+
+    const startSpy = jest
+      .spyOn(orchestrationService, 'startWorkflow')
+      .mockResolvedValue({ workflowRunId: 'wfr_1', stepRunIds: [] });
+
+    await expect(
+      controller.runManual('wf_1', {
+        input: { hello: 'world' },
+        overrides: {
+          step_1: { body: { content: 'dynamic' } },
+        },
+      }),
+    ).resolves.toEqual({ workflowRunId: 'wfr_1', status: 'QUEUED' });
+
+    expect(startSpy).toHaveBeenCalledWith({
+      workflowId: 'wf_1',
+      workflowVersionId: 'wfv_1',
+      eventType: 'MANUAL',
+      input: { hello: 'world' },
+      overrides: {
+        step_1: { body: { content: 'dynamic' } },
+      },
     });
   });
 });

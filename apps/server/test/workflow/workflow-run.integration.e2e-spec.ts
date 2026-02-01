@@ -75,7 +75,14 @@ describe('Workflow Run (integration e2e)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/workflows/wf_1/run',
-      payload: { hello: 'world' },
+      payload: {
+        input: { hello: 'world' },
+        overrides: {
+          step_1: {
+            body: { content: 'dynamic' },
+          },
+        },
+      },
     });
 
     expect(res.statusCode).toBe(201);
@@ -89,6 +96,12 @@ describe('Workflow Run (integration e2e)', () => {
         workflowId: 'wf_1',
         workflowVersionId: 'wfv_1',
         eventType: 'MANUAL',
+        input: { hello: 'world' },
+        overrides: {
+          step_1: {
+            body: { content: 'dynamic' },
+          },
+        },
       }),
     );
   });

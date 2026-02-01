@@ -82,6 +82,9 @@ export class WorkflowController {
     @Param('id') workflowId: string,
     @Body() body: RunWorkflowReqDto,
   ) {
+    const input = body.input ?? {};
+    const overrides = body.overrides ?? {};
+
     const workflow = await this.service.get(workflowId);
 
     if (!workflow.latestVersionId) {
@@ -92,7 +95,8 @@ export class WorkflowController {
       workflowId,
       workflowVersionId: workflow.latestVersionId,
       eventType: 'MANUAL',
-      input: body,
+      input,
+      overrides,
     });
 
     return { workflowRunId, status: 'QUEUED' };

@@ -16,6 +16,7 @@ export const WorkflowRunResSchema = z.object({
   eventId: z.string().nullable(),
   status: WorkflowRunStatusSchema,
   input: z.unknown(),
+  overrides: z.unknown().nullable(),
   output: z.unknown().nullable(),
   startedAt: z.iso.datetime().nullable(),
   finishedAt: z.iso.datetime().nullable(),

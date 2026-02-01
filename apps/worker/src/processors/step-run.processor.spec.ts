@@ -21,7 +21,16 @@ describe('StepRunProcessor', () => {
       id: 'wfv_1',
       definition: {
         steps: [
-          { key: 'step_1', type: 'http', request: { method: 'GET', url: 'https://x.test' } },
+          {
+            key: 'step_1',
+            type: 'http',
+            request: {
+              method: 'POST',
+              url: 'https://x.test',
+              query: { base: '1' },
+              body: { content: 'base' },
+            },
+          },
           { key: 'step_2', type: 'http', request: { method: 'GET', url: 'https://x.test' } },
         ],
       },
@@ -68,7 +77,11 @@ describe('StepRunProcessor', () => {
         stepRunId: 'sr_1',
         stepKey: 'step_1',
         workflowVersionId: 'wfv_1',
-        input: {},
+        input: { hello: 'world' },
+        requestOverride: {
+          query: { override: '2' },
+          body: { content: 'override' },
+        },
       },
     } as unknown as Job<StepRunJobPayload>;
 
@@ -83,6 +96,15 @@ describe('StepRunProcessor', () => {
     );
 
     expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith({
+      request: {
+        method: 'POST',
+        url: 'https://x.test',
+        query: { base: '1', override: '2' },
+        body: { content: 'override' },
+      },
+      input: { hello: 'world' },
+    });
 
     expect(prisma.workflowRun.update).toHaveBeenCalledWith(
       expect.objectContaining({
