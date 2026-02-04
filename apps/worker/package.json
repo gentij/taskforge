@@ -32,6 +32,7 @@
     "@taskforge/db-access": "workspace:*",
     "@taskforge/queue-config": "workspace:*",
     "bullmq": "^5.58.5",
+    "jmespath": "^0.16.0",
     "nestjs-pino": "^4.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

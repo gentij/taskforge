@@ -1,14 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { StepExecutor } from './executor.interface';
 import { HttpExecutor } from './http/http-executor';
+import { TransformExecutor } from './transform/transform-executor';
 
 @Injectable()
 export class ExecutorRegistry {
   private readonly logger = new Logger(ExecutorRegistry.name);
   private readonly executors: Map<string, StepExecutor> = new Map();
 
-  constructor(private readonly httpExecutor: HttpExecutor) {
+  constructor(
+    private readonly httpExecutor: HttpExecutor,
+    private readonly transformExecutor: TransformExecutor,
+  ) {
     this.register(httpExecutor);
+    this.register(transformExecutor);
   }
 
   private register(executor: StepExecutor): void {

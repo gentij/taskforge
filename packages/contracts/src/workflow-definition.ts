@@ -46,8 +46,21 @@ export const HttpStepDefinitionSchema = BaseStepDefinitionSchema.extend({
   request: HttpRequestSpecSchema,
 });
 
+export const TransformRequestSpecSchema = z
+  .object({
+    source: z.record(z.string(), z.unknown()).optional(),
+    output: z.unknown(),
+  })
+  .strict();
+
+export const TransformStepDefinitionSchema = BaseStepDefinitionSchema.extend({
+  type: z.literal('transform'),
+  request: TransformRequestSpecSchema,
+});
+
 export const StepDefinitionSchema = z.discriminatedUnion('type', [
   HttpStepDefinitionSchema,
+  TransformStepDefinitionSchema,
 ]);
 
 export const WorkflowDefinitionSchema = z.object({
@@ -58,5 +71,7 @@ export const WorkflowDefinitionSchema = z.object({
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
 export type HttpRequestSpec = z.infer<typeof HttpRequestSpecSchema>;
 export type HttpStepDefinition = z.infer<typeof HttpStepDefinitionSchema>;
+export type TransformRequestSpec = z.infer<typeof TransformRequestSpecSchema>;
+export type TransformStepDefinition = z.infer<typeof TransformStepDefinitionSchema>;
 export type StepDefinition = z.infer<typeof StepDefinitionSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

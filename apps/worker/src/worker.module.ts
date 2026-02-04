@@ -10,6 +10,7 @@ import {
 } from '@taskforge/db-access';
 import { ExecutorRegistry } from './executors/executor-registry';
 import { HttpExecutorModule } from './executors/http/http-executor.module';
+import { TransformExecutorModule } from './executors/transform/transform-executor.module';
 import { StepRunProcessor } from './processors/step-run.processor';
 
 @Module({
@@ -22,6 +23,7 @@ import { StepRunProcessor } from './processors/step-run.processor';
     QueueConfigModule,
     BullModule.registerQueue({ name: STEP_RUN_QUEUE_NAME }),
     HttpExecutorModule,
+    TransformExecutorModule,
   ],
   providers: [
     StepRunProcessor,
