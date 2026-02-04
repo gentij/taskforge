@@ -12,9 +12,20 @@ export const HttpRequestSpecSchema = z.object({
   method: HttpMethodSchema,
   url: z
     .string()
-    .url()
-    .refine((value) => value.startsWith('http://') || value.startsWith('https://'), {
-      message: 'url must be an absolute http(s) URL',
+    .refine((value) => {
+      // Allow template patterns like {{input.apiUrl}}/path
+      if (value.includes('{{') && value.includes('}}')) {
+        return true;
+      }
+      // Must be valid URL
+      try {
+        new URL(value);
+        return value.startsWith('http://') || value.startsWith('https://');
+      } catch {
+        return false;
+      }
+    }, {
+      message: 'url must be an absolute http(s) URL or a template pattern',
     }),
   headers: z.record(z.string(), z.string()).optional(),
   query: z
@@ -24,8 +35,13 @@ export const HttpRequestSpecSchema = z.object({
   timeoutMs: z.number().int().positive().optional(),
 });
 
-export const HttpStepDefinitionSchema = z.object({
+export const BaseStepDefinitionSchema = z.object({
   key: z.string().min(1),
+  dependsOn: z.array(z.string()).optional(),
+  input: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const HttpStepDefinitionSchema = BaseStepDefinitionSchema.extend({
   type: z.literal('http'),
   request: HttpRequestSpecSchema,
 });
@@ -35,6 +51,7 @@ export const StepDefinitionSchema = z.discriminatedUnion('type', [
 ]);
 
 export const WorkflowDefinitionSchema = z.object({
+  input: z.record(z.string(), z.unknown()).optional(),
   steps: z.array(StepDefinitionSchema).default([]),
 });
 

@@ -15,6 +15,7 @@ export const StepRunJobPayloadSchema = z.object({
   stepKey: z.string().min(1),
   workflowVersionId: z.string().min(1),
   input: z.unknown().default({}),
+  dependsOn: z.array(z.string()).default([]),
   requestOverride: HttpRequestOverrideSchema.optional(),
 });
 

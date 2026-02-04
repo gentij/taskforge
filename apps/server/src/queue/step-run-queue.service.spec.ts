@@ -26,6 +26,7 @@ describe('StepRunQueueService', () => {
       stepKey: 'step-1',
       workflowVersionId: 'wfv_1',
       input: { foo: 'bar' },
+      dependsOn: [],
     };
 
     queue.add.mockResolvedValue({ id: 'sr_1' });
@@ -52,6 +53,7 @@ describe('StepRunQueueService', () => {
       stepKey: 'step-2',
       workflowVersionId: 'wfv_2',
       input: {},
+      dependsOn: [],
     };
 
     queue.add.mockResolvedValue({ id: 'sr_2' });

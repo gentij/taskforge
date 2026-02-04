@@ -11,6 +11,21 @@ import { ExecutorRegistry } from '../executors/executor-registry';
 import { createPrismaServiceMock } from 'test/prisma.mocks';
 
 describe('StepRunProcessor', () => {
+  let executeMock: jest.Mock;
+  let registryMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    executeMock = jest.fn().mockResolvedValue({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: { ok: true },
+    });
+    
+    registryMock = jest.fn().mockReturnValue({ stepType: 'http', execute: executeMock });
+  });
+
   it('marks step succeeded and workflow succeeded when all steps complete', async () => {
     const prisma = createPrismaServiceMock();
 
@@ -54,20 +69,11 @@ describe('StepRunProcessor', () => {
     const workflowRunRepo = new WorkflowRunRepository(prismaService);
     const workflowVersionRepo = new WorkflowVersionRepository(prismaService);
 
-    const execute = jest.fn().mockResolvedValue({
-      statusCode: 200,
-      headers: { 'content-type': 'application/json' },
-      body: { ok: true },
-    });
-    const registry = {
-      get: jest.fn().mockReturnValue({ stepType: 'http', execute }),
-    } as unknown as ExecutorRegistry;
-
     const processor = new StepRunProcessor(
       stepRunRepo,
       workflowRunRepo,
       workflowVersionRepo,
-      registry,
+      { get: registryMock } as unknown as ExecutorRegistry,
     );
 
     const job = {
@@ -95,15 +101,18 @@ describe('StepRunProcessor', () => {
       expect.objectContaining({ where: { id: 'sr_1' } }),
     );
 
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute).toHaveBeenCalledWith({
+    expect(executeMock).toHaveBeenCalledTimes(1);
+    expect(executeMock).toHaveBeenCalledWith({
       request: {
         method: 'POST',
         url: 'https://x.test',
         query: { base: '1', override: '2' },
         body: { content: 'override' },
       },
-      input: { hello: 'world' },
+      input: {
+        input: { hello: 'world' },
+        steps: {},
+      },
     });
 
     expect(prisma.workflowRun.update).toHaveBeenCalledWith(
@@ -118,6 +127,7 @@ describe('StepRunProcessor', () => {
     const prisma = createPrismaServiceMock();
 
     prisma.workflowRun.updateMany.mockResolvedValue({ count: 1 });
+
     prisma.workflowVersion.findUnique.mockResolvedValue({
       id: 'wfv_1',
       definition: {
@@ -144,16 +154,13 @@ describe('StepRunProcessor', () => {
     const workflowRunRepo = new WorkflowRunRepository(prismaService);
     const workflowVersionRepo = new WorkflowVersionRepository(prismaService);
 
-    const execute = jest.fn().mockRejectedValue(new Error('boom'));
-    const registry = {
-      get: jest.fn().mockReturnValue({ stepType: 'http', execute }),
-    } as unknown as ExecutorRegistry;
+    const executeFailed = jest.fn().mockRejectedValue(new Error('boom'));
 
     const processor = new StepRunProcessor(
       stepRunRepo,
       workflowRunRepo,
       workflowVersionRepo,
-      registry,
+      { get: () => ({ stepType: 'http', execute: executeFailed }) } as unknown as ExecutorRegistry,
     );
 
     const job = {

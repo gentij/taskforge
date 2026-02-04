@@ -14,7 +14,10 @@ describe('OrchestrationService', () => {
   let service: OrchestrationService;
 
   it('creates event, workflowRun, stepRuns and enqueues', async () => {
-    const enqueueStepRun = jest.fn().mockResolvedValue(undefined);
+    const enqueueStepRun = jest
+      .fn()
+      .mockResolvedValueOnce({ id: 'job_1' })
+      .mockResolvedValueOnce({ id: 'job_2' });
 
     const tx: PrismaTxMock = {
       trigger: {
@@ -163,6 +166,7 @@ describe('OrchestrationService', () => {
           body: { content: 'dynamic' },
         },
       }),
+      undefined,
     );
     expect(enqueueStepRun).toHaveBeenNthCalledWith(
       2,
@@ -172,6 +176,92 @@ describe('OrchestrationService', () => {
         stepKey: 'step_2',
         requestOverride: undefined,
       }),
+      undefined,
+    );
+  });
+
+  it('infers dependsOn from step template references', async () => {
+    const enqueueStepRun = jest
+      .fn()
+      .mockResolvedValueOnce({ id: 'job_1' })
+      .mockResolvedValueOnce({ id: 'job_2' });
+
+    const tx: PrismaTxMock = {
+      trigger: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'tr_manual' }),
+        create: jest.fn(),
+      },
+      event: {
+        create: jest.fn().mockResolvedValue({ id: 'ev_1' }),
+      },
+      workflowRun: {
+        create: jest.fn().mockResolvedValue({ id: 'wfr_1' }),
+        update: jest.fn(),
+      },
+      workflowVersion: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          definition: {
+            steps: [
+              { key: 'step_1', type: 'http', request: { method: 'GET' } },
+              {
+                key: 'step_2',
+                type: 'http',
+                request: {
+                  method: 'POST',
+                  url: 'https://example.com',
+                  body: {
+                    a: '{{steps.step_1.output.statusCode}}',
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      },
+      stepRun: {
+        create: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'sr_1', stepKey: 'step_1' })
+          .mockResolvedValueOnce({ id: 'sr_2', stepKey: 'step_2' }),
+      },
+      workflow: {
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+
+    const prismaMock: PrismaServiceMock = createPrismaServiceMock();
+    prismaMock.$transaction.mockImplementation((cb) => Promise.resolve(cb(tx)));
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OrchestrationService,
+        {
+          provide: PrismaService,
+          useValue: prismaMock as unknown as PrismaService,
+        },
+        { provide: StepRunQueueService, useValue: { enqueueStepRun } },
+      ],
+    }).compile();
+
+    service = moduleRef.get(OrchestrationService);
+
+    await service.startWorkflow({
+      workflowId: 'wf_1',
+      workflowVersionId: 'wfv_1',
+      eventType: 'MANUAL',
+    });
+
+    expect(enqueueStepRun).toHaveBeenNthCalledWith(
+      2,
+      'http',
+      expect.objectContaining({
+        stepKey: 'step_2',
+        dependsOn: ['step_1'],
+      }),
+      expect.objectContaining({ dependsOn: ['job_1'] }),
     );
   });
 
@@ -240,7 +330,7 @@ describe('OrchestrationService', () => {
   it('marks workflow failed when enqueue fails', async () => {
     const enqueueStepRun = jest
       .fn()
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ id: 'job_1' })
       .mockRejectedValueOnce(new Error('redis down'));
 
     const tx1: PrismaTxMock = {

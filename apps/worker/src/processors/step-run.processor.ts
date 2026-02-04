@@ -8,10 +8,20 @@ import {
 } from '@taskforge/db-access';
 import { StepRunJobPayload } from '@taskforge/contracts';
 import { ExecutorRegistry } from '../executors/executor-registry';
+import { TemplateResolver } from '../utils/template-resolver';
+
+interface StepDefinition {
+  key: string;
+  type: string;
+  dependsOn?: string[];
+  input?: Record<string, unknown>;
+  request?: Record<string, unknown>;
+}
 
 @Processor('step-runs')
 export class StepRunProcessor extends WorkerHost {
   private readonly logger = new Logger(StepRunProcessor.name);
+  private readonly templateResolver = new TemplateResolver();
 
   constructor(
     private readonly stepRunRepository: StepRunRepository,
@@ -23,9 +33,7 @@ export class StepRunProcessor extends WorkerHost {
   }
 
   async process(job: Job<StepRunJobPayload>): Promise<void> {
-    const { workflowRunId, stepRunId, stepKey, workflowVersionId, input } = job.data;
-
-    this.logger.log(`Processing step ${stepKey} for run ${workflowRunId} (jobId: ${job.id})`);
+    const { workflowRunId, stepRunId, stepKey, workflowVersionId, dependsOn, input: triggerInput } = job.data;
 
     try {
       await this.workflowRunRepository.markRunningIfQueued(workflowRunId);
@@ -42,7 +50,8 @@ export class StepRunProcessor extends WorkerHost {
       }
 
       const definition = workflowVersion.definition as unknown as {
-        steps: Array<{ key: string; type: string; request: unknown }>;
+        input?: Record<string, unknown>;
+        steps: StepDefinition[];
       };
       const stepDef = definition.steps.find((s) => s.key === stepKey);
 
@@ -50,17 +59,34 @@ export class StepRunProcessor extends WorkerHost {
         throw new Error(`Step definition not found for key: ${stepKey}`);
       }
 
-      const executor = this.executorRegistry.get(stepDef.type);
+      const mergedInput = (triggerInput as Record<string, unknown>) ?? {};
+      const stepLevelInput = (stepDef.input ?? {}) as Record<string, unknown>;
+
+      const stepOutputs = await this.fetchStepOutputs(workflowRunId, dependsOn || []);
+
+      // Build context: merged input + step-level input + previous step outputs
+      const context = {
+        input: {
+          ...mergedInput,
+          ...stepLevelInput,
+        },
+        steps: stepOutputs,
+      };
+
+      const requestDef = stepDef.request ?? {};
+      const { resolved: resolvedRequest, referencedSteps } = this.templateResolver.resolve(requestDef, context);
 
       const request = this.applyHttpOverrides(
         stepDef.type,
-        stepDef.request,
+        resolvedRequest,
         job.data.requestOverride,
       );
 
+      const executor = this.executorRegistry.get(stepDef.type);
+
       const output = await executor.execute({
         request,
-        input,
+        input: context,
       });
 
       const stepRun = await this.stepRunRepository.findById(stepRunId);
@@ -74,6 +100,7 @@ export class StepRunProcessor extends WorkerHost {
         status: 'SUCCEEDED',
         finishedAt: new Date(),
         output: output as unknown as object,
+        input: context.input as unknown as object,
         durationMs,
       });
 
@@ -81,15 +108,14 @@ export class StepRunProcessor extends WorkerHost {
 
       await this.checkWorkflowCompletion(workflowRunId, stepRunId);
     } catch (error) {
-      this.logger.error(
-        `Step ${stepKey} failed: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
+      const errorMessage = error instanceof Error ? error.message : 'unknown error';
+      this.logger.error(`Step ${stepKey} failed: ${errorMessage}`);
 
       await this.stepRunRepository.update(stepRunId, {
         status: 'FAILED',
         finishedAt: new Date(),
         error: {
-          message: error instanceof Error ? error.message : 'unknown error',
+          message: errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
         },
       });
@@ -100,12 +126,27 @@ export class StepRunProcessor extends WorkerHost {
     }
   }
 
+  private async fetchStepOutputs(workflowRunId: string, stepKeys: string[]): Promise<Record<string, unknown>> {
+    const outputs: Record<string, unknown> = {};
+
+    for (const key of stepKeys) {
+      const stepRun = await this.stepRunRepository.findFirst({
+        where: { workflowRunId, stepKey: key, status: 'SUCCEEDED' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (stepRun?.output) {
+        outputs[key] = stepRun.output;
+      }
+    }
+
+    return outputs;
+  }
+
   private async checkWorkflowCompletion(
     workflowRunId: string,
     completedStepRunId: string,
   ): Promise<void> {
-    void completedStepRunId;
-
     const siblingSteps = await this.stepRunRepository.findManyByWorkflowRun(workflowRunId);
 
     const allDone = siblingSteps.every((s) => s.status === 'SUCCEEDED' || s.status === 'FAILED');

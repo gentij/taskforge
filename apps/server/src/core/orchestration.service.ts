@@ -2,11 +2,22 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@taskforge/db-access';
 import { StepRunJobPayload, WorkflowDefinition } from '@taskforge/contracts';
+import type { JobsOptions } from 'bullmq';
 
 import { StepRunQueueService } from '../queue/step-run-queue.service';
 
+interface StepDef {
+  key: string;
+  type: string;
+  dependsOn?: string[];
+  request?: Record<string, unknown>;
+}
+
 type EnqueueItem = {
   stepType: string;
+  stepKey: string;
+  stepRunId: string;
+  dependsOn: string[];
   payload: StepRunJobPayload;
 };
 
@@ -75,7 +86,17 @@ export class OrchestrationService {
 
         const definition =
           workflowVersion.definition as unknown as WorkflowDefinition;
-        const steps = definition.steps ?? [];
+        const steps = (definition.steps ?? []) as StepDef[];
+
+        this.applyInferredTemplateDependencies(steps);
+
+        const workflowInput = definition.input ?? {};
+        const triggerPayload = input ?? {};
+
+        const mergedInput = {
+          ...triggerPayload,
+          ...workflowInput,
+        };
 
         const overridesToPersist = this.pickAndNormalizeOverridesForSteps(
           steps,
@@ -88,7 +109,7 @@ export class OrchestrationService {
           triggerId: triggerIdToUse,
           eventId: event.id,
           status: 'QUEUED',
-          input: (input ?? {}) as unknown as Prisma.InputJsonValue,
+          input: mergedInput as Prisma.InputJsonValue,
           overrides: overridesToPersist
             ? (overridesToPersist as unknown as Prisma.InputJsonValue)
             : Prisma.DbNull,
@@ -111,40 +132,44 @@ export class OrchestrationService {
           };
         }
 
-        const createdStepRuns = await Promise.all(
-          steps.map((step) => {
-            const stepRunData: Prisma.StepRunUncheckedCreateInput = {
+        const stepRunMap = new Map<string, string>();
+        for (const step of steps) {
+          const stepRun = await tx.stepRun.create({
+            data: {
               workflowRunId: workflowRun.id,
               stepKey: step.key,
               status: 'QUEUED',
               attempt: 0,
-              input: (input ?? {}) as unknown as Prisma.InputJsonValue,
+              input: mergedInput as Prisma.InputJsonValue,
               requestOverride: overridesToPersist?.[step.key]
                 ? (overridesToPersist[
                     step.key
                   ] as unknown as Prisma.InputJsonValue)
                 : Prisma.DbNull,
-            };
+            },
+            select: { id: true, stepKey: true },
+          });
+          stepRunMap.set(step.key, stepRun.id);
+        }
 
-            return tx.stepRun.create({
-              data: stepRunData,
-              select: { id: true, stepKey: true },
-            });
-          }),
-        );
+        const stepRunIds = Array.from(stepRunMap.values());
 
-        const stepRunIds = createdStepRuns.map((sr) => sr.id);
+        const enqueueItems: EnqueueItem[] = steps.map((step) => {
+          const stepRunId = stepRunMap.get(step.key)!;
+          const stepDeps = step.dependsOn || [];
 
-        const enqueueItems: EnqueueItem[] = createdStepRuns.map((sr, idx) => {
-          const step = steps[idx];
           return {
             stepType: step.type,
+            stepKey: step.key,
+            stepRunId,
+            dependsOn: stepDeps,
             payload: {
               workflowRunId: workflowRun.id,
-              stepRunId: sr.id,
-              stepKey: sr.stepKey,
+              stepRunId,
+              stepKey: step.key,
               workflowVersionId,
-              input: input ?? {},
+              input: mergedInput,
+              dependsOn: stepDeps,
               requestOverride: overridesToPersist?.[step.key],
             },
           };
@@ -153,21 +178,50 @@ export class OrchestrationService {
         return { workflowRunId: workflowRun.id, stepRunIds, enqueueItems };
       });
 
-    // Enqueue after DB transaction commits
+    const jobIdMap = new Map<string, string>();
     const enqueuedStepRunIds: string[] = [];
+
     try {
-      for (const item of enqueueItems) {
-        await this.stepRunQueueService.enqueueStepRun(
-          item.stepType,
-          item.payload,
-        );
-        enqueuedStepRunIds.push(item.payload.stepRunId);
+      const batches = this.getExecutionBatches(
+        enqueueItems.map((item) => ({
+          key: item.stepKey,
+          type: item.stepType,
+          dependsOn: item.dependsOn,
+        })),
+      );
+
+      for (const batch of batches) {
+        const batchJobs: Promise<string>[] = [];
+
+        for (const stepKey of batch) {
+          const item = enqueueItems.find((i) => i.stepKey === stepKey)!;
+          const dependsOnJobIds = item.dependsOn
+            .map((depKey) => jobIdMap.get(depKey))
+            .filter((id): id is string => id !== undefined);
+
+          const options: JobsOptions | undefined =
+            dependsOnJobIds.length > 0
+              ? ({ dependsOn: dependsOnJobIds } as JobsOptions)
+              : undefined;
+
+          const jobPromise = this.stepRunQueueService
+            .enqueueStepRun(item.stepType, item.payload, options)
+            .then((job) => {
+              jobIdMap.set(stepKey, job.id!);
+              enqueuedStepRunIds.push(item.stepRunId);
+              return job.id!;
+            });
+
+          batchJobs.push(jobPromise);
+        }
+
+        await Promise.all(batchJobs);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
 
       this.logger.error(
-        `Failed to enqueue step runs for workflowRunId=${workflowRunId}: ${message} (enqueued ${enqueuedStepRunIds.length}/${enqueueItems.length})`,
+        `Failed to enqueue step runs for workflowRunId=${workflowRunId}: ${message} (enqueued ${enqueuedStepRunIds.length}/${stepRunIds.length})`,
       );
 
       const notEnqueued = stepRunIds.filter(
@@ -206,6 +260,82 @@ export class OrchestrationService {
     );
 
     return { workflowRunId, stepRunIds };
+  }
+
+  private getExecutionBatches(steps: StepDef[]): string[][] {
+    const dependencies = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+    const graph = new Map<string, string[]>();
+    const allStepKeys = new Set(steps.map((s) => s.key));
+
+    for (const step of steps) {
+      dependencies.set(step.key, [...(step.dependsOn || [])]);
+      inDegree.set(step.key, 0);
+      graph.set(step.key, []);
+    }
+
+    for (const [stepKey, deps] of dependencies) {
+      for (const dep of deps) {
+        if (allStepKeys.has(dep)) {
+          const children = graph.get(dep) || [];
+          children.push(stepKey);
+          graph.set(dep, children);
+          inDegree.set(stepKey, (inDegree.get(stepKey) || 0) + 1);
+        }
+      }
+    }
+
+    const queue: string[] = [];
+    for (const [key, degree] of inDegree) {
+      if (degree === 0) queue.push(key);
+    }
+
+    const batches: string[][] = [];
+
+    while (queue.length > 0) {
+      const batch = [...queue];
+      batches.push(batch);
+      queue.length = 0;
+
+      for (const stepKey of batch) {
+        const children = graph.get(stepKey) || [];
+        for (const child of children) {
+          const newDegree = (inDegree.get(child) || 0) - 1;
+          inDegree.set(child, newDegree);
+          if (newDegree === 0) queue.push(child);
+        }
+      }
+    }
+
+    return batches;
+  }
+
+  private applyInferredTemplateDependencies(steps: StepDef[]): void {
+    const allStepKeys = new Set(steps.map((s) => s.key));
+    const templatePattern =
+      /\{\{\s*steps\.([a-zA-Z0-9_-]+)(?:\.[^}]*)?\s*\}\}/g;
+
+    for (const step of steps) {
+      if (!step.request) continue;
+
+      const requestStr = JSON.stringify(step.request);
+      const inferred: string[] = [];
+      let match: RegExpExecArray | null;
+
+      while ((match = templatePattern.exec(requestStr)) !== null) {
+        const referencedStep = match[1];
+        if (!referencedStep) continue;
+        if (referencedStep === step.key) continue;
+        if (!allStepKeys.has(referencedStep)) continue;
+        if (!inferred.includes(referencedStep)) inferred.push(referencedStep);
+      }
+
+      if (inferred.length === 0) continue;
+
+      const explicit = step.dependsOn ?? [];
+      const merged = Array.from(new Set([...explicit, ...inferred]));
+      step.dependsOn = merged;
+    }
   }
 
   private async resolveTriggerIdForEvent(
