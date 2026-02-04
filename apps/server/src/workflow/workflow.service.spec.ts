@@ -202,6 +202,82 @@ describe('WorkflowService', () => {
     });
   });
 
+  it('createVersion() rejects definitions with unknown input template refs (strict)', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    repo.findById.mockResolvedValue(wf);
+
+    const tx: PrismaTxMock = {
+      workflow: {
+        create: jest.fn(),
+        update: jest.fn().mockResolvedValue(wf),
+      },
+      workflowVersion: {
+        findFirst: jest.fn().mockResolvedValue({ version: 1 }),
+        create: jest.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation((cb) => Promise.resolve(cb(tx)));
+
+    await expect(
+      service.createVersion('wf_1', {
+        input: { apiUrl: 'https://example.com' },
+        steps: [
+          {
+            key: 's1',
+            type: 'http',
+            request: {
+              method: 'GET',
+              url: '{{input.missing}}/x',
+            },
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(tx.workflowVersion.create).not.toHaveBeenCalled();
+  });
+
+  it('createVersion() rejects definitions with invalid $jmes', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    repo.findById.mockResolvedValue(wf);
+
+    const tx: PrismaTxMock = {
+      workflow: {
+        create: jest.fn(),
+        update: jest.fn().mockResolvedValue(wf),
+      },
+      workflowVersion: {
+        findFirst: jest.fn().mockResolvedValue({ version: 1 }),
+        create: jest.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation((cb) => Promise.resolve(cb(tx)));
+
+    await expect(
+      service.createVersion('wf_1', {
+        input: {},
+        steps: [
+          {
+            key: 't1',
+            type: 'transform',
+            request: {
+              source: {},
+              output: {
+                bad: { $jmes: 'length(' },
+              },
+            },
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(tx.workflowVersion.create).not.toHaveBeenCalled();
+  });
+
+  // condition step type not enabled yet
+
   it('createVersion() throws notFound when workflow missing', async () => {
     repo.findById.mockResolvedValue(null);
 

@@ -36,7 +36,12 @@ export const HttpRequestSpecSchema = z.object({
 });
 
 export const BaseStepDefinitionSchema = z.object({
-  key: z.string().min(1),
+  key: z
+    .string()
+    .min(1)
+    .regex(/^[a-zA-Z0-9_-]+$/, {
+      message: 'key must contain only letters, numbers, underscore, or hyphen',
+    }),
   dependsOn: z.array(z.string()).optional(),
   input: z.record(z.string(), z.unknown()).optional(),
 });
