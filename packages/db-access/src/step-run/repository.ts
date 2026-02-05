@@ -21,6 +21,10 @@ export class StepRunRepository {
     return this.prisma.stepRun.findUnique({ where: { id } });
   }
 
+  findFirst(args: Prisma.StepRunFindFirstArgs): Promise<StepRun | null> {
+    return this.prisma.stepRun.findFirst(args);
+  }
+
   update(id: string, data: Prisma.StepRunUpdateInput): Promise<StepRun> {
     return this.prisma.stepRun.update({ where: { id }, data });
   }

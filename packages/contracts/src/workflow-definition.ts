@@ -44,6 +44,13 @@ export const BaseStepDefinitionSchema = z.object({
     }),
   dependsOn: z.array(z.string()).optional(),
   input: z.record(z.string(), z.unknown()).optional(),
+  outputPolicy: z
+    .object({
+      truncate: z.boolean().optional(),
+      maxBytes: z.number().int().positive().optional(),
+    })
+    .strict()
+    .optional(),
 });
 
 export const HttpStepDefinitionSchema = BaseStepDefinitionSchema.extend({

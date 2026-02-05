@@ -116,10 +116,12 @@ export class TemplateResolver {
     }
 
     const output = stepOutput as unknown as Record<string, unknown>;
+    const stepData = unwrapEnvelope(stepOutput);
+
     const data =
-      output && typeof output === 'object' && 'body' in output
-        ? (output as { body: unknown }).body
-        : stepOutput;
+      stepData && typeof stepData === 'object' && 'body' in (stepData as any)
+        ? (stepData as { body: unknown }).body
+        : stepData;
 
     if (!path) return data;
 
@@ -206,4 +208,10 @@ export class TemplateResolver {
     if (typeof value === 'object') return value;
     return String(value);
   }
+}
+
+function unwrapEnvelope(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  if (!('data' in (value as any)) || !('_taskforge' in (value as any))) return value;
+  return (value as any).data;
 }

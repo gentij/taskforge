@@ -9,6 +9,7 @@ import {
 import { StepRunJobPayload } from '@taskforge/contracts';
 import { ExecutorRegistry } from '../executors/executor-registry';
 import { TemplateResolver } from '../utils/template-resolver';
+import { wrapForDb } from '../utils/persisted-json';
 
 interface StepDefinition {
   key: string;
@@ -16,6 +17,10 @@ interface StepDefinition {
   dependsOn?: string[];
   input?: Record<string, unknown>;
   request?: Record<string, unknown>;
+  outputPolicy?: {
+    truncate?: boolean;
+    maxBytes?: number;
+  };
 }
 
 @Processor('step-runs')
@@ -84,10 +89,12 @@ export class StepRunProcessor extends WorkerHost {
 
       const executor = this.executorRegistry.get(stepDef.type);
 
-      const output = await executor.execute({
+      const rawOutput = await executor.execute({
         request,
         input: context,
       });
+
+      const outputUnwrapped = unwrapExecutorOutput(rawOutput);
 
       const stepRun = await this.stepRunRepository.findById(stepRunId);
       if (!stepRun) {
@@ -96,11 +103,24 @@ export class StepRunProcessor extends WorkerHost {
 
       const durationMs = stepRun.startedAt ? Date.now() - stepRun.startedAt.getTime() : 0;
 
+      const outputPolicy = stepDef.outputPolicy ?? {};
+      const outputEnvelope = wrapForDb(outputUnwrapped, {
+        maxBytes: outputPolicy.maxBytes ?? 256 * 1024,
+        truncate: outputPolicy.truncate ?? true,
+        reason: 'step_output',
+      });
+
+      const inputEnvelope = wrapForDb(context.input, {
+        maxBytes: 256 * 1024,
+        truncate: true,
+        reason: 'step_input',
+      });
+
       await this.stepRunRepository.update(stepRunId, {
         status: 'SUCCEEDED',
         finishedAt: new Date(),
-        output: output as unknown as object,
-        input: context.input as unknown as object,
+        output: outputEnvelope as unknown as object,
+        input: inputEnvelope as unknown as object,
         durationMs,
       });
 
@@ -111,13 +131,23 @@ export class StepRunProcessor extends WorkerHost {
       const errorMessage = error instanceof Error ? error.message : 'unknown error';
       this.logger.error(`Step ${stepKey} failed: ${errorMessage}`);
 
-      await this.stepRunRepository.update(stepRunId, {
-        status: 'FAILED',
-        finishedAt: new Date(),
-        error: {
+      const errorEnvelope = wrapForDb(
+        {
           message: errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
         },
+        {
+          maxBytes: 64 * 1024,
+          truncate: true,
+          reason: 'step_error',
+        },
+      );
+
+      await this.stepRunRepository.update(stepRunId, {
+        status: 'FAILED',
+        finishedAt: new Date(),
+        lastErrorAt: new Date(),
+        error: errorEnvelope as unknown as object,
       });
 
       await this.checkWorkflowCompletion(workflowRunId, stepRunId);
@@ -136,7 +166,8 @@ export class StepRunProcessor extends WorkerHost {
       });
 
       if (stepRun?.output) {
-        outputs[key] = stepRun.output;
+        const o = stepRun.output as unknown as { data?: unknown };
+        outputs[key] = o && typeof o === 'object' && 'data' in o ? (o as any).data : stepRun.output;
       }
     }
 
@@ -190,4 +221,12 @@ export class StepRunProcessor extends WorkerHost {
 
     return merged;
   }
+}
+
+function unwrapExecutorOutput(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  if ('_taskforgeHttp' in (value as any) && 'data' in (value as any)) {
+    return (value as any).data;
+  }
+  return value;
 }

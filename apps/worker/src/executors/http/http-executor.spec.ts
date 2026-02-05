@@ -24,7 +24,16 @@ describe('HttpExecutor', () => {
     });
 
     expect(out.statusCode).toBe(200);
-    expect(out.body).toEqual({ ok: true });
+    expect(out.body).toEqual({
+      _taskforgeHttp: expect.objectContaining({
+        contentType: expect.any(String),
+        truncated: false,
+        softMaxBytes: expect.any(Number),
+        hardMaxBytes: expect.any(Number),
+        bytesRead: expect.any(Number),
+      }),
+      data: { ok: true },
+    });
   });
 
   it('sends JSON body for POST and sets Content-Type if missing', async () => {

@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { StepExecutor, ExecutorOutput } from '../executor.interface';
 import { HttpExecutorInput, HttpRequestSpec } from './http.types';
 
+const DEFAULT_TIMEOUT_MS = 30_000;
+const HTTP_SOFT_MAX_BYTES = 256 * 1024;
+const HTTP_HARD_MAX_BYTES = 10 * 1024 * 1024;
+
 @Injectable()
 export class HttpExecutor implements StepExecutor {
   readonly stepType = 'http';
@@ -57,7 +61,7 @@ export class HttpExecutor implements StepExecutor {
     const fetchOptions: RequestInit = {
       method: request.method,
       headers,
-      signal: request.timeoutMs ? AbortSignal.timeout(request.timeoutMs) : undefined,
+      signal: AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     };
 
     if (request.body && ['POST', 'PUT', 'PATCH'].includes(request.method)) {
@@ -74,21 +78,92 @@ export class HttpExecutor implements StepExecutor {
       responseHeaders[key] = value;
     });
 
-    let body: unknown;
-    const contentType = response.headers.get('content-type') ?? '';
+    const { text, bytesRead, truncated } = await this.readTextWithLimits(
+      response,
+      HTTP_SOFT_MAX_BYTES,
+      HTTP_HARD_MAX_BYTES,
+    );
 
-    if (contentType.includes('application/json')) {
-      body = await response.json();
-    } else if (contentType.includes('text/')) {
-      body = await response.text();
-    } else {
-      body = await response.text();
+    const contentType = response.headers.get('content-type') ?? '';
+    const meta = {
+      contentType,
+      truncated,
+      bytesRead,
+      softMaxBytes: HTTP_SOFT_MAX_BYTES,
+      hardMaxBytes: HTTP_HARD_MAX_BYTES,
+    };
+
+    if (truncated) {
+      throw new Error(
+        `HTTP response truncated (softMaxBytes=${HTTP_SOFT_MAX_BYTES} bytesRead=${bytesRead})`,
+      );
     }
+
+    let data: unknown = text;
+    if (contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
+    }
+
+    const body = { _taskforgeHttp: meta, data };
 
     return {
       statusCode: response.status,
       headers: responseHeaders,
       body,
     };
+  }
+
+  private async readTextWithLimits(
+    response: Response,
+    softMaxBytes: number,
+    hardMaxBytes: number,
+  ): Promise<{ text: string; bytesRead: number; truncated: boolean }> {
+    if (!response.body) {
+      const text = await response.text();
+      const bytesRead = Buffer.byteLength(text, 'utf8');
+      return { text, bytesRead, truncated: bytesRead > softMaxBytes };
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      total += value.byteLength;
+      if (total > hardMaxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // ignore
+        }
+        throw new Error(`HTTP response body too large (bytes>${hardMaxBytes})`);
+      }
+
+      if (total > softMaxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // ignore
+        }
+        return {
+          text: Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8'),
+          bytesRead: total,
+          truncated: true,
+        };
+      }
+
+      chunks.push(value);
+    }
+
+    const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
+    return { text: buf.toString('utf8'), bytesRead: total, truncated: false };
   }
 }
