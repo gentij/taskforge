@@ -14,6 +14,10 @@ import {
   WorkflowVersionResDto,
 } from 'src/workflow-version/dto/workflow-version.dto';
 import { OrchestrationService } from 'src/core/orchestration.service';
+import {
+  ValidateWorkflowDefinitionReqDto,
+  ValidateWorkflowDefinitionResDto,
+} from './dto/workflow-validation.dto';
 
 @ApiTags('Workflows')
 @ApiBearerAuth('bearer')
@@ -71,6 +75,27 @@ export class WorkflowController {
     @Body() body: CreateWorkflowVersionReqDto,
   ) {
     return this.service.createVersion(id, body.definition);
+  }
+
+  @ApiEnvelope(ValidateWorkflowDefinitionResDto, {
+    description: 'Validate workflow definition (no persist)',
+    errors: [401, 404, 500],
+  })
+  @Post(':id/versions/validate')
+  async validateVersionDefinition(
+    @Param('id') id: string,
+    @Body() body: ValidateWorkflowDefinitionReqDto,
+  ) {
+    // Ensure workflow exists and the caller has access.
+    await this.service.get(id);
+
+    const result = this.service.validateDefinition(body.definition);
+    return {
+      valid: result.valid,
+      issues: result.issues,
+      inferredDependencies: result.inferredDependencies,
+      executionBatches: result.executionBatches,
+    };
   }
 
   @ApiEnvelope(RunWorkflowResDto, {

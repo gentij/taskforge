@@ -5,7 +5,11 @@ const jmespath = jmespathImport as unknown as {
 };
 import type { WorkflowDefinition } from '@taskforge/contracts';
 
-type FieldDetail = { field?: string; message: string };
+export type ValidationIssue = {
+  field?: string;
+  stepKey?: string;
+  message: string;
+};
 
 type StepLike = {
   key: string;
@@ -19,8 +23,8 @@ type TransformRequestLike = { output?: unknown };
 
 export function validateWorkflowDefinitionStrict(
   definition: WorkflowDefinition,
-): FieldDetail[] {
-  const issues: FieldDetail[] = [];
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
 
   const steps = (definition.steps ?? []) as unknown as StepLike[];
   const workflowInputKeys = new Set(Object.keys(definition.input ?? {}));
@@ -33,6 +37,7 @@ export function validateWorkflowDefinitionStrict(
     if (count > 1) {
       issues.push({
         field: 'steps',
+        stepKey: key,
         message: `Duplicate step key: "${key}"`,
       });
     }
@@ -49,11 +54,13 @@ export function validateWorkflowDefinitionStrict(
       if (dep === step.key) {
         issues.push({
           field: `steps[${i}].dependsOn[${j}]`,
+          stepKey: step.key,
           message: `stepKey=${step.key}: dependsOn cannot reference itself`,
         });
       } else if (!allStepKeys.has(dep)) {
         issues.push({
           field: `steps[${i}].dependsOn[${j}]`,
+          stepKey: step.key,
           message: `stepKey=${step.key}: dependsOn references unknown step "${dep}"`,
         });
       }
@@ -86,6 +93,7 @@ export function validateWorkflowDefinitionStrict(
         if (!allStepKeys.has(ref)) {
           issues.push({
             field: path,
+            stepKey: step.key,
             message: `stepKey=${step.key}: references unknown step "${ref}"`,
           });
         } else if (ref !== step.key) {
@@ -100,6 +108,7 @@ export function validateWorkflowDefinitionStrict(
         if (!allowedInputKeys.has(ref)) {
           issues.push({
             field: path,
+            stepKey: step.key,
             message: `stepKey=${step.key}: input field "${ref}" must be declared in workflow definition.input or step.input`,
           });
         }
@@ -123,6 +132,7 @@ export function validateWorkflowDefinitionStrict(
           const message = err instanceof Error ? err.message : String(err);
           issues.push({
             field,
+            stepKey: step.key,
             message: `stepKey=${step.key}: invalid JMESPath expression: ${message}`,
           });
         }
@@ -182,6 +192,7 @@ export function validateWorkflowDefinitionStrict(
 
     issues.push({
       field: 'steps',
+      stepKey: remaining.join(','),
       message: `Dependency cycle detected (explicit or template-based). Steps involved: ${remaining.join(
         ', ',
       )}`,
@@ -189,6 +200,88 @@ export function validateWorkflowDefinitionStrict(
   }
 
   return issues;
+}
+
+export function getInferredDependencies(
+  definition: WorkflowDefinition,
+): Record<string, string[]> {
+  const steps = (definition.steps ?? []) as unknown as StepLike[];
+  const allStepKeys = new Set(steps.map((s) => s.key));
+  const templatePattern = /\{\{\s*steps\.([a-zA-Z0-9_-]+)(?:\.[^}]*)?\s*\}\}/g;
+
+  const inferred: Record<string, Set<string>> = {};
+  for (const s of steps) inferred[s.key] = new Set();
+
+  for (const step of steps) {
+    const requestStr = JSON.stringify(step.request ?? {});
+    templatePattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = templatePattern.exec(requestStr)) !== null) {
+      const ref = match[1];
+      if (!ref) continue;
+      if (ref === step.key) continue;
+      if (!allStepKeys.has(ref)) continue;
+      inferred[step.key].add(ref);
+    }
+  }
+
+  const out: Record<string, string[]> = {};
+  for (const [k, set] of Object.entries(inferred)) {
+    out[k] = Array.from(set);
+  }
+
+  return out;
+}
+
+export function getExecutionBatchesFromDependencies(
+  deps: Record<string, string[]>,
+): string[][] {
+  const keys = Object.keys(deps);
+  const allStepKeys = new Set(keys);
+  const inDegree = new Map<string, number>();
+  const graph = new Map<string, string[]>();
+
+  for (const k of keys) {
+    inDegree.set(k, 0);
+    graph.set(k, []);
+  }
+
+  for (const [stepKey, depsList] of Object.entries(deps)) {
+    for (const dep of depsList) {
+      if (!allStepKeys.has(dep)) continue;
+      graph.get(dep)?.push(stepKey);
+      inDegree.set(stepKey, (inDegree.get(stepKey) ?? 0) + 1);
+    }
+  }
+
+  const queue: string[] = [];
+  for (const [k, deg] of inDegree) {
+    if (deg === 0) queue.push(k);
+  }
+
+  const batches: string[][] = [];
+  let visited = 0;
+
+  while (queue.length > 0) {
+    const batch = [...queue];
+    batches.push(batch);
+    queue.length = 0;
+
+    for (const stepKey of batch) {
+      visited++;
+      for (const child of graph.get(stepKey) ?? []) {
+        const nd = (inDegree.get(child) ?? 0) - 1;
+        inDegree.set(child, nd);
+        if (nd === 0) queue.push(child);
+      }
+    }
+  }
+
+  if (visited !== keys.length) {
+    throw new Error('Dependency cycle detected');
+  }
+
+  return batches;
 }
 
 function walk(
@@ -216,7 +309,7 @@ function walkJmes(
   node: unknown,
   path: string,
   onExpr: (expr: string, field: string) => void,
-  issues: FieldDetail[],
+  issues: ValidationIssue[],
   stepKey: string,
 ): void {
   if (Array.isArray(node)) {
@@ -234,6 +327,7 @@ function walkJmes(
       if (!(keys.length === 1 && keys[0] === '$jmes')) {
         issues.push({
           field: path,
+          stepKey,
           message: `stepKey=${stepKey}: $jmes node must be exactly { "$jmes": "..." }`,
         });
       }
@@ -242,6 +336,7 @@ function walkJmes(
       if (typeof expr !== 'string' || expr.trim().length === 0) {
         issues.push({
           field: `${path}.$jmes`,
+          stepKey,
           message: `stepKey=${stepKey}: $jmes expression must be a non-empty string`,
         });
       } else {

@@ -22,6 +22,7 @@ describe('WorkflowController', () => {
             get: jest.fn(),
             update: jest.fn(),
             createVersion: jest.fn(),
+            validateDefinition: jest.fn(),
           },
         },
         {
@@ -86,6 +87,33 @@ describe('WorkflowController', () => {
     expect(createVersionSpy).toHaveBeenCalledWith('wf_1', {
       steps: [],
     });
+  });
+
+  it('validateVersionDefinition() calls WorkflowService.validateDefinition() and WorkflowService.get()', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    jest.spyOn(service, 'get').mockResolvedValue(wf);
+
+    const validateSpy = jest
+      .spyOn(service as any, 'validateDefinition')
+      .mockReturnValue({
+        valid: true,
+        issues: [],
+        inferredDependencies: {},
+        executionBatches: [['a']],
+      });
+
+    await expect(
+      controller.validateVersionDefinition('wf_1', {
+        definition: { steps: [] },
+      }),
+    ).resolves.toEqual({
+      valid: true,
+      issues: [],
+      inferredDependencies: {},
+      executionBatches: [['a']],
+    });
+
+    expect(validateSpy).toHaveBeenCalledWith({ steps: [] });
   });
 
   it('runManual() calls OrchestrationService.startWorkflow() with input + overrides', async () => {

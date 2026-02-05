@@ -4,7 +4,11 @@ import { WorkflowDefinitionSchema } from '@taskforge/contracts';
 import { WorkflowRepository, PrismaService } from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
-import { validateWorkflowDefinitionStrict } from './workflow-definition.validator';
+import {
+  getInferredDependencies,
+  getExecutionBatchesFromDependencies,
+  validateWorkflowDefinitionStrict,
+} from './workflow-definition.validator';
 
 @Injectable()
 export class WorkflowService {
@@ -53,14 +57,7 @@ export class WorkflowService {
     await this.get(workflowId);
 
     const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
-
-    const issues = validateWorkflowDefinitionStrict(normalizedDefinition);
-    if (issues.length > 0) {
-      throw AppError.badRequest(
-        ErrorDefinitions.COMMON.VALIDATION_ERROR,
-        issues,
-      );
-    }
+    this.validateDefinitionOrThrow(normalizedDefinition);
 
     return this.prisma.$transaction(async (tx) => {
       const latest = await tx.workflowVersion.findFirst({
@@ -86,6 +83,37 @@ export class WorkflowService {
 
       return created;
     });
+  }
+
+  validateDefinition(definition: unknown) {
+    const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
+    const issues = validateWorkflowDefinitionStrict(normalizedDefinition);
+
+    const inferredDependencies = getInferredDependencies(normalizedDefinition);
+    let executionBatches: string[][] = [];
+    if (issues.length === 0) {
+      executionBatches =
+        getExecutionBatchesFromDependencies(inferredDependencies);
+    }
+
+    return {
+      valid: issues.length === 0,
+      issues,
+      inferredDependencies,
+      executionBatches,
+    };
+  }
+
+  validateDefinitionOrThrow(definition: unknown) {
+    const result = this.validateDefinition(definition);
+    if (!result.valid) {
+      throw AppError.badRequest(
+        ErrorDefinitions.COMMON.VALIDATION_ERROR,
+        result.issues,
+      );
+    }
+
+    return result;
   }
 
   list(): Promise<Workflow[]> {
