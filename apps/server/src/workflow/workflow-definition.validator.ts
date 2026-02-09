@@ -233,6 +233,43 @@ export function getInferredDependencies(
   return out;
 }
 
+export function getReferencedSecrets(
+  definition: WorkflowDefinition,
+): Array<{ name: string; field: string; stepKey?: string }> {
+  const steps = (definition.steps ?? []) as unknown as StepLike[];
+  const secretPattern = /\{\{\s*secret\.([a-zA-Z0-9_-]+)\s*\}\}/g;
+
+  const refs: Array<{ name: string; field: string; stepKey?: string }> = [];
+
+  // definition.input can also contain templates
+  walk(definition.input ?? {}, 'input', (value, path) => {
+    if (typeof value !== 'string') return;
+    secretPattern.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = secretPattern.exec(value)) !== null) {
+      const name = m[1];
+      if (!name) continue;
+      refs.push({ name, field: path });
+    }
+  });
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    walk(step.request, `steps[${i}].request`, (value, path) => {
+      if (typeof value !== 'string') return;
+      secretPattern.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = secretPattern.exec(value)) !== null) {
+        const name = m[1];
+        if (!name) continue;
+        refs.push({ name, field: path, stepKey: step.key });
+      }
+    });
+  }
+
+  return refs;
+}
+
 export function getExecutionBatchesFromDependencies(
   deps: Record<string, string[]>,
 ): string[][] {

@@ -1,6 +1,7 @@
 interface ResolutionContext {
   input: Record<string, unknown>;
   steps: Record<string, unknown>;
+  secret?: Record<string, string>;
 }
 
 interface ResolutionResult {
@@ -82,8 +83,19 @@ export class TemplateResolver {
       };
     }
 
+    const fullSecretMatch = template.match(/^\{\{\s*secret\.([a-zA-Z0-9_-]+)\s*\}\}$/);
+    if (fullSecretMatch) {
+      const key = fullSecretMatch[1];
+      const value = this.resolveSecretReference(key, context);
+      return {
+        resolved: this.coerceSingleValue(value),
+        referencedSteps: [],
+      };
+    }
+
     const stepPattern = /\{\{steps\.([a-zA-Z0-9_-]+)(\.[^}]*)?\}\}/g;
     const inputPattern = /\{\{input\.([a-zA-Z0-9_-]+)(\.[^}]*)?\}\}/g;
+    const secretPattern = /\{\{secret\.([a-zA-Z0-9_-]+)\}\}/g;
 
     let result = template.replace(stepPattern, (_, stepKey, path) => {
       referencedSteps.add(stepKey);
@@ -94,6 +106,11 @@ export class TemplateResolver {
 
     result = result.replace(inputPattern, (_, key, path) => {
       const value = this.resolveInputReference(key, path, context);
+      return this.coerceInterpolatedValue(value);
+    });
+
+    result = result.replace(secretPattern, (_, key) => {
+      const value = this.resolveSecretReference(key, context);
       return this.coerceInterpolatedValue(value);
     });
 
@@ -118,10 +135,15 @@ export class TemplateResolver {
     const output = stepOutput as unknown as Record<string, unknown>;
     const stepData = unwrapEnvelope(stepOutput);
 
-    const data =
-      stepData && typeof stepData === 'object' && 'body' in (stepData as any)
-        ? (stepData as { body: unknown }).body
-        : stepData;
+    const outputObj =
+      stepData && typeof stepData === 'object'
+        ? (stepData as Record<string, unknown>)
+        : undefined;
+
+    const maybeBody = outputObj?.body;
+    const bodyData = unwrapHttpBody(maybeBody);
+
+    const data = bodyData !== undefined ? bodyData : stepData;
 
     if (!path) return data;
 
@@ -161,6 +183,14 @@ export class TemplateResolver {
     }
 
     return value;
+  }
+
+  private resolveSecretReference(key: string, context: ResolutionContext): unknown {
+    const secrets = context.secret ?? {};
+    if (!(key in secrets)) {
+      throw new Error(`Secret "${key}" not found`);
+    }
+    return secrets[key];
   }
 
   private cleanReferencePath(path: string, prefixToStrip?: string): string {
@@ -213,5 +243,12 @@ export class TemplateResolver {
 function unwrapEnvelope(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   if (!('data' in (value as any)) || !('_taskforge' in (value as any))) return value;
+  const data = (value as any).data;
+  return data;
+}
+
+function unwrapHttpBody(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return undefined;
+  if (!('data' in (value as any)) || !('_taskforgeHttp' in (value as any))) return undefined;
   return (value as any).data;
 }

@@ -23,6 +23,7 @@ export const ValidateWorkflowDefinitionResSchema = z.object({
     .default([]),
   inferredDependencies: z.record(z.string(), z.array(z.string())).default({}),
   executionBatches: z.array(z.array(z.string())).default([]),
+  referencedSecrets: z.array(z.string()).default([]),
 });
 
 export class ValidateWorkflowDefinitionResDto extends createZodDto(

@@ -90,11 +90,15 @@ export class WorkflowController {
     await this.service.get(id);
 
     const result = this.service.validateDefinition(body.definition);
+    if (result.referencedSecrets.length > 0) {
+      await this.service.validateDefinitionOrThrow(body.definition);
+    }
     return {
       valid: result.valid,
       issues: result.issues,
       inferredDependencies: result.inferredDependencies,
       executionBatches: result.executionBatches,
+      referencedSecrets: result.referencedSecrets,
     };
   }
 

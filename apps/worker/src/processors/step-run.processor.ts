@@ -5,11 +5,14 @@ import {
   StepRunRepository,
   WorkflowRunRepository,
   WorkflowVersionRepository,
+  SecretRepository,
 } from '@taskforge/db-access';
 import { StepRunJobPayload } from '@taskforge/contracts';
 import { ExecutorRegistry } from '../executors/executor-registry';
 import { TemplateResolver } from '../utils/template-resolver';
 import { wrapForDb } from '../utils/persisted-json';
+import { redactSecrets } from '../utils/redact';
+import { CryptoService } from '../crypto/crypto.service';
 
 interface StepDefinition {
   key: string;
@@ -32,6 +35,8 @@ export class StepRunProcessor extends WorkerHost {
     private readonly stepRunRepository: StepRunRepository,
     private readonly workflowRunRepository: WorkflowRunRepository,
     private readonly workflowVersionRepository: WorkflowVersionRepository,
+    private readonly secretRepository: SecretRepository,
+    private readonly crypto: CryptoService,
     private readonly executorRegistry: ExecutorRegistry,
   ) {
     super();
@@ -69,6 +74,12 @@ export class StepRunProcessor extends WorkerHost {
 
       const stepOutputs = await this.fetchStepOutputs(workflowRunId, dependsOn || []);
 
+      const secretNames = this.findSecretRefs(stepDef.request ?? {});
+      const secrets = await this.secretRepository.findManyByNames(secretNames);
+      const secretMap: Record<string, string> = {};
+      for (const s of secrets) secretMap[s.name] = this.crypto.decryptSecret(s.value);
+      const secretValues = Object.values(secretMap);
+
       // Build context: merged input + step-level input + previous step outputs
       const context = {
         input: {
@@ -76,6 +87,7 @@ export class StepRunProcessor extends WorkerHost {
           ...stepLevelInput,
         },
         steps: stepOutputs,
+        secret: secretMap,
       };
 
       const requestDef = stepDef.request ?? {};
@@ -104,13 +116,15 @@ export class StepRunProcessor extends WorkerHost {
       const durationMs = stepRun.startedAt ? Date.now() - stepRun.startedAt.getTime() : 0;
 
       const outputPolicy = stepDef.outputPolicy ?? {};
-      const outputEnvelope = wrapForDb(outputUnwrapped, {
+      const redactedOutput = redactSecrets(outputUnwrapped, { secretValues });
+      const outputEnvelope = wrapForDb(redactedOutput, {
         maxBytes: outputPolicy.maxBytes ?? 256 * 1024,
         truncate: outputPolicy.truncate ?? true,
         reason: 'step_output',
       });
 
-      const inputEnvelope = wrapForDb(context.input, {
+      const redactedInput = redactSecrets(context.input, { secretValues });
+      const inputEnvelope = wrapForDb(redactedInput, {
         maxBytes: 256 * 1024,
         truncate: true,
         reason: 'step_input',
@@ -131,17 +145,21 @@ export class StepRunProcessor extends WorkerHost {
       const errorMessage = error instanceof Error ? error.message : 'unknown error';
       this.logger.error(`Step ${stepKey} failed: ${errorMessage}`);
 
-      const errorEnvelope = wrapForDb(
+      // Best-effort: if we already loaded secrets earlier in the run, they are not in scope here.
+      // We still redact common sensitive keys.
+
+      const redactedError = redactSecrets(
         {
           message: errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
         },
-        {
-          maxBytes: 64 * 1024,
-          truncate: true,
-          reason: 'step_error',
-        },
+        { secretValues: [] },
       );
+      const errorEnvelope = wrapForDb(redactedError, {
+        maxBytes: 64 * 1024,
+        truncate: true,
+        reason: 'step_error',
+      });
 
       await this.stepRunRepository.update(stepRunId, {
         status: 'FAILED',
@@ -154,6 +172,32 @@ export class StepRunProcessor extends WorkerHost {
 
       throw error;
     }
+  }
+
+  private findSecretRefs(value: unknown): string[] {
+    const found = new Set<string>();
+    const pattern = /\{\{\s*secret\.([a-zA-Z0-9_-]+)\s*\}\}/g;
+
+    const walk = (node: unknown) => {
+      if (typeof node === 'string') {
+        pattern.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = pattern.exec(node)) !== null) {
+          if (m[1]) found.add(m[1]);
+        }
+        return;
+      }
+      if (Array.isArray(node)) {
+        for (const x of node) walk(x);
+        return;
+      }
+      if (node && typeof node === 'object') {
+        for (const v of Object.values(node as Record<string, unknown>)) walk(v);
+      }
+    };
+
+    walk(value);
+    return Array.from(found);
   }
 
   private async fetchStepOutputs(workflowRunId: string, stepKeys: string[]): Promise<Record<string, unknown>> {
@@ -225,6 +269,7 @@ export class StepRunProcessor extends WorkerHost {
 
 function unwrapExecutorOutput(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
+  // Unwrap HttpExecutor body helper wrapper.
   if ('_taskforgeHttp' in (value as any) && 'data' in (value as any)) {
     return (value as any).data;
   }

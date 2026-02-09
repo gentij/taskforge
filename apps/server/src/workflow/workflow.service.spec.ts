@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { WorkflowService } from './workflow.service';
 import { WorkflowRepository, PrismaService } from '@taskforge/db-access';
+import { SecretRepository } from '@taskforge/db-access';
 import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,
@@ -25,11 +26,13 @@ describe('WorkflowService', () => {
   beforeEach(async () => {
     repo = createWorkflowRepositoryMock();
     prisma = createPrismaServiceMock();
+    const secretRepo = { findManyByNames: jest.fn().mockResolvedValue([]) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         WorkflowService,
         { provide: WorkflowRepository, useValue: repo },
+        { provide: SecretRepository, useValue: secretRepo },
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();

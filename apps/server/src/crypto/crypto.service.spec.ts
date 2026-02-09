@@ -4,7 +4,10 @@ describe('CryptoService', () => {
   let service: CryptoService;
 
   beforeEach(() => {
-    service = new CryptoService();
+    const config = {
+      get: jest.fn().mockReturnValue('0'.repeat(64)),
+    } as unknown as ConfigService;
+    service = new CryptoService(config);
   });
 
   it('generateApiToken() returns token with tf_ prefix and hex payload', () => {
@@ -31,3 +34,4 @@ describe('CryptoService', () => {
     expect(hash).toBe(hash2);
   });
 });
+import type { ConfigService } from '@nestjs/config';

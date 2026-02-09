@@ -100,6 +100,7 @@ describe('WorkflowController', () => {
         issues: [],
         inferredDependencies: {},
         executionBatches: [['a']],
+        referencedSecrets: [],
       });
 
     await expect(
@@ -111,6 +112,7 @@ describe('WorkflowController', () => {
       issues: [],
       inferredDependencies: {},
       executionBatches: [['a']],
+      referencedSecrets: [],
     });
 
     expect(validateSpy).toHaveBeenCalledWith({ steps: [] });

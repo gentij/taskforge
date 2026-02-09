@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Workflow, WorkflowVersion } from '@prisma/client';
 import { WorkflowDefinitionSchema } from '@taskforge/contracts';
-import { WorkflowRepository, PrismaService } from '@taskforge/db-access';
+import {
+  SecretRepository,
+  WorkflowRepository,
+  PrismaService,
+} from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
 import {
   getInferredDependencies,
   getExecutionBatchesFromDependencies,
+  getReferencedSecrets,
   validateWorkflowDefinitionStrict,
 } from './workflow-definition.validator';
 
@@ -14,6 +19,7 @@ import {
 export class WorkflowService {
   constructor(
     private readonly repo: WorkflowRepository,
+    private readonly secretRepo: SecretRepository,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -57,7 +63,7 @@ export class WorkflowService {
     await this.get(workflowId);
 
     const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
-    this.validateDefinitionOrThrow(normalizedDefinition);
+    await this.validateDefinitionOrThrow(normalizedDefinition);
 
     return this.prisma.$transaction(async (tx) => {
       const latest = await tx.workflowVersion.findFirst({
@@ -89,6 +95,11 @@ export class WorkflowService {
     const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
     const issues = validateWorkflowDefinitionStrict(normalizedDefinition);
 
+    const secretRefs = getReferencedSecrets(normalizedDefinition);
+    const referencedSecrets = Array.from(
+      new Set(secretRefs.map((r) => r.name)),
+    );
+
     const inferredDependencies = getInferredDependencies(normalizedDefinition);
     let executionBatches: string[][] = [];
     if (issues.length === 0) {
@@ -101,15 +112,42 @@ export class WorkflowService {
       issues,
       inferredDependencies,
       executionBatches,
+      referencedSecrets,
     };
   }
 
-  validateDefinitionOrThrow(definition: unknown) {
+  async validateDefinitionOrThrow(definition: unknown) {
     const result = this.validateDefinition(definition);
     if (!result.valid) {
       throw AppError.badRequest(
         ErrorDefinitions.COMMON.VALIDATION_ERROR,
         result.issues,
+      );
+    }
+
+    const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
+    const secretRefs = getReferencedSecrets(normalizedDefinition);
+
+    const secrets = (await (
+      this.secretRepo as unknown as {
+        findManyByNames: (names: string[]) => Promise<Array<{ name: string }>>;
+      }
+    ).findManyByNames(result.referencedSecrets)) as Array<{ name: string }>;
+
+    const existing = new Set<string>(secrets.map((s) => s.name));
+    const missing = result.referencedSecrets.filter((n) => !existing.has(n));
+    if (missing.length > 0) {
+      const issues = secretRefs
+        .filter((r) => missing.includes(r.name))
+        .map((r) => ({
+          field: r.field,
+          stepKey: r.stepKey,
+          message: `secret "${r.name}" not found`,
+        }));
+
+      throw AppError.badRequest(
+        ErrorDefinitions.COMMON.VALIDATION_ERROR,
+        issues,
       );
     }
 

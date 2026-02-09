@@ -18,6 +18,15 @@ export class SecretRepository {
     return this.prisma.secret.findUnique({ where: { id } });
   }
 
+  findByName(name: string): Promise<Secret | null> {
+    return this.prisma.secret.findUnique({ where: { name } });
+  }
+
+  findManyByNames(names: string[]): Promise<Secret[]> {
+    if (names.length === 0) return Promise.resolve([]);
+    return this.prisma.secret.findMany({ where: { name: { in: names } } });
+  }
+
   update(id: string, data: Prisma.SecretUpdateInput): Promise<Secret> {
     return this.prisma.secret.update({ where: { id }, data });
   }

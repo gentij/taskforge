@@ -10,6 +10,12 @@ import {
   createSecretListFixture,
 } from 'test/secret/secret.fixtures';
 import { AppError } from 'src/common/http/errors/app-error';
+import { CryptoService } from 'src/crypto/crypto.service';
+import { ConfigService } from '@nestjs/config';
+
+function createConfigMock() {
+  return { get: jest.fn().mockReturnValue('0'.repeat(64)) };
+}
 
 describe('SecretService', () => {
   let service: SecretService;
@@ -17,9 +23,19 @@ describe('SecretService', () => {
 
   beforeEach(async () => {
     repo = createSecretRepositoryMock();
+    const config = createConfigMock();
+    const crypto = new CryptoService(config as unknown as ConfigService);
 
     const moduleRef = await Test.createTestingModule({
-      providers: [SecretService, { provide: SecretRepository, useValue: repo }],
+      providers: [
+        SecretService,
+        { provide: SecretRepository, useValue: repo },
+        { provide: CryptoService, useValue: crypto },
+        {
+          provide: ConfigService,
+          useValue: config as unknown as ConfigService,
+        },
+      ],
     }).compile();
 
     service = moduleRef.get(SecretService);
@@ -29,15 +45,15 @@ describe('SecretService', () => {
     const created = createSecretFixture({ name: 'API_KEY' });
     repo.create.mockResolvedValue(created);
 
-    await expect(
-      service.create({ name: 'API_KEY', value: 'secret-value' }),
-    ).resolves.toBe(created);
+    await service.create({ name: 'API_KEY', value: 'secret-value' });
 
-    expect(repo.create).toHaveBeenCalledWith({
-      name: 'API_KEY',
-      value: 'secret-value',
-      description: undefined,
-    });
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'API_KEY',
+        description: undefined,
+        value: expect.stringMatching(/^tfsec:v1:/) as unknown as string,
+      }),
+    );
   });
 
   it('list() returns secrets', async () => {
@@ -49,10 +65,14 @@ describe('SecretService', () => {
   });
 
   it('get() returns secret when found', async () => {
+    const crypto = new CryptoService(
+      createConfigMock() as unknown as ConfigService,
+    );
     const secret = createSecretFixture({ id: 'sec_1' });
-    repo.findById.mockResolvedValue(secret);
+    const encrypted = crypto.encryptSecret(secret.value);
+    repo.findById.mockResolvedValue({ ...secret, value: encrypted });
 
-    await expect(service.get('sec_1')).resolves.toBe(secret);
+    await expect(service.get('sec_1')).resolves.toStrictEqual(secret);
     expect(repo.findById).toHaveBeenCalledWith('sec_1');
   });
 
@@ -63,25 +83,36 @@ describe('SecretService', () => {
   });
 
   it('update() updates secret after existence check', async () => {
+    const crypto = new CryptoService(
+      createConfigMock() as unknown as ConfigService,
+    );
     const secret = createSecretFixture({ id: 'sec_1' });
+    const encrypted = crypto.encryptSecret(secret.value);
     const updated = createSecretFixture({ id: 'sec_1', name: 'UPDATED' });
 
-    repo.findById.mockResolvedValue(secret);
-    repo.update.mockResolvedValue(updated);
+    repo.findById.mockResolvedValue({ ...secret, value: encrypted });
+    repo.update.mockResolvedValue({ ...updated, value: encrypted });
 
-    await expect(service.update('sec_1', { name: 'UPDATED' })).resolves.toBe(
-      updated,
+    await expect(
+      service.update('sec_1', { name: 'UPDATED' }),
+    ).resolves.toStrictEqual(updated);
+
+    expect(repo.update).toHaveBeenCalledWith(
+      'sec_1',
+      expect.objectContaining({ name: 'UPDATED' }),
     );
-
-    expect(repo.update).toHaveBeenCalledWith('sec_1', { name: 'UPDATED' });
   });
 
   it('delete() deletes secret after existence check', async () => {
+    const crypto = new CryptoService(
+      createConfigMock() as unknown as ConfigService,
+    );
     const secret = createSecretFixture({ id: 'sec_1' });
-    repo.findById.mockResolvedValue(secret);
-    repo.delete.mockResolvedValue(secret);
+    const encrypted = crypto.encryptSecret(secret.value);
+    repo.findById.mockResolvedValue({ ...secret, value: encrypted });
+    repo.delete.mockResolvedValue({ ...secret, value: encrypted });
 
-    await expect(service.delete('sec_1')).resolves.toBe(secret);
+    await expect(service.delete('sec_1')).resolves.toStrictEqual(secret);
     expect(repo.delete).toHaveBeenCalledWith('sec_1');
   });
 });

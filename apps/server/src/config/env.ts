@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+function isBase64Key32(value: string): boolean {
+  try {
+    const buf = Buffer.from(value, 'base64');
+    return buf.length === 32;
+  } catch {
+    return false;
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -35,6 +44,14 @@ const envSchema = z.object({
   TASKFORGE_ADMIN_TOKEN: z
     .string()
     .min(32, 'TASKFORGE_ADMIN_TOKEN must be at least 32 characters'),
+
+  TASKFORGE_SECRET_KEY: z
+    .string()
+    .min(1, 'TASKFORGE_SECRET_KEY is required')
+    .refine((v) => /^[0-9a-fA-F]{64}$/.test(v) || isBase64Key32(v), {
+      message:
+        'TASKFORGE_SECRET_KEY must be 64-char hex or base64 for 32 bytes',
+    }),
 
   VERSION: z.string().default('0.1.0'),
 });

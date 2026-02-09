@@ -1,6 +1,7 @@
 import { StepRunProcessor } from './step-run.processor';
 import {
   type PrismaService,
+  SecretRepository,
   StepRunRepository,
   WorkflowRunRepository,
   WorkflowVersionRepository,
@@ -9,6 +10,7 @@ import type { Job } from 'bullmq';
 import type { StepRunJobPayload } from '@taskforge/contracts';
 import { ExecutorRegistry } from '../executors/executor-registry';
 import { createPrismaServiceMock } from 'test/prisma.mocks';
+import { CryptoService } from '../crypto/crypto.service';
 
 describe('StepRunProcessor', () => {
   let executeMock: jest.Mock;
@@ -68,11 +70,19 @@ describe('StepRunProcessor', () => {
     const stepRunRepo = new StepRunRepository(prismaService);
     const workflowRunRepo = new WorkflowRunRepository(prismaService);
     const workflowVersionRepo = new WorkflowVersionRepository(prismaService);
+    const secretRepo = {
+      findManyByNames: jest.fn().mockResolvedValue([]),
+    } as unknown as SecretRepository;
+
+    process.env.TASKFORGE_SECRET_KEY = '0'.repeat(64);
+    const crypto = new CryptoService();
 
     const processor = new StepRunProcessor(
       stepRunRepo,
       workflowRunRepo,
       workflowVersionRepo,
+      secretRepo,
+      crypto,
       { get: registryMock } as unknown as ExecutorRegistry,
     );
 
@@ -112,6 +122,7 @@ describe('StepRunProcessor', () => {
       input: {
         input: { hello: 'world' },
         steps: {},
+        secret: {},
       },
     });
 
@@ -153,6 +164,12 @@ describe('StepRunProcessor', () => {
     const stepRunRepo = new StepRunRepository(prismaService);
     const workflowRunRepo = new WorkflowRunRepository(prismaService);
     const workflowVersionRepo = new WorkflowVersionRepository(prismaService);
+    const secretRepo = {
+      findManyByNames: jest.fn().mockResolvedValue([]),
+    } as unknown as SecretRepository;
+
+    process.env.TASKFORGE_SECRET_KEY = '0'.repeat(64);
+    const crypto = new CryptoService();
 
     const executeFailed = jest.fn().mockRejectedValue(new Error('boom'));
 
@@ -160,6 +177,8 @@ describe('StepRunProcessor', () => {
       stepRunRepo,
       workflowRunRepo,
       workflowVersionRepo,
+      secretRepo,
+      crypto,
       { get: () => ({ stepType: 'http', execute: executeFailed }) } as unknown as ExecutorRegistry,
     );
 

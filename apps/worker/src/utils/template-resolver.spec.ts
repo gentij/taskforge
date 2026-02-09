@@ -27,7 +27,7 @@ describe('TemplateResolver', () => {
       steps: { fetch: { statusCode: 200, body: { ok: true } } },
     });
 
-    expect(resolved).toEqual({ ok: true });
+    expect(resolved).toEqual({ statusCode: 200, body: { ok: true } });
   });
 
   it('interpolates primitives inside strings', () => {
@@ -37,5 +37,15 @@ describe('TemplateResolver', () => {
     });
 
     expect(resolved).toBe('Hello Alice!');
+  });
+
+  it('resolves secret references', () => {
+    const { resolved } = resolver.resolve('Hello {{secret.token}}', {
+      input: {},
+      steps: {},
+      secret: { token: 'ABC' },
+    });
+
+    expect(resolved).toBe('Hello ABC');
   });
 });
