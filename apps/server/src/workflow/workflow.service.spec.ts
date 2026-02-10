@@ -45,7 +45,16 @@ describe('WorkflowService', () => {
     const version = createWorkflowVersionFixture({
       workflowId: wf.id,
       version: 1,
-      definition: { steps: [] },
+      definition: {
+        input: {},
+        steps: [
+          {
+            key: 's1',
+            type: 'http',
+            request: { method: 'GET', url: 'https://example.com' },
+          },
+        ],
+      },
     });
     const updated = createWorkflowFixture({
       id: wf.id,
@@ -78,7 +87,12 @@ describe('WorkflowService', () => {
 
     prisma.$transaction.mockImplementation((cb) => Promise.resolve(cb(tx)));
 
-    await expect(service.create('My WF')).resolves.toBe(updated);
+    await expect(
+      service.create({
+        name: 'My WF',
+        definition: version.definition,
+      }),
+    ).resolves.toBe(updated);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.workflow.create).toHaveBeenCalledWith({
@@ -101,7 +115,7 @@ describe('WorkflowService', () => {
       data: {
         workflowId: wf.id,
         version: 1,
-        definition: { steps: [] },
+        definition: version.definition,
       },
     });
     expect(tx.workflow.update).toHaveBeenCalledWith({

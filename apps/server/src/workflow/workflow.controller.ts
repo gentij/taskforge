@@ -34,7 +34,10 @@ export class WorkflowController {
   })
   @Post()
   create(@Body() body: CreateWorkflowReqDto) {
-    return this.service.create(body.name);
+    return this.service.create({
+      name: body.name,
+      definition: body.definition,
+    });
   }
 
   @ApiEnvelope(WorkflowResDto, {

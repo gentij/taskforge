@@ -44,8 +44,16 @@ describe('WorkflowController', () => {
     const wf = createWorkflowFixture({ name: 'My WF' });
     const createSpy = jest.spyOn(service, 'create').mockResolvedValue(wf);
 
-    await expect(controller.create({ name: 'My WF' })).resolves.toBe(wf);
-    expect(createSpy).toHaveBeenCalledWith('My WF');
+    await expect(
+      controller.create({
+        name: 'My WF',
+        definition: { steps: [] },
+      }),
+    ).resolves.toBe(wf);
+    expect(createSpy).toHaveBeenCalledWith({
+      name: 'My WF',
+      definition: { steps: [] },
+    });
   });
 
   it('list() calls WorkflowService.list()', async () => {

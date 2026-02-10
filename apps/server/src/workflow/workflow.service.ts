@@ -23,10 +23,18 @@ export class WorkflowService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async create(name: string): Promise<Workflow> {
+  async create(params: {
+    name: string;
+    definition: unknown;
+  }): Promise<Workflow> {
+    const normalizedDefinition = WorkflowDefinitionSchema.parse(
+      params.definition,
+    );
+    await this.validateDefinitionOrThrow(normalizedDefinition);
+
     return this.prisma.$transaction(async (tx) => {
       const workflow = await tx.workflow.create({
-        data: { name },
+        data: { name: params.name },
       });
 
       await tx.trigger.create({
@@ -43,7 +51,7 @@ export class WorkflowService {
         data: {
           workflowId: workflow.id,
           version: 1,
-          definition: { steps: [] },
+          definition: normalizedDefinition as Prisma.InputJsonValue,
         },
       });
 
