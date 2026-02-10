@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ZodValidationPipe, ZodSerializerInterceptor } from 'nestjs-zod';
 import { LoggerModule } from 'nestjs-pino';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { validateEnv } from './config/env';
 import { HealthModule } from './health/health.module';
@@ -15,6 +16,7 @@ import { PrismaModule } from './prisma/prisma.module';
       isGlobal: true,
       validate: validateEnv,
     }),
+    ScheduleModule.forRoot(),
     LoggerModule.forRoot(),
     CoreModule,
     PrismaModule,

@@ -3,6 +3,10 @@ import type { Prisma, Trigger } from '@prisma/client';
 import { TriggerRepository, WorkflowRepository } from '@taskforge/db-access';
 import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
+import { CronTriggerConfigSchema } from './cron/cron-trigger.types';
+import { parseExpression } from 'cron-parser';
+
+const CRON_FIVE_FIELD = /^\s*([^\s]+\s+){4}[^\s]+\s*$/;
 
 @Injectable()
 export class TriggerService {
@@ -25,6 +29,28 @@ export class TriggerService {
     config?: Prisma.InputJsonValue;
   }): Promise<Trigger> {
     await this.assertWorkflowExists(params.workflowId);
+
+    if (params.type === 'CRON') {
+      const parsed = CronTriggerConfigSchema.safeParse(params.config ?? {});
+      if (!parsed.success) {
+        throw AppError.badRequest(ErrorDefinitions.COMMON.VALIDATION_ERROR, [
+          { field: 'config', message: parsed.error.message },
+        ]);
+      }
+
+      // Validate cron expression (5-field only) and timezone.
+      try {
+        if (!CRON_FIVE_FIELD.test(parsed.data.cron)) {
+          throw new Error('Cron expression must have 5 fields');
+        }
+        parseExpression(parsed.data.cron, { tz: parsed.data.timezone });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw AppError.badRequest(ErrorDefinitions.COMMON.VALIDATION_ERROR, [
+          { field: 'config.cron', message: `Invalid cron: ${msg}` },
+        ]);
+      }
+    }
 
     return this.repo.create({
       workflow: { connect: { id: params.workflowId } },
@@ -60,6 +86,30 @@ export class TriggerService {
     },
   ): Promise<Trigger> {
     await this.get(workflowId, id);
+
+    // If updating config for a CRON trigger, validate it.
+    const existing = await this.repo.findById(id);
+    if (existing?.type === 'CRON' && patch.config !== undefined) {
+      const parsed = CronTriggerConfigSchema.safeParse(patch.config);
+      if (!parsed.success) {
+        throw AppError.badRequest(ErrorDefinitions.COMMON.VALIDATION_ERROR, [
+          { field: 'config', message: parsed.error.message },
+        ]);
+      }
+
+      try {
+        if (!CRON_FIVE_FIELD.test(parsed.data.cron)) {
+          throw new Error('Cron expression must have 5 fields');
+        }
+        parseExpression(parsed.data.cron, { tz: parsed.data.timezone });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw AppError.badRequest(ErrorDefinitions.COMMON.VALIDATION_ERROR, [
+          { field: 'config.cron', message: `Invalid cron: ${msg}` },
+        ]);
+      }
+    }
+
     return this.repo.update(id, patch);
   }
 }
