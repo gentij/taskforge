@@ -70,9 +70,24 @@ export const TransformStepDefinitionSchema = BaseStepDefinitionSchema.extend({
   request: TransformRequestSpecSchema,
 });
 
+export const ConditionRequestSpecSchema = z
+  .object({
+    expr: z.string().min(1),
+    assert: z.boolean().optional(),
+    message: z.string().min(1).optional(),
+    source: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
+export const ConditionStepDefinitionSchema = BaseStepDefinitionSchema.extend({
+  type: z.literal('condition'),
+  request: ConditionRequestSpecSchema,
+});
+
 export const StepDefinitionSchema = z.discriminatedUnion('type', [
   HttpStepDefinitionSchema,
   TransformStepDefinitionSchema,
+  ConditionStepDefinitionSchema,
 ]);
 
 export const WorkflowDefinitionSchema = z.object({
@@ -85,5 +100,7 @@ export type HttpRequestSpec = z.infer<typeof HttpRequestSpecSchema>;
 export type HttpStepDefinition = z.infer<typeof HttpStepDefinitionSchema>;
 export type TransformRequestSpec = z.infer<typeof TransformRequestSpecSchema>;
 export type TransformStepDefinition = z.infer<typeof TransformStepDefinitionSchema>;
+export type ConditionRequestSpec = z.infer<typeof ConditionRequestSpecSchema>;
+export type ConditionStepDefinition = z.infer<typeof ConditionStepDefinitionSchema>;
 export type StepDefinition = z.infer<typeof StepDefinitionSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

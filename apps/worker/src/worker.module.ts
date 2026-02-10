@@ -13,6 +13,7 @@ import {
 import { ExecutorRegistry } from './executors/executor-registry';
 import { HttpExecutorModule } from './executors/http/http-executor.module';
 import { TransformExecutorModule } from './executors/transform/transform-executor.module';
+import { ConditionExecutorModule } from './executors/condition/condition-executor.module';
 import { StepRunProcessor } from './processors/step-run.processor';
 
 @Module({
@@ -27,6 +28,7 @@ import { StepRunProcessor } from './processors/step-run.processor';
     BullModule.registerQueue({ name: STEP_RUN_QUEUE_NAME }),
     HttpExecutorModule,
     TransformExecutorModule,
+    ConditionExecutorModule,
   ],
   providers: [
     StepRunProcessor,

@@ -4,6 +4,8 @@ export {
   HttpStepDefinitionSchema,
   TransformRequestSpecSchema,
   TransformStepDefinitionSchema,
+  ConditionRequestSpecSchema,
+  ConditionStepDefinitionSchema,
   StepDefinitionSchema,
   WorkflowDefinitionSchema,
 } from './workflow-definition';
@@ -13,6 +15,8 @@ export type {
   HttpStepDefinition,
   TransformRequestSpec,
   TransformStepDefinition,
+  ConditionRequestSpec,
+  ConditionStepDefinition,
   StepDefinition,
   WorkflowDefinition,
 } from './workflow-definition';

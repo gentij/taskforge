@@ -20,6 +20,7 @@ type StepLike = {
 };
 
 type TransformRequestLike = { output?: unknown };
+type ConditionRequestLike = { expr?: unknown };
 
 export function validateWorkflowDefinitionStrict(
   definition: WorkflowDefinition,
@@ -142,7 +143,24 @@ export function validateWorkflowDefinitionStrict(
     );
   }
 
-  // (reserved for future step types)
+  // Validate condition expressions compile.
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (step.type !== 'condition') continue;
+    const expr = (step.request as ConditionRequestLike | undefined)?.expr;
+    if (typeof expr !== 'string' || expr.trim().length === 0) continue;
+
+    try {
+      jmespath.compile(expr);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      issues.push({
+        field: `steps[${i}].request.expr`,
+        stepKey: step.key,
+        message: `stepKey=${step.key}: invalid JMESPath expression: ${message}`,
+      });
+    }
+  }
 
   // Cycle detection using explicit + inferred dependencies
   const deps = new Map<string, Set<string>>();

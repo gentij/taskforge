@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { StepExecutor } from './executor.interface';
 import { HttpExecutor } from './http/http-executor';
 import { TransformExecutor } from './transform/transform-executor';
+import { ConditionExecutor } from './condition/condition-executor';
 
 @Injectable()
 export class ExecutorRegistry {
@@ -11,9 +12,11 @@ export class ExecutorRegistry {
   constructor(
     private readonly httpExecutor: HttpExecutor,
     private readonly transformExecutor: TransformExecutor,
+    private readonly conditionExecutor: ConditionExecutor,
   ) {
     this.register(httpExecutor);
     this.register(transformExecutor);
+    this.register(conditionExecutor);
   }
 
   private register(executor: StepExecutor): void {
