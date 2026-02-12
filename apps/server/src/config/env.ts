@@ -41,6 +41,19 @@ const envSchema = z.object({
       message: 'REDIS_URL must be a Redis connection string',
     }),
 
+  CACHE_TTL_SECONDS: z
+    .string()
+    .optional()
+    .transform((val) => (val ? Number(val) : 60))
+    .refine((val) => Number.isInteger(val) && val > 0, {
+      message: 'CACHE_TTL_SECONDS must be a positive integer',
+    }),
+
+  CACHE_REDIS_PREFIX: z
+    .string()
+    .optional()
+    .transform((val) => val ?? 'tf:server:'),
+
   TASKFORGE_ADMIN_TOKEN: z
     .string()
     .min(32, 'TASKFORGE_ADMIN_TOKEN must be at least 32 characters'),

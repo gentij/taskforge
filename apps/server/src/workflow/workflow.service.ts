@@ -8,12 +8,16 @@ import {
 } from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import type { Cache } from 'cache-manager';
 import {
   getInferredDependencies,
   getExecutionBatchesFromDependencies,
   getReferencedSecrets,
   validateWorkflowDefinitionStrict,
 } from './workflow-definition.validator';
+import { cacheKeys } from 'src/cache/cache-keys';
 
 @Injectable()
 export class WorkflowService {
@@ -21,6 +25,7 @@ export class WorkflowService {
     private readonly repo: WorkflowRepository,
     private readonly secretRepo: SecretRepository,
     private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   async create(params: {
@@ -32,7 +37,7 @@ export class WorkflowService {
     );
     await this.validateDefinitionOrThrow(normalizedDefinition);
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const workflow = await tx.workflow.create({
         data: { name: params.name },
       });
@@ -62,6 +67,9 @@ export class WorkflowService {
 
       return updatedWorkflow;
     });
+
+    await this.cache.del(cacheKeys.workflowList());
+    return created;
   }
 
   async createVersion(
@@ -73,7 +81,7 @@ export class WorkflowService {
     const normalizedDefinition = WorkflowDefinitionSchema.parse(definition);
     await this.validateDefinitionOrThrow(normalizedDefinition);
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const latest = await tx.workflowVersion.findFirst({
         where: { workflowId },
         orderBy: { version: 'desc' },
@@ -97,6 +105,11 @@ export class WorkflowService {
 
       return created;
     });
+
+    await this.cache.del(cacheKeys.workflowList());
+    await this.cache.del(cacheKeys.workflowGet(workflowId));
+    await this.cache.del(cacheKeys.workflowVersionList(workflowId));
+    return created;
   }
 
   validateDefinition(definition: unknown) {
@@ -162,15 +175,42 @@ export class WorkflowService {
     return result;
   }
 
-  list(): Promise<Workflow[]> {
-    return this.repo.findMany();
+  async list(): Promise<Workflow[]> {
+    const key = cacheKeys.workflowList();
+    try {
+      const cached = await this.cache.get<Workflow[]>(key);
+      if (cached) return cached;
+    } catch {
+      // fail-open: cache errors should not break API
+    }
+
+    const workflows = await this.repo.findMany();
+    try {
+      await this.cache.set(key, workflows);
+    } catch {
+      // fail-open: cache errors should not break API
+    }
+    return workflows;
   }
 
   async get(id: string): Promise<Workflow> {
+    const key = cacheKeys.workflowGet(id);
+    try {
+      const cached = await this.cache.get<Workflow>(key);
+      if (cached) return cached;
+    } catch {
+      // fail-open: cache errors should not break API
+    }
+
     const wf = await this.repo.findById(id);
 
     if (!wf) throw AppError.notFound(ErrorDefinitions.WORKFLOW.NOT_FOUND);
 
+    try {
+      await this.cache.set(key, wf);
+    } catch {
+      // fail-open: cache errors should not break API
+    }
     return wf;
   }
 
@@ -180,6 +220,9 @@ export class WorkflowService {
   ): Promise<Workflow> {
     await this.get(id);
 
-    return this.repo.update(id, patch);
+    const updated = await this.repo.update(id, patch);
+    await this.cache.del(cacheKeys.workflowList());
+    await this.cache.del(cacheKeys.workflowGet(id));
+    return updated;
   }
 }

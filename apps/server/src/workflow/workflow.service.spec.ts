@@ -17,6 +17,7 @@ import {
   PrismaServiceMock,
   PrismaTxMock,
 } from 'test/prisma/prisma.mocks';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 describe('WorkflowService', () => {
   let service: WorkflowService;
@@ -27,6 +28,18 @@ describe('WorkflowService', () => {
     repo = createWorkflowRepositoryMock();
     prisma = createPrismaServiceMock();
     const secretRepo = { findManyByNames: jest.fn().mockResolvedValue([]) };
+    const cacheStore = new Map<string, unknown>();
+    const cache = {
+      get: jest.fn((key: string) => Promise.resolve(cacheStore.get(key))),
+      set: jest.fn((key: string, value: unknown) => {
+        cacheStore.set(key, value);
+        return Promise.resolve();
+      }),
+      del: jest.fn((key: string) => {
+        cacheStore.delete(key);
+        return Promise.resolve();
+      }),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -34,6 +47,7 @@ describe('WorkflowService', () => {
         { provide: WorkflowRepository, useValue: repo },
         { provide: SecretRepository, useValue: secretRepo },
         { provide: PrismaService, useValue: prisma },
+        { provide: CACHE_MANAGER, useValue: cache },
       ],
     }).compile();
 

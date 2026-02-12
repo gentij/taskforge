@@ -1,11 +1,14 @@
 import { APP_PIPE, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ZodValidationPipe, ZodSerializerInterceptor } from 'nestjs-zod';
 import { LoggerModule } from 'nestjs-pino';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerBehindProxyGuard } from './common/http/guards/throttler-behind-proxy.guard';
+import Keyv from 'keyv';
+import KeyvRedis from '@keyv/redis';
 
 import { validateEnv } from './config/env';
 import { HealthModule } from './health/health.module';
@@ -17,6 +20,19 @@ import { PrismaModule } from './prisma/prisma.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        stores: new Keyv({
+          store: new KeyvRedis(config.get<string>('REDIS_URL') ?? ''),
+          ttl: (config.get<number>('CACHE_TTL_SECONDS') ?? 60) * 1000,
+          namespace: config.get<string>('CACHE_REDIS_PREFIX') ?? 'tf:server:',
+        }),
+        ttl: (config.get<number>('CACHE_TTL_SECONDS') ?? 60) * 1000,
+        namespace: config.get<string>('CACHE_REDIS_PREFIX') ?? 'tf:server:',
+      }),
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
