@@ -20,7 +20,7 @@ export class TransformExecutor implements StepExecutor {
     const request = validated.request;
     const ctx = validated.input as any;
 
-    const source = (request.source ?? {}) as Record<string, unknown>;
+    const source = request.source ?? {};
     const stepResponses = (ctx?.steps ?? {}) as Record<string, unknown>;
     const steps = this.unwrapBodies(stepResponses);
 

@@ -1,6 +1,4 @@
-import {
-  createDecipheriv,
-} from 'crypto';
+import { createDecipheriv } from 'crypto';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -10,9 +8,7 @@ export class CryptoService {
   constructor() {
     const raw = process.env.TASKFORGE_SECRET_KEY;
     if (!raw) {
-      throw new Error(
-        'TASKFORGE_SECRET_KEY is required (32-byte base64 or 64-char hex)',
-      );
+      throw new Error('TASKFORGE_SECRET_KEY is required (32-byte base64 or 64-char hex)');
     }
 
     this.secretKey = decodeKey(raw);
@@ -37,10 +33,7 @@ export class CryptoService {
 
     const decipher = createDecipheriv('aes-256-gcm', this.secretKey, iv);
     decipher.setAuthTag(tag);
-    const plaintext = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     return plaintext.toString('utf8');
   }
 }

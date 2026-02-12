@@ -13,6 +13,10 @@ import { TemplateResolver } from '../utils/template-resolver';
 import { wrapForDb } from '../utils/persisted-json';
 import { redactSecrets } from '../utils/redact';
 import { CryptoService } from '../crypto/crypto.service';
+import { Inject } from '@nestjs/common';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.constants';
+import { checkFixedWindowRateLimit } from '../utils/rate-limit';
 
 interface StepDefinition {
   key: string;
@@ -23,6 +27,11 @@ interface StepDefinition {
   outputPolicy?: {
     truncate?: boolean;
     maxBytes?: number;
+  };
+  rateLimit?: {
+    key: string;
+    max: number;
+    perSeconds: number;
   };
 }
 
@@ -37,13 +46,21 @@ export class StepRunProcessor extends WorkerHost {
     private readonly workflowVersionRepository: WorkflowVersionRepository,
     private readonly secretRepository: SecretRepository,
     private readonly crypto: CryptoService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly executorRegistry: ExecutorRegistry,
   ) {
     super();
   }
 
   async process(job: Job<StepRunJobPayload>): Promise<void> {
-    const { workflowRunId, stepRunId, stepKey, workflowVersionId, dependsOn, input: triggerInput } = job.data;
+    const {
+      workflowRunId,
+      stepRunId,
+      stepKey,
+      workflowVersionId,
+      dependsOn,
+      input: triggerInput,
+    } = job.data;
 
     try {
       await this.workflowRunRepository.markRunningIfQueued(workflowRunId);
@@ -70,7 +87,7 @@ export class StepRunProcessor extends WorkerHost {
       }
 
       const mergedInput = (triggerInput as Record<string, unknown>) ?? {};
-      const stepLevelInput = (stepDef.input ?? {}) as Record<string, unknown>;
+      const stepLevelInput = stepDef.input ?? {};
 
       const stepOutputs = await this.fetchStepOutputs(workflowRunId, dependsOn || []);
 
@@ -91,7 +108,10 @@ export class StepRunProcessor extends WorkerHost {
       };
 
       const requestDef = stepDef.request ?? {};
-      const { resolved: resolvedRequest, referencedSteps } = this.templateResolver.resolve(requestDef, context);
+      const { resolved: resolvedRequest, referencedSteps } = this.templateResolver.resolve(
+        requestDef,
+        context,
+      );
 
       const request = this.applyHttpOverrides(
         stepDef.type,
@@ -100,6 +120,10 @@ export class StepRunProcessor extends WorkerHost {
       );
 
       const executor = this.executorRegistry.get(stepDef.type);
+
+      if (stepDef.type === 'http') {
+        await this.maybeRateLimitHttp(workflowRunId, stepRunId, stepDef);
+      }
 
       const rawOutput = await executor.execute({
         request,
@@ -174,6 +198,86 @@ export class StepRunProcessor extends WorkerHost {
     }
   }
 
+  private async maybeRateLimitHttp(
+    workflowRunId: string,
+    stepRunId: string,
+    stepDef: StepDefinition,
+  ): Promise<void> {
+    const workflowRun = await this.workflowRunRepository.findById(workflowRunId);
+    if (!workflowRun) return;
+
+    const enabled = process.env.WORKER_DEFAULT_HTTP_RATE_LIMIT_ENABLED !== 'false';
+    const parsePositiveInt = (value: string | number | undefined, fallback: number) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+    };
+    const defaultMax = parsePositiveInt(process.env.WORKER_DEFAULT_HTTP_RATE_LIMIT_MAX, 300);
+    const defaultPerSeconds = parsePositiveInt(
+      process.env.WORKER_DEFAULT_HTTP_RATE_LIMIT_PER_SECONDS,
+      60,
+    );
+
+    const limiter = stepDef.rateLimit
+      ? {
+          key: stepDef.rateLimit.key,
+          max: parsePositiveInt(stepDef.rateLimit.max, defaultMax),
+          perSeconds: parsePositiveInt(stepDef.rateLimit.perSeconds, defaultPerSeconds),
+        }
+      : enabled
+        ? { key: '__default_http__', max: defaultMax, perSeconds: defaultPerSeconds }
+        : null;
+
+    if (!limiter) return;
+
+    const redisKey = `ratelimit:wf:${workflowRun.workflowId}:${limiter.key}`;
+    let allowed = true;
+    let ttlSeconds = 0;
+    let current = 0;
+    try {
+      const res = await checkFixedWindowRateLimit({
+        redis: this.redis,
+        key: redisKey,
+        max: limiter.max,
+        perSeconds: limiter.perSeconds,
+      });
+      allowed = res.allowed;
+      ttlSeconds = res.ttlSeconds;
+      current = res.current;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(
+        `Rate limit check failed (fail-open) for ${redisKey}: ${errorMessage}`,
+      );
+      return;
+    }
+
+    if (allowed) return;
+
+    const jitter = Math.floor(Math.random() * 500);
+    const delayMs = Math.max(1000, ttlSeconds * 1000 + jitter);
+    const when = Date.now() + delayMs;
+
+    const logEnvelope = wrapForDb(
+      {
+        code: 'RATE_LIMITED',
+        limiterKey: limiter.key,
+        max: limiter.max,
+        perSeconds: limiter.perSeconds,
+        current,
+        ttlSeconds,
+        sleepMs: delayMs,
+        resumeAt: new Date(when).toISOString(),
+      },
+      { maxBytes: 128 * 1024, truncate: true, reason: 'step_logs' },
+    );
+
+    await this.stepRunRepository.update(stepRunId, {
+      logs: logEnvelope as unknown as object,
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+  }
+
   private findSecretRefs(value: unknown): string[] {
     const found = new Set<string>();
     const pattern = /\{\{\s*secret\.([a-zA-Z0-9_-]+)\s*\}\}/g;
@@ -200,7 +304,10 @@ export class StepRunProcessor extends WorkerHost {
     return Array.from(found);
   }
 
-  private async fetchStepOutputs(workflowRunId: string, stepKeys: string[]): Promise<Record<string, unknown>> {
+  private async fetchStepOutputs(
+    workflowRunId: string,
+    stepKeys: string[],
+  ): Promise<Record<string, unknown>> {
     const outputs: Record<string, unknown> = {};
 
     for (const key of stepKeys) {

@@ -50,15 +50,10 @@ export class TemplateResolver {
     return { resolved: value, referencedSteps: [] };
   }
 
-  private resolveString(
-    template: string,
-    context: ResolutionContext
-  ): ResolutionResult {
+  private resolveString(template: string, context: ResolutionContext): ResolutionResult {
     const referencedSteps: Set<string> = new Set();
 
-    const fullStepMatch = template.match(
-      /^\{\{\s*steps\.([a-zA-Z0-9_-]+)(\.[^}]*)?\s*\}\}$/
-    );
+    const fullStepMatch = template.match(/^\{\{\s*steps\.([a-zA-Z0-9_-]+)(\.[^}]*)?\s*\}\}$/);
     if (fullStepMatch) {
       const stepKey = fullStepMatch[1];
       const path = fullStepMatch[2];
@@ -70,9 +65,7 @@ export class TemplateResolver {
       };
     }
 
-    const fullInputMatch = template.match(
-      /^\{\{\s*input\.([a-zA-Z0-9_-]+)(\.[^}]*)?\s*\}\}$/
-    );
+    const fullInputMatch = template.match(/^\{\{\s*input\.([a-zA-Z0-9_-]+)(\.[^}]*)?\s*\}\}$/);
     if (fullInputMatch) {
       const key = fullInputMatch[1];
       const path = fullInputMatch[2];
@@ -123,22 +116,18 @@ export class TemplateResolver {
   private resolveStepReference(
     stepKey: string,
     path: string | undefined,
-    context: ResolutionContext
+    context: ResolutionContext,
   ): unknown {
     const stepOutput = context.steps[stepKey];
     if (stepOutput === undefined || stepOutput === null) {
-      throw new Error(
-        `Referenced step "${stepKey}" does not exist or has not completed`
-      );
+      throw new Error(`Referenced step "${stepKey}" does not exist or has not completed`);
     }
 
     const output = stepOutput as unknown as Record<string, unknown>;
     const stepData = unwrapEnvelope(stepOutput);
 
     const outputObj =
-      stepData && typeof stepData === 'object'
-        ? (stepData as Record<string, unknown>)
-        : undefined;
+      stepData && typeof stepData === 'object' ? (stepData as Record<string, unknown>) : undefined;
 
     const maybeBody = outputObj?.body;
     const bodyData = unwrapHttpBody(maybeBody);
@@ -150,15 +139,17 @@ export class TemplateResolver {
     const cleanPath = this.cleanReferencePath(path, 'output');
     if (!cleanPath) return data;
 
-    return this.getByPath(data, cleanPath, () =>
-      new Error(`Path "${path}" not found in step "${stepKey}" output`)
+    return this.getByPath(
+      data,
+      cleanPath,
+      () => new Error(`Path "${path}" not found in step "${stepKey}" output`),
     );
   }
 
   private resolveInputReference(
     key: string,
     path: string | undefined,
-    context: ResolutionContext
+    context: ResolutionContext,
   ): unknown {
     if (!(key in context.input)) {
       throw new Error(`Input field "${key}" not found in workflow input`);
@@ -170,16 +161,14 @@ export class TemplateResolver {
     const cleanPath = this.cleanReferencePath(path);
     if (!cleanPath) return data;
 
-    const value = this.getByPath(data, cleanPath, () =>
-      new Error(
-        `Path "${path}" not found in workflow input field "${key}"`
-      )
+    const value = this.getByPath(
+      data,
+      cleanPath,
+      () => new Error(`Path "${path}" not found in workflow input field "${key}"`),
     );
 
     if (value === undefined) {
-      throw new Error(
-        `Path "${cleanPath}" not found in workflow input field "${key}"`
-      );
+      throw new Error(`Path "${cleanPath}" not found in workflow input field "${key}"`);
     }
 
     return value;
@@ -204,11 +193,7 @@ export class TemplateResolver {
     return clean;
   }
 
-  private getByPath(
-    base: unknown,
-    cleanPath: string,
-    makeError: () => Error
-  ): unknown {
+  private getByPath(base: unknown, cleanPath: string, makeError: () => Error): unknown {
     const parts = cleanPath.split('.').filter(Boolean);
     let value: unknown = base;
 

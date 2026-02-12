@@ -90,17 +90,12 @@ export function buildDependencyGraph(steps: StepDefinition[]): DependencyGraph {
 
   // Check for cycles
   if (executionBatches.length !== steps.length) {
-    throw new Error(
-      `Dependency cycle detected. Steps: ${steps.map((s) => s.key).join(', ')}`
-    );
+    throw new Error(`Dependency cycle detected. Steps: ${steps.map((s) => s.key).join(', ')}`);
   }
 
   return { dependencies, executionBatches };
 }
 
-export function getStepDependencies(
-  stepKey: string,
-  graph: DependencyGraph
-): string[] {
+export function getStepDependencies(stepKey: string, graph: DependencyGraph): string[] {
   return graph.dependencies.get(stepKey) || [];
 }

@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { STEP_RUN_QUEUE_NAME, QueueConfigModule } from '@taskforge/queue-config';
 import { PrismaModule } from './prisma/prisma.module';
 import { CryptoModule } from './crypto/crypto.module';
+import { RedisModule } from './redis/redis.module';
 import {
   StepRunRepository,
   SecretRepository,
@@ -24,6 +25,7 @@ import { StepRunProcessor } from './processors/step-run.processor';
     }),
     PrismaModule,
     CryptoModule,
+    RedisModule,
     QueueConfigModule,
     BullModule.registerQueue({ name: STEP_RUN_QUEUE_NAME }),
     HttpExecutorModule,

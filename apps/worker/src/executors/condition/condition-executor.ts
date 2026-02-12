@@ -23,7 +23,7 @@ export class ConditionExecutor implements StepExecutor {
     const ctx = validated.input as any;
     const stepResponses = (ctx?.steps ?? {}) as Record<string, unknown>;
     const steps = unwrapStepBodies(stepResponses);
-    const source = (request.source ?? {}) as Record<string, unknown>;
+    const source = request.source ?? {};
 
     const root: RootContext = {
       input: ctx?.input ?? {},
@@ -79,7 +79,7 @@ function unwrapStepBodies(stepResponses: Record<string, unknown>): Record<string
       const body = (value as any).body;
       // Unwrap HttpExecutor body wrapper if present.
       if (body && typeof body === 'object' && '_taskforgeHttp' in body && 'data' in body) {
-        out[key] = (body as any).data;
+        out[key] = body.data;
       } else {
         out[key] = body;
       }

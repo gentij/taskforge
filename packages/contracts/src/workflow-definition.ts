@@ -51,6 +51,20 @@ export const BaseStepDefinitionSchema = z.object({
     })
     .strict()
     .optional(),
+
+  rateLimit: z
+    .object({
+      key: z
+        .string()
+        .min(1)
+        .regex(/^[A-Za-z0-9_]+$/, {
+          message: 'rateLimit.key must contain only letters, numbers, underscore',
+        }),
+      max: z.number().int().positive(),
+      perSeconds: z.number().int().positive(),
+    })
+    .strict()
+    .optional(),
 });
 
 export const HttpStepDefinitionSchema = BaseStepDefinitionSchema.extend({

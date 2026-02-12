@@ -1,5 +1,4 @@
-const DEFAULT_SENSITIVE_KEY_PATTERN =
-  /(webhook|token|secret|password|api[-_]?key|authorization)/i;
+const DEFAULT_SENSITIVE_KEY_PATTERN = /(webhook|token|secret|password|api[-_]?key|authorization)/i;
 
 export function redactSecrets(value: unknown, opts: { secretValues: string[] }): unknown {
   const { secretValues } = opts;

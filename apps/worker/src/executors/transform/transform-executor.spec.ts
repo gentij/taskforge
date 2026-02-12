@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-
 import { TransformExecutor } from './transform-executor';
 
 describe('TransformExecutor', () => {
@@ -9,7 +7,10 @@ describe('TransformExecutor', () => {
     const out = await exec.execute({
       request: {
         source: {
-          users: [{ id: 1, email: 'a@test.com' }, { id: 2, email: 'b@test.com' }],
+          users: [
+            { id: 1, email: 'a@test.com' },
+            { id: 2, email: 'b@test.com' },
+          ],
         },
         output: {
           usersCount: { $jmes: 'length(source.users)' },
@@ -35,10 +36,13 @@ describe('TransformExecutor', () => {
     const out = await exec.execute({
       request: {
         source: {
-          users: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }],
+          users: [
+            { id: 1, name: 'Alice' },
+            { id: 2, name: 'Bob' },
+          ],
         },
         output: {
-          filteredNames: { $jmes: "source.users[?id == `1`].name" },
+          filteredNames: { $jmes: 'source.users[?id == `1`].name' },
         },
       },
       input: {

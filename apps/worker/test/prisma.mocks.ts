@@ -7,6 +7,7 @@ export type PrismaStepRunModelMock = {
 export type PrismaWorkflowRunModelMock = {
   update: jest.Mock;
   updateMany: jest.Mock;
+  findUnique: jest.Mock;
 };
 
 export type PrismaWorkflowVersionModelMock = {
@@ -28,6 +29,7 @@ export const createPrismaServiceMock = (): PrismaServiceMock => ({
   workflowRun: {
     update: jest.fn(),
     updateMany: jest.fn(),
+    findUnique: jest.fn(),
   },
   workflowVersion: {
     findUnique: jest.fn(),
