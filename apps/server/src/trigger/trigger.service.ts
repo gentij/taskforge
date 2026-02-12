@@ -3,6 +3,7 @@ import type { Prisma, Trigger } from '@prisma/client';
 import { TriggerRepository, WorkflowRepository } from '@taskforge/db-access';
 import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 import { CronTriggerConfigSchema } from './cron/cron-trigger.types';
 import { parseExpression } from 'cron-parser';
 
@@ -61,9 +62,24 @@ export class TriggerService {
     });
   }
 
-  async list(workflowId: string): Promise<Trigger[]> {
-    await this.assertWorkflowExists(workflowId);
-    return this.repo.findManyByWorkflow(workflowId);
+  async list(params: {
+    workflowId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    items: Trigger[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+  }> {
+    await this.assertWorkflowExists(params.workflowId);
+    const { items, total } = await this.repo.findPageByWorkflow(params);
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(workflowId: string, id: string): Promise<Trigger> {

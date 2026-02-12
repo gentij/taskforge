@@ -6,15 +6,20 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ApiEnvelope } from 'src/common/swagger/envelope/api-envelope.decorator';
+import {
+  ApiEnvelope,
+  ApiPaginatedEnvelope,
+} from 'src/common/swagger/envelope/api-envelope.decorator';
 import { SecretService } from './secret.service';
 import {
   CreateSecretReqDto,
   SecretResDto,
   UpdateSecretReqDto,
 } from './dto/secret.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Secrets')
 @ApiBearerAuth('bearer')
@@ -35,14 +40,13 @@ export class SecretController {
     });
   }
 
-  @ApiEnvelope(SecretResDto, {
+  @ApiPaginatedEnvelope(SecretResDto, {
     description: 'List secrets',
-    isArray: true,
     errors: [401, 500],
   })
   @Get()
-  list() {
-    return this.service.list();
+  list(@Query() query: PaginationQueryDto) {
+    return this.service.list(query);
   }
 
   @ApiEnvelope(SecretResDto, {

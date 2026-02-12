@@ -1,6 +1,17 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ApiEnvelope } from 'src/common/swagger/envelope/api-envelope.decorator';
+import {
+  ApiEnvelope,
+  ApiPaginatedEnvelope,
+} from 'src/common/swagger/envelope/api-envelope.decorator';
 import type { Prisma } from '@prisma/client';
 import { TriggerService } from './trigger.service';
 import {
@@ -11,6 +22,7 @@ import {
 import { OrchestrationService } from 'src/core/orchestration.service';
 import { WorkflowService } from 'src/workflow/workflow.service';
 import { RunWorkflowReqDto } from 'src/workflow/dto/workflow.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Triggers')
 @ApiBearerAuth('bearer')
@@ -40,14 +52,16 @@ export class TriggerController {
     });
   }
 
-  @ApiEnvelope(TriggerResDto, {
+  @ApiPaginatedEnvelope(TriggerResDto, {
     description: 'List triggers',
-    isArray: true,
     errors: [401, 404, 500],
   })
   @Get()
-  list(@Param('workflowId') workflowId: string) {
-    return this.service.list(workflowId);
+  list(
+    @Param('workflowId') workflowId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.service.list({ workflowId, ...query });
   }
 
   @ApiEnvelope(TriggerResDto, {

@@ -7,6 +7,7 @@ import {
 } from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 
 @Injectable()
 export class EventService {
@@ -43,9 +44,29 @@ export class EventService {
     });
   }
 
-  async list(workflowId: string, triggerId: string): Promise<Event[]> {
-    await this.assertTriggerExists(workflowId, triggerId);
-    return this.repo.findManyByTrigger(triggerId);
+  async list(params: {
+    workflowId: string;
+    triggerId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    items: Event[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+  }> {
+    await this.assertTriggerExists(params.workflowId, params.triggerId);
+    const { items, total } = await this.repo.findPageByTrigger({
+      triggerId: params.triggerId,
+      page: params.page,
+      pageSize: params.pageSize,
+    });
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(workflowId: string, triggerId: string, id: string): Promise<Event> {

@@ -140,10 +140,20 @@ describe('WorkflowService', () => {
 
   it('list() returns workflows', async () => {
     const list = createWorkflowListFixture(2);
-    repo.findMany.mockResolvedValue(list);
+    repo.findPage.mockResolvedValue({ items: list, total: 2 });
 
-    await expect(service.list()).resolves.toBe(list);
-    expect(repo.findMany).toHaveBeenCalledTimes(1);
+    await expect(service.list({ page: 1, pageSize: 25 })).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(repo.findPage).toHaveBeenCalledWith({ page: 1, pageSize: 25 });
   });
 
   it('get() returns workflow when found', async () => {

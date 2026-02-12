@@ -18,6 +18,7 @@ import {
   validateWorkflowDefinitionStrict,
 } from './workflow-definition.validator';
 import { cacheKeys } from 'src/cache/cache-keys';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 
 @Injectable()
 export class WorkflowService {
@@ -68,7 +69,6 @@ export class WorkflowService {
       return updatedWorkflow;
     });
 
-    await this.cache.del(cacheKeys.workflowList());
     return created;
   }
 
@@ -106,9 +106,7 @@ export class WorkflowService {
       return created;
     });
 
-    await this.cache.del(cacheKeys.workflowList());
     await this.cache.del(cacheKeys.workflowGet(workflowId));
-    await this.cache.del(cacheKeys.workflowVersionList(workflowId));
     return created;
   }
 
@@ -175,22 +173,19 @@ export class WorkflowService {
     return result;
   }
 
-  async list(): Promise<Workflow[]> {
-    const key = cacheKeys.workflowList();
-    try {
-      const cached = await this.cache.get<Workflow[]>(key);
-      if (cached) return cached;
-    } catch {
-      // fail-open: cache errors should not break API
-    }
-
-    const workflows = await this.repo.findMany();
-    try {
-      await this.cache.set(key, workflows);
-    } catch {
-      // fail-open: cache errors should not break API
-    }
-    return workflows;
+  async list(params: { page: number; pageSize: number }): Promise<{
+    items: Workflow[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+  }> {
+    const { items, total } = await this.repo.findPage(params);
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(id: string): Promise<Workflow> {
@@ -221,7 +216,6 @@ export class WorkflowService {
     await this.get(id);
 
     const updated = await this.repo.update(id, patch);
-    await this.cache.del(cacheKeys.workflowList());
     await this.cache.del(cacheKeys.workflowGet(id));
     return updated;
   }

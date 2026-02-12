@@ -17,6 +17,27 @@ export class StepRunRepository {
     });
   }
 
+  async findPageByWorkflowRun(params: {
+    workflowRunId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: StepRun[]; total: number }> {
+    const skip = (params.page - 1) * params.pageSize;
+    const [items, total] = await Promise.all([
+      this.prisma.stepRun.findMany({
+        where: { workflowRunId: params.workflowRunId },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take: params.pageSize,
+      }),
+      this.prisma.stepRun.count({
+        where: { workflowRunId: params.workflowRunId },
+      }),
+    ]);
+
+    return { items, total };
+  }
+
   findById(id: string): Promise<StepRun | null> {
     return this.prisma.stepRun.findUnique({ where: { id } });
   }

@@ -82,18 +82,44 @@ describe('EventService', () => {
 
     workflowRepo.findById.mockResolvedValue(wf);
     triggerRepo.findById.mockResolvedValue(trigger);
-    repo.findManyByTrigger.mockResolvedValue(list);
+    repo.findPageByTrigger.mockResolvedValue({ items: list, total: 2 });
 
-    await expect(service.list('wf_1', 'tr_1')).resolves.toBe(list);
-    expect(repo.findManyByTrigger).toHaveBeenCalledWith('tr_1');
+    await expect(
+      service.list({
+        workflowId: 'wf_1',
+        triggerId: 'tr_1',
+        page: 1,
+        pageSize: 25,
+      }),
+    ).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(repo.findPageByTrigger).toHaveBeenCalledWith({
+      triggerId: 'tr_1',
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it('list() throws notFound when workflow missing', async () => {
     workflowRepo.findById.mockResolvedValue(null);
 
-    await expect(service.list('missing', 'tr_1')).rejects.toBeInstanceOf(
-      AppError,
-    );
+    await expect(
+      service.list({
+        workflowId: 'missing',
+        triggerId: 'tr_1',
+        page: 1,
+        pageSize: 25,
+      }),
+    ).rejects.toBeInstanceOf(AppError);
   });
 
   it('list() throws notFound when trigger belongs to another workflow', async () => {
@@ -103,7 +129,14 @@ describe('EventService', () => {
     workflowRepo.findById.mockResolvedValue(wf);
     triggerRepo.findById.mockResolvedValue(trigger);
 
-    await expect(service.list('wf_1', 'tr_1')).rejects.toBeInstanceOf(AppError);
+    await expect(
+      service.list({
+        workflowId: 'wf_1',
+        triggerId: 'tr_1',
+        page: 1,
+        pageSize: 25,
+      }),
+    ).rejects.toBeInstanceOf(AppError);
   });
 
   it('get() returns event when found', async () => {

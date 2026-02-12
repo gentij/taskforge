@@ -27,10 +27,36 @@ describe('StepRunController', () => {
 
   it('list() calls StepRunService.list()', async () => {
     const list = [createStepRunFixture({ id: 'sr_1' })];
-    const listSpy = jest.spyOn(service, 'list').mockResolvedValue(list);
+    const listSpy = jest.spyOn(service, 'list').mockResolvedValue({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
 
-    await expect(controller.list('wf_1', 'wfr_1')).resolves.toBe(list);
-    expect(listSpy).toHaveBeenCalledWith('wfr_1');
+    await expect(
+      controller.list('wf_1', 'wfr_1', { page: 1, pageSize: 25 }),
+    ).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(listSpy).toHaveBeenCalledWith({
+      workflowRunId: 'wfr_1',
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it('get() calls StepRunService.get()', async () => {

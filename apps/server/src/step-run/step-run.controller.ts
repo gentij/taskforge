@@ -1,8 +1,12 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ApiEnvelope } from 'src/common/swagger/envelope/api-envelope.decorator';
+import {
+  ApiEnvelope,
+  ApiPaginatedEnvelope,
+} from 'src/common/swagger/envelope/api-envelope.decorator';
 import { StepRunService } from './step-run.service';
 import { StepRunResDto } from './dto/step-run.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Step Runs')
 @ApiBearerAuth('bearer')
@@ -10,14 +14,17 @@ import { StepRunResDto } from './dto/step-run.dto';
 export class StepRunController {
   constructor(private readonly service: StepRunService) {}
 
-  @ApiEnvelope(StepRunResDto, {
+  @ApiPaginatedEnvelope(StepRunResDto, {
     description: 'List step runs',
-    isArray: true,
     errors: [401, 404, 500],
   })
   @Get()
-  list(@Param('workflowId') workflowId: string, @Param('runId') runId: string) {
-    return this.service.list(runId);
+  list(
+    @Param('workflowId') workflowId: string,
+    @Param('runId') runId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.service.list({ workflowRunId: runId, ...query });
   }
 
   @ApiEnvelope(StepRunResDto, {

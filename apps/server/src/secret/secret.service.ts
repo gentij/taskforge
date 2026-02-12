@@ -4,6 +4,7 @@ import { SecretRepository } from '@taskforge/db-access';
 import { AppError } from 'src/common/http/errors/app-error';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { CryptoService } from 'src/crypto/crypto.service';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 
 @Injectable()
 export class SecretService {
@@ -25,8 +26,19 @@ export class SecretService {
     });
   }
 
-  list(): Promise<Secret[]> {
-    return this.repo.findMany();
+  async list(params: { page: number; pageSize: number }): Promise<{
+    items: Secret[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+  }> {
+    const { items, total } = await this.repo.findPage(params);
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(id: string): Promise<Secret> {

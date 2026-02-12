@@ -63,10 +63,36 @@ describe('TriggerController', () => {
 
   it('list() calls TriggerService.list()', async () => {
     const list = [createTriggerFixture({ id: 'tr_1' })];
-    const listSpy = jest.spyOn(service, 'list').mockResolvedValue(list);
+    const listSpy = jest.spyOn(service, 'list').mockResolvedValue({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
 
-    await expect(controller.list('wf_1')).resolves.toBe(list);
-    expect(listSpy).toHaveBeenCalledWith('wf_1');
+    await expect(
+      controller.list('wf_1', { page: 1, pageSize: 25 }),
+    ).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(listSpy).toHaveBeenCalledWith({
+      workflowId: 'wf_1',
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it('get() calls TriggerService.get()', async () => {

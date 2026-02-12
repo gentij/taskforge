@@ -3,6 +3,7 @@ import type { Prisma, StepRun } from '@prisma/client';
 import { WorkflowRunRepository, StepRunRepository } from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 
 @Injectable()
 export class StepRunService {
@@ -49,9 +50,24 @@ export class StepRunService {
     });
   }
 
-  async list(workflowRunId: string): Promise<StepRun[]> {
-    await this.assertWorkflowRunExists(workflowRunId);
-    return this.repo.findManyByWorkflowRun(workflowRunId);
+  async list(params: {
+    workflowRunId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    items: StepRun[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+  }> {
+    await this.assertWorkflowRunExists(params.workflowRunId);
+    const { items, total } = await this.repo.findPageByWorkflowRun(params);
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(workflowRunId: string, id: string): Promise<StepRun> {

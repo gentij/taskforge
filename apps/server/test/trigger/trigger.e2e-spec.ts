@@ -110,7 +110,7 @@ describe('Trigger (e2e)', () => {
     const list = createTriggerListFixture(2);
 
     workflowRepo.findById.mockResolvedValue(wf);
-    repo.findManyByWorkflow.mockResolvedValue(list);
+    repo.findPageByWorkflow.mockResolvedValue({ items: list, total: 2 });
 
     const res = await app.inject({
       method: 'GET',
@@ -121,8 +121,9 @@ describe('Trigger (e2e)', () => {
 
     const body = res.json();
     expect(body.ok).toBe(true);
-    expect(Array.isArray(body.data)).toBe(true);
-    expect(body.data).toHaveLength(2);
+    expect(Array.isArray(body.data.items)).toBe(true);
+    expect(body.data.items).toHaveLength(2);
+    expect(body.data.pagination.total).toBe(2);
   });
 
   it('GET /workflows/:workflowId/triggers/:id -> 200 when found', async () => {

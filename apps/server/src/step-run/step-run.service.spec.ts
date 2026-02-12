@@ -84,10 +84,26 @@ describe('StepRunService', () => {
     const list = createStepRunListFixture(2);
 
     runRepo.findById.mockResolvedValue(run);
-    repo.findManyByWorkflowRun.mockResolvedValue(list);
+    repo.findPageByWorkflowRun.mockResolvedValue({ items: list, total: 2 });
 
-    await expect(service.list('wfr_1')).resolves.toBe(list);
-    expect(repo.findManyByWorkflowRun).toHaveBeenCalledWith('wfr_1');
+    await expect(
+      service.list({ workflowRunId: 'wfr_1', page: 1, pageSize: 25 }),
+    ).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(repo.findPageByWorkflowRun).toHaveBeenCalledWith({
+      workflowRunId: 'wfr_1',
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it('get() returns step run when found', async () => {

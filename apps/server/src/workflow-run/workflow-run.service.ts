@@ -6,6 +6,7 @@ import {
 } from '@taskforge/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 
 @Injectable()
 export class WorkflowRunService {
@@ -48,9 +49,24 @@ export class WorkflowRunService {
     });
   }
 
-  async list(workflowId: string): Promise<WorkflowRun[]> {
-    await this.assertWorkflowExists(workflowId);
-    return this.repo.findManyByWorkflow(workflowId);
+  async list(params: {
+    workflowId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    items: WorkflowRun[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+  }> {
+    await this.assertWorkflowExists(params.workflowId);
+    const { items, total } = await this.repo.findPageByWorkflow(params);
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(workflowId: string, id: string): Promise<WorkflowRun> {

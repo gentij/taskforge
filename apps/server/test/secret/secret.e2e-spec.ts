@@ -81,7 +81,7 @@ describe('Secret (e2e)', () => {
 
   it('GET /secrets -> 200 + data array', async () => {
     const list = createSecretListFixture(2);
-    repo.findMany.mockResolvedValue(list);
+    repo.findPage.mockResolvedValue({ items: list, total: 2 });
 
     const res = await app.inject({ method: 'GET', url: '/secrets' });
 
@@ -89,8 +89,9 @@ describe('Secret (e2e)', () => {
 
     const body = res.json();
     expect(body.ok).toBe(true);
-    expect(Array.isArray(body.data)).toBe(true);
-    expect(body.data).toHaveLength(2);
+    expect(Array.isArray(body.data.items)).toBe(true);
+    expect(body.data.items).toHaveLength(2);
+    expect(body.data.pagination.total).toBe(2);
   });
 
   it('GET /secrets/:id -> 200 when found', async () => {

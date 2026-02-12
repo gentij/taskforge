@@ -17,6 +17,27 @@ export class WorkflowVersionRepository {
     });
   }
 
+  async findPageByWorkflow(params: {
+    workflowId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: WorkflowVersion[]; total: number }> {
+    const skip = (params.page - 1) * params.pageSize;
+    const [items, total] = await Promise.all([
+      this.prisma.workflowVersion.findMany({
+        where: { workflowId: params.workflowId },
+        orderBy: { version: 'desc' },
+        skip,
+        take: params.pageSize,
+      }),
+      this.prisma.workflowVersion.count({
+        where: { workflowId: params.workflowId },
+      }),
+    ]);
+
+    return { items, total };
+  }
+
   findById(id: string): Promise<WorkflowVersion | null> {
     return this.prisma.workflowVersion.findUnique({ where: { id } });
   }

@@ -58,17 +58,35 @@ describe('WorkflowVersionService', () => {
     const list = createWorkflowVersionListFixture(2);
 
     workflowRepo.findById.mockResolvedValue(wf);
-    repo.findManyByWorkflow.mockResolvedValue(list);
+    repo.findPageByWorkflow.mockResolvedValue({ items: list, total: 2 });
 
-    await expect(service.list('wf_1')).resolves.toBe(list);
-    expect(repo.findManyByWorkflow).toHaveBeenCalledWith('wf_1');
+    await expect(
+      service.list({ workflowId: 'wf_1', page: 1, pageSize: 25 }),
+    ).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(repo.findPageByWorkflow).toHaveBeenCalledWith({
+      workflowId: 'wf_1',
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it('list() throws notFound when workflow missing', async () => {
     workflowRepo.findById.mockResolvedValue(null);
 
-    await expect(service.list('missing')).rejects.toBeInstanceOf(AppError);
-    expect(repo.findManyByWorkflow).not.toHaveBeenCalled();
+    await expect(
+      service.list({ workflowId: 'missing', page: 1, pageSize: 25 }),
+    ).rejects.toBeInstanceOf(AppError);
+    expect(repo.findPageByWorkflow).not.toHaveBeenCalled();
   });
 
   it('get() returns a version when found', async () => {

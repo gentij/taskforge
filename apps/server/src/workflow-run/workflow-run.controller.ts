@@ -1,8 +1,12 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ApiEnvelope } from 'src/common/swagger/envelope/api-envelope.decorator';
+import {
+  ApiEnvelope,
+  ApiPaginatedEnvelope,
+} from 'src/common/swagger/envelope/api-envelope.decorator';
 import { WorkflowRunService } from './workflow-run.service';
 import { WorkflowRunResDto } from './dto/workflow-run.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Workflow Runs')
 @ApiBearerAuth('bearer')
@@ -10,14 +14,16 @@ import { WorkflowRunResDto } from './dto/workflow-run.dto';
 export class WorkflowRunController {
   constructor(private readonly service: WorkflowRunService) {}
 
-  @ApiEnvelope(WorkflowRunResDto, {
+  @ApiPaginatedEnvelope(WorkflowRunResDto, {
     description: 'List workflow runs',
-    isArray: true,
     errors: [401, 404, 500],
   })
   @Get()
-  list(@Param('workflowId') workflowId: string) {
-    return this.service.list(workflowId);
+  list(
+    @Param('workflowId') workflowId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.service.list({ workflowId, ...query });
   }
 
   @ApiEnvelope(WorkflowRunResDto, {

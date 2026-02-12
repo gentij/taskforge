@@ -32,10 +32,36 @@ describe('WorkflowVersionController', () => {
 
   it('list() calls WorkflowVersionService.list()', async () => {
     const list = createWorkflowVersionListFixture(2);
-    const listSpy = jest.spyOn(service, 'list').mockResolvedValue(list);
+    const listSpy = jest.spyOn(service, 'list').mockResolvedValue({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
 
-    await expect(controller.list('wf_1')).resolves.toBe(list);
-    expect(listSpy).toHaveBeenCalledWith('wf_1');
+    await expect(
+      controller.list('wf_1', { page: 1, pageSize: 25 }),
+    ).resolves.toEqual({
+      items: list,
+      pagination: {
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      },
+    });
+    expect(listSpy).toHaveBeenCalledWith({
+      workflowId: 'wf_1',
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it('get() calls WorkflowVersionService.get()', async () => {

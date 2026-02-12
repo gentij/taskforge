@@ -14,6 +14,23 @@ export class WorkflowRepository {
     return this.prisma.workflow.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  async findPage(params: {
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: Workflow[]; total: number }> {
+    const skip = (params.page - 1) * params.pageSize;
+    const [items, total] = await Promise.all([
+      this.prisma.workflow.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: params.pageSize,
+      }),
+      this.prisma.workflow.count(),
+    ]);
+
+    return { items, total };
+  }
+
   findById(id: string): Promise<Workflow | null> {
     return this.prisma.workflow.findUnique({ where: { id } });
   }

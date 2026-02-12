@@ -8,6 +8,7 @@ import { AppError } from 'src/common/http/errors/app-error';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { cacheKeys } from 'src/cache/cache-keys';
+import { buildPaginationMeta } from 'src/common/pagination/pagination';
 
 @Injectable()
 export class WorkflowVersionService {
@@ -23,24 +24,17 @@ export class WorkflowVersionService {
     return wf;
   }
 
-  async list(workflowId: string) {
-    await this.assertWorkflowExists(workflowId);
-
-    const key = cacheKeys.workflowVersionList(workflowId);
-    try {
-      const cached = await this.cache.get(key);
-      if (cached) return cached;
-    } catch {
-      // fail-open: cache errors should not break API
-    }
-
-    const versions = await this.repo.findManyByWorkflow(workflowId);
-    try {
-      await this.cache.set(key, versions);
-    } catch {
-      // fail-open: cache errors should not break API
-    }
-    return versions;
+  async list(params: { workflowId: string; page: number; pageSize: number }) {
+    await this.assertWorkflowExists(params.workflowId);
+    const { items, total } = await this.repo.findPageByWorkflow(params);
+    return {
+      items,
+      pagination: buildPaginationMeta({
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }),
+    };
   }
 
   async get(workflowId: string, version: number) {

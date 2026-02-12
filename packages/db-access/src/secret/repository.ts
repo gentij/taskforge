@@ -14,6 +14,23 @@ export class SecretRepository {
     return this.prisma.secret.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  async findPage(params: {
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: Secret[]; total: number }> {
+    const skip = (params.page - 1) * params.pageSize;
+    const [items, total] = await Promise.all([
+      this.prisma.secret.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: params.pageSize,
+      }),
+      this.prisma.secret.count(),
+    ]);
+
+    return { items, total };
+  }
+
   findById(id: string): Promise<Secret | null> {
     return this.prisma.secret.findUnique({ where: { id } });
   }
