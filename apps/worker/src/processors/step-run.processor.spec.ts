@@ -15,6 +15,12 @@ import { CryptoService } from '../crypto/crypto.service';
 describe('StepRunProcessor', () => {
   let executeMock: jest.Mock;
   let registryMock: jest.Mock;
+  let cacheMock: {
+    getWorkflowVersion: jest.Mock;
+    getWorkflowRun: jest.Mock;
+    getSecret: jest.Mock;
+    setSecret: jest.Mock;
+  };
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -27,6 +33,13 @@ describe('StepRunProcessor', () => {
     });
 
     registryMock = jest.fn().mockReturnValue({ stepType: 'http', execute: executeMock });
+
+    cacheMock = {
+      getWorkflowVersion: jest.fn((_: string, loader: () => Promise<unknown>) => loader()),
+      getWorkflowRun: jest.fn((_: string, loader: () => Promise<unknown>) => loader()),
+      getSecret: jest.fn().mockReturnValue(undefined),
+      setSecret: jest.fn(),
+    };
   });
 
   afterEach(() => {
@@ -96,6 +109,7 @@ describe('StepRunProcessor', () => {
       crypto,
       redis as any,
       { get: registryMock } as unknown as ExecutorRegistry,
+      cacheMock as any,
     );
 
     const job = {
@@ -202,6 +216,7 @@ describe('StepRunProcessor', () => {
       crypto,
       redis as any,
       { get: registryMock } as unknown as ExecutorRegistry,
+      cacheMock as any,
     );
 
     const job = {
@@ -275,6 +290,7 @@ describe('StepRunProcessor', () => {
       crypto,
       redis as any,
       { get: () => ({ stepType: 'http', execute: executeFailed }) } as unknown as ExecutorRegistry,
+      cacheMock as any,
     );
 
     const job = {

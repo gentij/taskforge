@@ -34,6 +34,7 @@
     "bullmq": "^5.58.5",
     "ioredis": "^5.9.2",
     "jmespath": "^0.16.0",
+    "lru-cache": "^10.2.2",
     "nestjs-pino": "^4.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

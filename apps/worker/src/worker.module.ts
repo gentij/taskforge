@@ -16,6 +16,7 @@ import { HttpExecutorModule } from './executors/http/http-executor.module';
 import { TransformExecutorModule } from './executors/transform/transform-executor.module';
 import { ConditionExecutorModule } from './executors/condition/condition-executor.module';
 import { StepRunProcessor } from './processors/step-run.processor';
+import { WorkerCacheService } from './cache/worker-cache.service';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { StepRunProcessor } from './processors/step-run.processor';
     WorkflowRunRepository,
     WorkflowVersionRepository,
     ExecutorRegistry,
+    WorkerCacheService,
   ],
   exports: [],
 })

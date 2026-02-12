@@ -17,6 +17,7 @@ import { Inject } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.constants';
 import { checkFixedWindowRateLimit } from '../utils/rate-limit';
+import { WorkerCacheService } from '../cache/worker-cache.service';
 
 interface StepDefinition {
   key: string;
@@ -48,6 +49,7 @@ export class StepRunProcessor extends WorkerHost {
     private readonly crypto: CryptoService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly executorRegistry: ExecutorRegistry,
+    private readonly cache: WorkerCacheService,
   ) {
     super();
   }
@@ -70,7 +72,10 @@ export class StepRunProcessor extends WorkerHost {
         startedAt: new Date(),
       });
 
-      const workflowVersion = await this.workflowVersionRepository.findById(workflowVersionId);
+      const workflowVersion = await this.cache.getWorkflowVersion(
+        workflowVersionId,
+        () => this.workflowVersionRepository.findById(workflowVersionId),
+      );
 
       if (!workflowVersion) {
         throw new Error(`WorkflowVersion not found: ${workflowVersionId}`);
@@ -92,9 +97,26 @@ export class StepRunProcessor extends WorkerHost {
       const stepOutputs = await this.fetchStepOutputs(workflowRunId, dependsOn || []);
 
       const secretNames = this.findSecretRefs(stepDef.request ?? {});
-      const secrets = await this.secretRepository.findManyByNames(secretNames);
       const secretMap: Record<string, string> = {};
-      for (const s of secrets) secretMap[s.name] = this.crypto.decryptSecret(s.value);
+      const missingSecrets: string[] = [];
+
+      for (const name of secretNames) {
+        const cached = this.cache.getSecret(name);
+        if (cached !== undefined) {
+          secretMap[name] = cached;
+        } else {
+          missingSecrets.push(name);
+        }
+      }
+
+      if (missingSecrets.length > 0) {
+        const secrets = await this.secretRepository.findManyByNames(missingSecrets);
+        for (const s of secrets) {
+          const value = this.crypto.decryptSecret(s.value);
+          secretMap[s.name] = value;
+          this.cache.setSecret(s.name, value);
+        }
+      }
       const secretValues = Object.values(secretMap);
 
       // Build context: merged input + step-level input + previous step outputs
@@ -203,7 +225,9 @@ export class StepRunProcessor extends WorkerHost {
     stepRunId: string,
     stepDef: StepDefinition,
   ): Promise<void> {
-    const workflowRun = await this.workflowRunRepository.findById(workflowRunId);
+    const workflowRun = await this.cache.getWorkflowRun(workflowRunId, () =>
+      this.workflowRunRepository.findById(workflowRunId),
+    );
     if (!workflowRun) return;
 
     const enabled = process.env.WORKER_DEFAULT_HTTP_RATE_LIMIT_ENABLED !== 'false';

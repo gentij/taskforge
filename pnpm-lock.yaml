@@ -222,6 +222,9 @@ importers:
       jmespath:
         specifier: ^0.16.0
         version: 0.16.0
+      lru-cache:
+        specifier: ^10.2.2
+        version: 10.4.3
       nestjs-pino:
         specifier: ^4.5.0
         version: 4.5.0(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@11.0.0)(pino@10.3.0)(rxjs@7.8.2)
