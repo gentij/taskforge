@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gentij/taskforge/apps/cli/internal/api"
+	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -95,9 +97,42 @@ func init() {
 		},
 	}
 
+	whoamiCmd := &cobra.Command{
+		Use:   "whoami",
+		Short: "Validate token and show identity",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, _, err := loadConfig()
+			if err != nil {
+				return err
+			}
+			if strings.TrimSpace(cfg.Token) == "" {
+				return fmt.Errorf("token not set")
+			}
+
+			client := api.NewClient(cfg.ServerURL, cfg.Token)
+			var result struct {
+				ID     string   `json:"id"`
+				Name   string   `json:"name"`
+				Scopes []string `json:"scopes"`
+			}
+			if err := client.GetJSON("/auth/whoami", &result); err != nil {
+				return err
+			}
+
+			if outputJSON {
+				return output.PrintJSON(result)
+			}
+			fmt.Printf("id: %s\n", result.ID)
+			fmt.Printf("name: %s\n", result.Name)
+			fmt.Printf("scopes: %s\n", strings.Join(result.Scopes, ","))
+			return nil
+		},
+	}
+
 	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(logoutCmd)
 	authCmd.AddCommand(statusCmd)
+	authCmd.AddCommand(whoamiCmd)
 }
 
 func tokenStatus(token string) string {

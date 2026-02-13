@@ -66,7 +66,7 @@ const envSchema = z.object({
         'TASKFORGE_SECRET_KEY must be 64-char hex or base64 for 32 bytes',
     }),
 
-  VERSION: z.string().default('0.1.0'),
+  VERSION: z.string().default('1'),
 });
 
 export function validateEnv(env: NodeJS.ProcessEnv) {
