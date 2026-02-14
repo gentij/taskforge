@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
@@ -44,6 +45,10 @@ var workflowListPage int
 var workflowListPageSize int
 var workflowCreateName string
 var workflowCreateDefinition string
+var workflowUpdateName string
+var workflowUpdateIsActive bool
+var workflowRunInput string
+var workflowRunOverrides string
 
 func init() {
 	listCmd := &cobra.Command{
@@ -73,10 +78,35 @@ func init() {
 	_ = createCmd.MarkFlagRequired("name")
 	_ = createCmd.MarkFlagRequired("definition")
 
+	updateCmd := &cobra.Command{
+		Use:   "update <workflow-id>",
+		Short: "Update a workflow",
+		Args:  cobra.ExactArgs(1),
+		RunE:  workflowUpdate,
+	}
+	updateCmd.Flags().StringVar(&workflowUpdateName, "name", "", "Workflow name")
+	updateCmd.Flags().BoolVar(&workflowUpdateIsActive, "is-active", false, "Set workflow active state")
+
+	deleteCmd := &cobra.Command{
+		Use:   "delete <workflow-id>",
+		Short: "Delete a workflow (soft)",
+		Args:  cobra.ExactArgs(1),
+		RunE:  workflowDelete,
+	}
+
+	runCmd := &cobra.Command{
+		Use:   "run <workflow-id>",
+		Short: "Run a workflow",
+		Args:  cobra.ExactArgs(1),
+		RunE:  workflowRun,
+	}
+	runCmd.Flags().StringVar(&workflowRunInput, "input", "", "Path to input JSON")
+	runCmd.Flags().StringVar(&workflowRunOverrides, "overrides", "", "Path to overrides JSON")
+
 	workflowCmd.AddCommand(createCmd)
-	workflowCmd.AddCommand(newNotImplementedCmd("update", "Update a workflow"))
-	workflowCmd.AddCommand(newNotImplementedCmd("delete", "Delete a workflow"))
-	workflowCmd.AddCommand(newNotImplementedCmd("run", "Run a workflow"))
+	workflowCmd.AddCommand(updateCmd)
+	workflowCmd.AddCommand(deleteCmd)
+	workflowCmd.AddCommand(runCmd)
 }
 
 func workflowList(cmd *cobra.Command, args []string) error {
@@ -176,6 +206,96 @@ func workflowCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	return printWorkflow(result)
+}
+
+func workflowUpdate(cmd *cobra.Command, args []string) error {
+	cfg, _, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	patch := map[string]any{}
+	if workflowUpdateName != "" {
+		patch["name"] = workflowUpdateName
+	}
+	if cmd.Flags().Changed("is-active") {
+		patch["isActive"] = workflowUpdateIsActive
+	}
+	if len(patch) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	client := api.NewClient(cfg.ServerURL, cfg.Token)
+	var result workflowItem
+	if err := client.PatchJSON("/workflows/"+args[0], patch, &result); err != nil {
+		return err
+	}
+
+	return printWorkflow(result)
+}
+
+func workflowDelete(cmd *cobra.Command, args []string) error {
+	cfg, _, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient(cfg.ServerURL, cfg.Token)
+	var result workflowItem
+	if err := client.DeleteJSON("/workflows/"+args[0], &result); err != nil {
+		return err
+	}
+
+	return printWorkflow(result)
+}
+
+func workflowRun(cmd *cobra.Command, args []string) error {
+	cfg, _, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	input, err := readOptionalJSONFile(workflowRunInput)
+	if err != nil {
+		return err
+	}
+
+	overrides, err := readOptionalJSONFile(workflowRunOverrides)
+	if err != nil {
+		return err
+	}
+
+	payload := map[string]any{
+		"input":     input,
+		"overrides": overrides,
+	}
+
+	client := api.NewClient(cfg.ServerURL, cfg.Token)
+	var result struct {
+		WorkflowRunID string `json:"workflowRunId"`
+		Status        string `json:"status"`
+	}
+	if err := client.PostJSON("/workflows/"+args[0]+"/run", payload, &result); err != nil {
+		return err
+	}
+
+	if outputJSON {
+		return output.PrintJSON(result)
+	}
+	if quiet {
+		fmt.Fprintln(os.Stdout, result.WorkflowRunID)
+		return nil
+	}
+
+	w := output.NewTableWriter()
+	fmt.Fprintln(w, "FIELD\tVALUE")
+	fmt.Fprintf(w, "workflowRunId\t%s\n", result.WorkflowRunID)
+	fmt.Fprintf(w, "status\t%s\n", result.Status)
+	return w.Flush()
+}
+
+func printWorkflow(result workflowItem) error {
 	if outputJSON {
 		return output.PrintJSON(result)
 	}
@@ -218,4 +338,12 @@ func readJSONFile(path string) (any, error) {
 	}
 
 	return value, nil
+}
+
+func readOptionalJSONFile(path string) (any, error) {
+	if strings.TrimSpace(path) == "" {
+		return map[string]any{}, nil
+	}
+
+	return readJSONFile(path)
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -77,6 +78,15 @@ export class WorkflowController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: UpdateWorkflowReqDto) {
     return this.service.update(id, body);
+  }
+
+  @ApiEnvelope(WorkflowResDto, {
+    description: 'Delete workflow (soft)',
+    errors: [401, 404, 500],
+  })
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return this.service.delete(id);
   }
 
   @ApiEnvelope(WorkflowVersionResDto, {

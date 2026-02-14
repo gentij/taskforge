@@ -219,4 +219,12 @@ export class WorkflowService {
     await this.cache.del(cacheKeys.workflowGet(id));
     return updated;
   }
+
+  async delete(id: string): Promise<Workflow> {
+    await this.get(id);
+
+    const deleted = await this.repo.softDelete(id);
+    await this.cache.del(cacheKeys.workflowGet(id));
+    return deleted;
+  }
 }

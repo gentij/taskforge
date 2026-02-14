@@ -38,4 +38,11 @@ export class WorkflowRepository {
   update(id: string, data: Prisma.WorkflowUpdateInput): Promise<Workflow> {
     return this.prisma.workflow.update({ where: { id }, data });
   }
+
+  softDelete(id: string): Promise<Workflow> {
+    return this.prisma.workflow.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
 }

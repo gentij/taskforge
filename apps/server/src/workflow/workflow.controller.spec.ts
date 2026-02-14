@@ -21,6 +21,7 @@ describe('WorkflowController', () => {
             list: jest.fn(),
             get: jest.fn(),
             update: jest.fn(),
+            delete: jest.fn(),
             createVersion: jest.fn(),
             validateDefinition: jest.fn(),
           },
@@ -98,6 +99,14 @@ describe('WorkflowController', () => {
 
     await expect(controller.update('wf_1', { name: 'New' })).resolves.toBe(wf);
     expect(updateSpy).toHaveBeenCalledWith('wf_1', { name: 'New' });
+  });
+
+  it('delete() calls WorkflowService.delete()', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1', isActive: false });
+    const deleteSpy = jest.spyOn(service, 'delete').mockResolvedValue(wf);
+
+    await expect(controller.delete('wf_1')).resolves.toBe(wf);
+    expect(deleteSpy).toHaveBeenCalledWith('wf_1');
   });
 
   it('createVersion() calls WorkflowService.createVersion()', async () => {

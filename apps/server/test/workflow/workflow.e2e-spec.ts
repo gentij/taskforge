@@ -204,6 +204,27 @@ describe('Workflow (e2e)', () => {
     expect(repo.update).toHaveBeenCalledWith('wf_1', { name: 'New' });
   });
 
+  it('DELETE /workflows/:id -> 200 soft deletes workflow', async () => {
+    const existing = createWorkflowFixture({ id: 'wf_1', isActive: true });
+    const deleted = createWorkflowFixture({ id: 'wf_1', isActive: false });
+
+    repo.findById.mockResolvedValue(existing);
+    repo.softDelete.mockResolvedValue(deleted);
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/workflows/wf_1',
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.isActive).toBe(false);
+
+    expect(repo.softDelete).toHaveBeenCalledWith('wf_1');
+  });
+
   it('POST /workflows/:id/versions -> 201 creates a new version', async () => {
     const wf = createWorkflowFixture({ id: 'wf_1' });
     const version = createWorkflowVersionFixture({

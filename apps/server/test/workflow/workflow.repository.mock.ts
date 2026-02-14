@@ -12,6 +12,7 @@ export type WorkflowRepositoryMock = {
     Promise<Workflow>,
     [string, { name?: string; isActive?: boolean }]
   >;
+  softDelete: jest.Mock<Promise<Workflow>, [string]>;
 };
 
 export const createWorkflowRepositoryMock = (): WorkflowRepositoryMock => ({
@@ -26,4 +27,5 @@ export const createWorkflowRepositoryMock = (): WorkflowRepositoryMock => ({
     Promise<Workflow>,
     [string, { name?: string; isActive?: boolean }]
   >(),
+  softDelete: jest.fn<Promise<Workflow>, [string]>(),
 });

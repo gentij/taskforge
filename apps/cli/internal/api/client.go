@@ -51,6 +51,14 @@ func (c *Client) PostJSON(path string, body any, out any) error {
 	return c.doJSON(http.MethodPost, path, body, out)
 }
 
+func (c *Client) PatchJSON(path string, body any, out any) error {
+	return c.doJSON(http.MethodPatch, path, body, out)
+}
+
+func (c *Client) DeleteJSON(path string, out any) error {
+	return c.doJSON(http.MethodDelete, path, nil, out)
+}
+
 func (c *Client) doJSON(method string, path string, body any, out any) error {
 	fullURL, err := c.buildURL(path)
 	if err != nil {

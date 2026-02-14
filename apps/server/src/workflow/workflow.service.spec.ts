@@ -194,6 +194,17 @@ describe('WorkflowService', () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
+  it('delete() soft deletes workflow', async () => {
+    const existing = createWorkflowFixture({ id: 'wf_1', isActive: true });
+    const deleted = createWorkflowFixture({ id: 'wf_1', isActive: false });
+
+    repo.findById.mockResolvedValue(existing);
+    repo.softDelete.mockResolvedValue(deleted);
+
+    await expect(service.delete('wf_1')).resolves.toBe(deleted);
+    expect(repo.softDelete).toHaveBeenCalledWith('wf_1');
+  });
+
   it('createVersion() creates next version and updates latestVersionId', async () => {
     const wf = createWorkflowFixture({ id: 'wf_1' });
     repo.findById.mockResolvedValue(wf);
