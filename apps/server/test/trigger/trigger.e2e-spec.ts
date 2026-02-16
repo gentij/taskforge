@@ -171,6 +171,35 @@ describe('Trigger (e2e)', () => {
     expect(body.data.name).toBe('Updated');
   });
 
+  it('DELETE /workflows/:workflowId/triggers/:id -> 200 soft deletes trigger', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    const trigger = createTriggerFixture({
+      id: 'tr_1',
+      workflowId: 'wf_1',
+      isActive: true,
+    });
+    const deleted = createTriggerFixture({
+      id: 'tr_1',
+      workflowId: 'wf_1',
+      isActive: false,
+    });
+
+    workflowRepo.findById.mockResolvedValue(wf);
+    repo.findById.mockResolvedValue(trigger);
+    repo.softDelete.mockResolvedValue(deleted);
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/workflows/wf_1/triggers/tr_1',
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.isActive).toBe(false);
+  });
+
   it('GET /workflows/:workflowId/triggers/:id -> 404 when missing', async () => {
     const wf = createWorkflowFixture({ id: 'wf_1' });
     workflowRepo.findById.mockResolvedValue(wf);

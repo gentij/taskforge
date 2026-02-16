@@ -20,6 +20,7 @@ describe('TriggerController', () => {
             list: jest.fn(),
             get: jest.fn(),
             update: jest.fn(),
+            delete: jest.fn(),
           },
         },
         {
@@ -120,5 +121,13 @@ describe('TriggerController', () => {
       isActive: undefined,
       config: undefined,
     });
+  });
+
+  it('delete() calls TriggerService.delete()', async () => {
+    const trigger = createTriggerFixture({ id: 'tr_1', isActive: false });
+    const deleteSpy = jest.spyOn(service, 'delete').mockResolvedValue(trigger);
+
+    await expect(controller.delete('wf_1', 'tr_1')).resolves.toBe(trigger);
+    expect(deleteSpy).toHaveBeenCalledWith('wf_1', 'tr_1');
   });
 });

@@ -130,6 +130,23 @@ describe('TriggerService', () => {
     await expect(service.get('wf_1', 'tr_1')).rejects.toBeInstanceOf(AppError);
   });
 
+  it('delete() soft deletes trigger', async () => {
+    const wf = createWorkflowFixture({ id: 'wf_1' });
+    const trigger = createTriggerFixture({ id: 'tr_1', workflowId: 'wf_1' });
+    const deleted = createTriggerFixture({
+      id: 'tr_1',
+      workflowId: 'wf_1',
+      isActive: false,
+    });
+
+    workflowRepo.findById.mockResolvedValue(wf);
+    repo.findById.mockResolvedValue(trigger);
+    repo.softDelete.mockResolvedValue(deleted);
+
+    await expect(service.delete('wf_1', 'tr_1')).resolves.toBe(deleted);
+    expect(repo.softDelete).toHaveBeenCalledWith('tr_1');
+  });
+
   it('update() updates trigger after existence check', async () => {
     const wf = createWorkflowFixture({ id: 'wf_1' });
     const trigger = createTriggerFixture({ id: 'tr_1', workflowId: 'wf_1' });

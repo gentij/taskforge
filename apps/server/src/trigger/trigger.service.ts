@@ -92,6 +92,16 @@ export class TriggerService {
     return trigger;
   }
 
+  async delete(workflowId: string, id: string): Promise<Trigger> {
+    await this.assertWorkflowExists(workflowId);
+    const trigger = await this.repo.findById(id);
+
+    if (!trigger || trigger.workflowId !== workflowId)
+      throw AppError.notFound(ErrorDefinitions.TRIGGER.NOT_FOUND);
+
+    return this.repo.softDelete(id);
+  }
+
   async update(
     workflowId: string,
     id: string,

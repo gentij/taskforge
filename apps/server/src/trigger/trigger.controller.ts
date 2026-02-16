@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -91,6 +92,15 @@ export class TriggerController {
           ? undefined
           : (body.config as Prisma.InputJsonValue),
     });
+  }
+
+  @ApiEnvelope(TriggerResDto, {
+    description: 'Delete trigger (soft)',
+    errors: [401, 404, 500],
+  })
+  @Delete(':id')
+  delete(@Param('workflowId') workflowId: string, @Param('id') id: string) {
+    return this.service.delete(workflowId, id);
   }
 
   @ApiTags('Triggers')

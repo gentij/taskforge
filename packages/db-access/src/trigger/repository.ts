@@ -45,4 +45,11 @@ export class TriggerRepository {
   update(id: string, data: Prisma.TriggerUpdateInput): Promise<Trigger> {
     return this.prisma.trigger.update({ where: { id }, data });
   }
+
+  softDelete(id: string): Promise<Trigger> {
+    return this.prisma.trigger.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
 }
