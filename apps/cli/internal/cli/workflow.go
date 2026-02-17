@@ -49,6 +49,7 @@ var workflowUpdateName string
 var workflowUpdateIsActive bool
 var workflowRunInput string
 var workflowRunOverrides string
+var workflowValidateDefinition string
 
 func init() {
 	listCmd := &cobra.Command{
@@ -107,6 +108,17 @@ func init() {
 	workflowCmd.AddCommand(updateCmd)
 	workflowCmd.AddCommand(deleteCmd)
 	workflowCmd.AddCommand(runCmd)
+	workflowCmd.AddCommand(workflowVersionCmd)
+
+	validateCmd := &cobra.Command{
+		Use:   "validate <workflow-id>",
+		Short: "Validate a workflow definition",
+		Args:  cobra.ExactArgs(1),
+		RunE:  workflowValidate,
+	}
+	validateCmd.Flags().StringVar(&workflowValidateDefinition, "definition", "", "Path to definition JSON")
+	_ = validateCmd.MarkFlagRequired("definition")
+	workflowCmd.AddCommand(validateCmd)
 }
 
 func workflowList(cmd *cobra.Command, args []string) error {
@@ -292,6 +304,54 @@ func workflowRun(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(w, "FIELD\tVALUE")
 	fmt.Fprintf(w, "workflowRunId\t%s\n", result.WorkflowRunID)
 	fmt.Fprintf(w, "status\t%s\n", result.Status)
+	return w.Flush()
+}
+
+func workflowValidate(cmd *cobra.Command, args []string) error {
+	cfg, _, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	definition, err := readJSONFile(workflowValidateDefinition)
+	if err != nil {
+		return err
+	}
+
+	payload := map[string]any{
+		"definition": definition,
+	}
+
+	client := api.NewClient(cfg.ServerURL, cfg.Token)
+	var result struct {
+		Valid                bool                `json:"valid"`
+		Issues               []any               `json:"issues"`
+		InferredDependencies map[string][]string `json:"inferredDependencies"`
+		ExecutionBatches     [][]string          `json:"executionBatches"`
+		ReferencedSecrets    []string            `json:"referencedSecrets"`
+	}
+	if err := client.PostJSON("/workflows/"+args[0]+"/versions/validate", payload, &result); err != nil {
+		return err
+	}
+
+	if outputJSON {
+		return output.PrintJSON(result)
+	}
+
+	if quiet {
+		fmt.Fprintln(os.Stdout, result.Valid)
+		return nil
+	}
+
+	issueCount := 0
+	if result.Issues != nil {
+		issueCount = len(result.Issues)
+	}
+
+	w := output.NewTableWriter()
+	fmt.Fprintln(w, "FIELD\tVALUE")
+	fmt.Fprintf(w, "valid\t%t\n", result.Valid)
+	fmt.Fprintf(w, "issues\t%d\n", issueCount)
 	return w.Flush()
 }
 
