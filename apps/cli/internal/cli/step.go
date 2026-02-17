@@ -2,28 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 
-	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
-
-type stepRunItem struct {
-	ID            string  `json:"id"`
-	WorkflowRunID string  `json:"workflowRunId"`
-	StepKey       string  `json:"stepKey"`
-	Status        string  `json:"status"`
-	CreatedAt     string  `json:"createdAt"`
-	StartedAt     *string `json:"startedAt"`
-	FinishedAt    *string `json:"finishedAt"`
-}
-
-type stepRunListResponse struct {
-	Items      []stepRunItem  `json:"items"`
-	Pagination paginationMeta `json:"pagination"`
-}
 
 var stepCmd = &cobra.Command{
 	Use:   "step",
@@ -55,84 +38,77 @@ func init() {
 }
 
 func stepList(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
 	runID := args[1]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	query := url.Values{}
-	query.Set("page", fmt.Sprintf("%d", stepListPage))
-	query.Set("pageSize", fmt.Sprintf("%d", stepListPageSize))
-
-	var result stepRunListResponse
-	if err := client.GetJSON("/workflows/"+workflowID+"/runs/"+runID+"/steps?"+query.Encode(), &result); err != nil {
+	result, err := ctx.Client.ListStepRuns(workflowID, runID, stepListPage, stepListPageSize)
+	if err != nil {
 		return err
 	}
 
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
 
-	if quiet {
+	if ctx.Quiet {
 		for _, item := range result.Items {
 			fmt.Fprintln(os.Stdout, item.ID)
 		}
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "ID\tSTEP_KEY\tSTATUS\tSTARTED")
+	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
 		started := ""
 		if item.StartedAt != nil {
 			started = *item.StartedAt
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.ID, item.StepKey, item.Status, started)
+		rows = append(rows, []string{item.ID, item.StepKey, item.Status, started})
 	}
-	return w.Flush()
+	return output.PrintListTable([]string{"ID", "STEP_KEY", "STATUS", "STARTED"}, rows)
 }
 
 func stepGet(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
 	runID := args[1]
 	stepID := args[2]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result stepRunItem
-	if err := client.GetJSON("/workflows/"+workflowID+"/runs/"+runID+"/steps/"+stepID, &result); err != nil {
+	result, err := ctx.Client.GetStepRun(workflowID, runID, stepID)
+	if err != nil {
 		return err
 	}
 
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-	if quiet {
+	if ctx.Quiet {
 		fmt.Fprintln(os.Stdout, result.ID)
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "id\t%s\n", result.ID)
-	fmt.Fprintf(w, "workflowRunId\t%s\n", result.WorkflowRunID)
-	fmt.Fprintf(w, "stepKey\t%s\n", result.StepKey)
-	fmt.Fprintf(w, "status\t%s\n", result.Status)
+	started := ""
 	if result.StartedAt != nil {
-		fmt.Fprintf(w, "startedAt\t%s\n", *result.StartedAt)
-	} else {
-		fmt.Fprintf(w, "startedAt\t\n")
+		started = *result.StartedAt
 	}
+	finished := ""
 	if result.FinishedAt != nil {
-		fmt.Fprintf(w, "finishedAt\t%s\n", *result.FinishedAt)
-	} else {
-		fmt.Fprintf(w, "finishedAt\t\n")
+		finished = *result.FinishedAt
 	}
-	return w.Flush()
+
+	return output.PrintKVTable([][2]string{
+		{"id", result.ID},
+		{"workflowRunId", result.WorkflowRunID},
+		{"stepKey", result.StepKey},
+		{"status", result.Status},
+		{"startedAt", started},
+		{"finishedAt", finished},
+	})
 }

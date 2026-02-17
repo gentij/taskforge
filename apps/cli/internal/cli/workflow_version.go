@@ -2,25 +2,12 @@ package cli
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
-
-type workflowVersionItem struct {
-	ID         string `json:"id"`
-	WorkflowID string `json:"workflowId"`
-	Version    int    `json:"version"`
-	CreatedAt  string `json:"createdAt"`
-}
-
-type workflowVersionListResponse struct {
-	Items      []workflowVersionItem `json:"items"`
-	Pagination paginationMeta        `json:"pagination"`
-}
 
 var workflowVersionCmd = &cobra.Command{
 	Use:   "version",
@@ -63,61 +50,54 @@ func init() {
 }
 
 func workflowVersionList(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	workflowID := args[0]
+	result, err := ctx.Client.ListWorkflowVersions(workflowID, workflowVersionListPage, workflowVersionListPageSize)
 	if err != nil {
 		return err
 	}
 
-	workflowID := args[0]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	query := url.Values{}
-	query.Set("page", fmt.Sprintf("%d", workflowVersionListPage))
-	query.Set("pageSize", fmt.Sprintf("%d", workflowVersionListPageSize))
-
-	var result workflowVersionListResponse
-	if err := client.GetJSON("/workflows/"+workflowID+"/versions?"+query.Encode(), &result); err != nil {
-		return err
-	}
-
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-	if quiet {
+	if ctx.Quiet {
 		for _, item := range result.Items {
 			fmt.Fprintln(os.Stdout, item.ID)
 		}
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "VERSION\tID\tCREATED")
+	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
-		fmt.Fprintf(w, "%d\t%s\t%s\n", item.Version, item.ID, item.CreatedAt)
+		rows = append(rows, []string{fmt.Sprintf("%d", item.Version), item.ID, item.CreatedAt})
 	}
-	return w.Flush()
+	return output.PrintListTable([]string{"VERSION", "ID", "CREATED"}, rows)
 }
 
 func workflowVersionGet(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
 	version := args[1]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result workflowVersionItem
-	if err := client.GetJSON("/workflows/"+workflowID+"/versions/"+version, &result); err != nil {
+	result, err := ctx.Client.GetWorkflowVersion(workflowID, version)
+	if err != nil {
 		return err
 	}
 
-	return printWorkflowVersion(result)
+	return printWorkflowVersion(ctx, result)
 }
 
 func workflowVersionCreate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
@@ -126,33 +106,27 @@ func workflowVersionCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	payload := map[string]any{
-		"definition": definition,
-	}
-
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result workflowVersionItem
-	if err := client.PostJSON("/workflows/"+workflowID+"/versions", payload, &result); err != nil {
+	result, err := ctx.Client.CreateWorkflowVersion(workflowID, definition)
+	if err != nil {
 		return err
 	}
 
-	return printWorkflowVersion(result)
+	return printWorkflowVersion(ctx, result)
 }
 
-func printWorkflowVersion(result workflowVersionItem) error {
-	if outputJSON {
+func printWorkflowVersion(ctx *Context, result api.WorkflowVersion) error {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-	if quiet {
+	if ctx.Quiet {
 		fmt.Fprintln(os.Stdout, result.ID)
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "id\t%s\n", result.ID)
-	fmt.Fprintf(w, "workflowId\t%s\n", result.WorkflowID)
-	fmt.Fprintf(w, "version\t%d\n", result.Version)
-	fmt.Fprintf(w, "createdAt\t%s\n", result.CreatedAt)
-	return w.Flush()
+	return output.PrintKVTable([][2]string{
+		{"id", result.ID},
+		{"workflowId", result.WorkflowID},
+		{"version", fmt.Sprintf("%d", result.Version)},
+		{"createdAt", result.CreatedAt},
+	})
 }

@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
@@ -11,22 +10,6 @@ import (
 	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
-
-type triggerItem struct {
-	ID         string `json:"id"`
-	WorkflowID string `json:"workflowId"`
-	Type       string `json:"type"`
-	Name       string `json:"name"`
-	IsActive   bool   `json:"isActive"`
-	Config     any    `json:"config"`
-	CreatedAt  string `json:"createdAt"`
-	UpdatedAt  string `json:"updatedAt"`
-}
-
-type triggerListResponse struct {
-	Items      []triggerItem  `json:"items"`
-	Pagination paginationMeta `json:"pagination"`
-}
 
 var triggerCmd = &cobra.Command{
 	Use:   "trigger",
@@ -97,62 +80,55 @@ func init() {
 }
 
 func triggerList(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	workflowID := args[0]
+	result, err := ctx.Client.ListTriggers(workflowID, triggerListPage, triggerListPageSize)
 	if err != nil {
 		return err
 	}
 
-	workflowID := args[0]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	query := url.Values{}
-	query.Set("page", fmt.Sprintf("%d", triggerListPage))
-	query.Set("pageSize", fmt.Sprintf("%d", triggerListPageSize))
-
-	var result triggerListResponse
-	if err := client.GetJSON("/workflows/"+workflowID+"/triggers?"+query.Encode(), &result); err != nil {
-		return err
-	}
-
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
 
-	if quiet {
+	if ctx.Quiet {
 		for _, item := range result.Items {
 			fmt.Fprintln(os.Stdout, item.ID)
 		}
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "ID\tTYPE\tNAME\tACTIVE")
+	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%t\n", item.ID, item.Type, item.Name, item.IsActive)
+		rows = append(rows, []string{item.ID, item.Type, item.Name, fmt.Sprintf("%t", item.IsActive)})
 	}
-	return w.Flush()
+	return output.PrintListTable([]string{"ID", "TYPE", "NAME", "ACTIVE"}, rows)
 }
 
 func triggerGet(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
 	triggerID := args[1]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result triggerItem
-	if err := client.GetJSON("/workflows/"+workflowID+"/triggers/"+triggerID, &result); err != nil {
+	result, err := ctx.Client.GetTrigger(workflowID, triggerID)
+	if err != nil {
 		return err
 	}
 
-	return printTrigger(result)
+	return printTrigger(ctx, result)
 }
 
 func triggerCreate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
@@ -168,19 +144,18 @@ func triggerCreate(cmd *cobra.Command, args []string) error {
 		"config":   configValue,
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result triggerItem
-	if err := client.PostJSON("/workflows/"+workflowID+"/triggers", payload, &result); err != nil {
+	result, err := ctx.Client.CreateTrigger(workflowID, payload)
+	if err != nil {
 		return err
 	}
 
-	return printTrigger(result)
+	return printTrigger(ctx, result)
 }
 
 func triggerUpdate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	workflowID := args[0]
@@ -204,57 +179,53 @@ func triggerUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no fields to update")
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result triggerItem
-	if err := client.PatchJSON("/workflows/"+workflowID+"/triggers/"+triggerID, patch, &result); err != nil {
-		return err
-	}
-
-	return printTrigger(result)
-}
-
-func triggerDelete(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	result, err := ctx.Client.UpdateTrigger(workflowID, triggerID, patch)
 	if err != nil {
 		return err
 	}
 
+	return printTrigger(ctx, result)
+}
+
+func triggerDelete(cmd *cobra.Command, args []string) error {
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
 	workflowID := args[0]
 	triggerID := args[1]
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result triggerItem
-	if err := client.DeleteJSON("/workflows/"+workflowID+"/triggers/"+triggerID, &result); err != nil {
+	result, err := ctx.Client.DeleteTrigger(workflowID, triggerID)
+	if err != nil {
 		return err
 	}
 
-	return printTrigger(result)
+	return printTrigger(ctx, result)
 }
 
-func printTrigger(result triggerItem) error {
-	if outputJSON {
+func printTrigger(ctx *Context, result api.Trigger) error {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-	if quiet {
+	if ctx.Quiet {
 		fmt.Fprintln(os.Stdout, result.ID)
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "id\t%s\n", result.ID)
-	fmt.Fprintf(w, "workflowId\t%s\n", result.WorkflowID)
-	fmt.Fprintf(w, "type\t%s\n", result.Type)
-	fmt.Fprintf(w, "name\t%s\n", result.Name)
-	fmt.Fprintf(w, "isActive\t%t\n", result.IsActive)
-
 	configData, err := json.Marshal(result.Config)
+	configValue := ""
 	if err == nil {
-		fmt.Fprintf(w, "config\t%s\n", string(configData))
-	} else {
-		fmt.Fprintf(w, "config\t\n")
+		configValue = string(configData)
 	}
 
-	fmt.Fprintf(w, "createdAt\t%s\n", result.CreatedAt)
-	fmt.Fprintf(w, "updatedAt\t%s\n", result.UpdatedAt)
-	return w.Flush()
+	return output.PrintKVTable([][2]string{
+		{"id", result.ID},
+		{"workflowId", result.WorkflowID},
+		{"type", result.Type},
+		{"name", result.Name},
+		{"isActive", fmt.Sprintf("%t", result.IsActive)},
+		{"config", configValue},
+		{"createdAt", result.CreatedAt},
+		{"updatedAt", result.UpdatedAt},
+	})
 }

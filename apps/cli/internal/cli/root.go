@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 
+	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +20,22 @@ var rootCmd = &cobra.Command{
 	Use:   "taskforge",
 	Short: "Taskforge CLI",
 	Long:  "Taskforge CLI for managing workflows, runs, triggers, and secrets.",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		cfg, _, err := loadConfig()
+		if err != nil {
+			return err
+		}
+
+		ctx := &Context{
+			Config:     cfg,
+			Client:     api.NewClient(cfg.ServerURL, cfg.Token),
+			OutputJSON: outputJSON,
+			Quiet:      quiet,
+		}
+
+		cmd.SetContext(WithContext(cmd.Context(), ctx))
+		return nil
+	},
 }
 
 func Execute() {

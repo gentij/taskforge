@@ -2,26 +2,12 @@ package cli
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
-
-type secretItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	CreatedAt   string  `json:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt"`
-}
-
-type secretListResponse struct {
-	Items      []secretItem   `json:"items"`
-	Pagination paginationMeta `json:"pagination"`
-}
 
 var secretCmd = &cobra.Command{
 	Use:   "secret",
@@ -89,59 +75,52 @@ func init() {
 }
 
 func secretList(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	result, err := ctx.Client.ListSecrets(secretListPage, secretListPageSize)
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	query := url.Values{}
-	query.Set("page", fmt.Sprintf("%d", secretListPage))
-	query.Set("pageSize", fmt.Sprintf("%d", secretListPageSize))
-
-	var result secretListResponse
-	if err := client.GetJSON("/secrets?"+query.Encode(), &result); err != nil {
-		return err
-	}
-
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
 
-	if quiet {
+	if ctx.Quiet {
 		for _, item := range result.Items {
 			fmt.Fprintln(os.Stdout, item.ID)
 		}
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "ID\tNAME\tCREATED\tUPDATED")
+	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.ID, item.Name, item.CreatedAt, item.UpdatedAt)
+		rows = append(rows, []string{item.ID, item.Name, item.CreatedAt, item.UpdatedAt})
 	}
-	return w.Flush()
+	return output.PrintListTable([]string{"ID", "NAME", "CREATED", "UPDATED"}, rows)
 }
 
 func secretGet(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	result, err := ctx.Client.GetSecret(args[0])
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result secretItem
-	if err := client.GetJSON("/secrets/"+args[0], &result); err != nil {
-		return err
-	}
-
-	return printSecret(result)
+	return printSecret(ctx, result)
 }
 
 func secretCreate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	payload := map[string]any{
@@ -150,19 +129,18 @@ func secretCreate(cmd *cobra.Command, args []string) error {
 		"description": secretCreateDescription,
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result secretItem
-	if err := client.PostJSON("/secrets", payload, &result); err != nil {
+	result, err := ctx.Client.CreateSecret(payload)
+	if err != nil {
 		return err
 	}
 
-	return printSecret(result)
+	return printSecret(ctx, result)
 }
 
 func secretUpdate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	patch := map[string]any{}
@@ -179,49 +157,47 @@ func secretUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no fields to update")
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result secretItem
-	if err := client.PatchJSON("/secrets/"+args[0], patch, &result); err != nil {
-		return err
-	}
-
-	return printSecret(result)
-}
-
-func secretDelete(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	result, err := ctx.Client.UpdateSecret(args[0], patch)
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result secretItem
-	if err := client.DeleteJSON("/secrets/"+args[0], &result); err != nil {
+	return printSecret(ctx, result)
+}
+
+func secretDelete(cmd *cobra.Command, args []string) error {
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	result, err := ctx.Client.DeleteSecret(args[0])
+	if err != nil {
 		return err
 	}
 
-	return printSecret(result)
+	return printSecret(ctx, result)
 }
 
-func printSecret(result secretItem) error {
-	if outputJSON {
+func printSecret(ctx *Context, result api.Secret) error {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-	if quiet {
+	if ctx.Quiet {
 		fmt.Fprintln(os.Stdout, result.ID)
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "id\t%s\n", result.ID)
-	fmt.Fprintf(w, "name\t%s\n", result.Name)
+	description := ""
 	if result.Description != nil {
-		fmt.Fprintf(w, "description\t%s\n", *result.Description)
-	} else {
-		fmt.Fprintf(w, "description\t\n")
+		description = *result.Description
 	}
-	fmt.Fprintf(w, "createdAt\t%s\n", result.CreatedAt)
-	fmt.Fprintf(w, "updatedAt\t%s\n", result.UpdatedAt)
-	return w.Flush()
+
+	return output.PrintKVTable([][2]string{
+		{"id", result.ID},
+		{"name", result.Name},
+		{"description", description},
+		{"createdAt", result.CreatedAt},
+		{"updatedAt", result.UpdatedAt},
+	})
 }

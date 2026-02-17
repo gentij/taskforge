@@ -59,6 +59,151 @@ func (c *Client) DeleteJSON(path string, out any) error {
 	return c.doJSON(http.MethodDelete, path, nil, out)
 }
 
+type validateResponse struct {
+	Valid                bool                `json:"valid"`
+	Issues               []any               `json:"issues"`
+	InferredDependencies map[string][]string `json:"inferredDependencies"`
+	ExecutionBatches     [][]string          `json:"executionBatches"`
+	ReferencedSecrets    []string            `json:"referencedSecrets"`
+}
+
+func (c *Client) ListWorkflows(page int, pageSize int) (Paginated[Workflow], error) {
+	var result Paginated[Workflow]
+	path := fmt.Sprintf("/workflows?page=%d&pageSize=%d", page, pageSize)
+	return result, c.GetJSON(path, &result)
+}
+
+func (c *Client) GetWorkflow(id string) (Workflow, error) {
+	var result Workflow
+	return result, c.GetJSON("/workflows/"+id, &result)
+}
+
+func (c *Client) CreateWorkflow(name string, definition any) (Workflow, error) {
+	var result Workflow
+	payload := map[string]any{"name": name, "definition": definition}
+	return result, c.PostJSON("/workflows", payload, &result)
+}
+
+func (c *Client) UpdateWorkflow(id string, patch map[string]any) (Workflow, error) {
+	var result Workflow
+	return result, c.PatchJSON("/workflows/"+id, patch, &result)
+}
+
+func (c *Client) DeleteWorkflow(id string) (Workflow, error) {
+	var result Workflow
+	return result, c.DeleteJSON("/workflows/"+id, &result)
+}
+
+func (c *Client) RunWorkflow(id string, input any, overrides any) (map[string]string, error) {
+	var result struct {
+		WorkflowRunID string `json:"workflowRunId"`
+		Status        string `json:"status"`
+	}
+	payload := map[string]any{"input": input, "overrides": overrides}
+	err := c.PostJSON("/workflows/"+id+"/run", payload, &result)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{"workflowRunId": result.WorkflowRunID, "status": result.Status}, nil
+}
+
+func (c *Client) ValidateWorkflow(id string, definition any) (validateResponse, error) {
+	var result validateResponse
+	payload := map[string]any{"definition": definition}
+	return result, c.PostJSON("/workflows/"+id+"/versions/validate", payload, &result)
+}
+
+func (c *Client) ListWorkflowVersions(workflowID string, page int, pageSize int) (Paginated[WorkflowVersion], error) {
+	var result Paginated[WorkflowVersion]
+	path := fmt.Sprintf("/workflows/%s/versions?page=%d&pageSize=%d", workflowID, page, pageSize)
+	return result, c.GetJSON(path, &result)
+}
+
+func (c *Client) GetWorkflowVersion(workflowID string, version string) (WorkflowVersion, error) {
+	var result WorkflowVersion
+	return result, c.GetJSON("/workflows/"+workflowID+"/versions/"+version, &result)
+}
+
+func (c *Client) CreateWorkflowVersion(workflowID string, definition any) (WorkflowVersion, error) {
+	var result WorkflowVersion
+	payload := map[string]any{"definition": definition}
+	return result, c.PostJSON("/workflows/"+workflowID+"/versions", payload, &result)
+}
+
+func (c *Client) ListTriggers(workflowID string, page int, pageSize int) (Paginated[Trigger], error) {
+	var result Paginated[Trigger]
+	path := fmt.Sprintf("/workflows/%s/triggers?page=%d&pageSize=%d", workflowID, page, pageSize)
+	return result, c.GetJSON(path, &result)
+}
+
+func (c *Client) GetTrigger(workflowID string, triggerID string) (Trigger, error) {
+	var result Trigger
+	return result, c.GetJSON("/workflows/"+workflowID+"/triggers/"+triggerID, &result)
+}
+
+func (c *Client) CreateTrigger(workflowID string, payload map[string]any) (Trigger, error) {
+	var result Trigger
+	return result, c.PostJSON("/workflows/"+workflowID+"/triggers", payload, &result)
+}
+
+func (c *Client) UpdateTrigger(workflowID string, triggerID string, patch map[string]any) (Trigger, error) {
+	var result Trigger
+	return result, c.PatchJSON("/workflows/"+workflowID+"/triggers/"+triggerID, patch, &result)
+}
+
+func (c *Client) DeleteTrigger(workflowID string, triggerID string) (Trigger, error) {
+	var result Trigger
+	return result, c.DeleteJSON("/workflows/"+workflowID+"/triggers/"+triggerID, &result)
+}
+
+func (c *Client) ListWorkflowRuns(workflowID string, page int, pageSize int) (Paginated[WorkflowRun], error) {
+	var result Paginated[WorkflowRun]
+	path := fmt.Sprintf("/workflows/%s/runs?page=%d&pageSize=%d", workflowID, page, pageSize)
+	return result, c.GetJSON(path, &result)
+}
+
+func (c *Client) GetWorkflowRun(workflowID string, runID string) (WorkflowRun, error) {
+	var result WorkflowRun
+	return result, c.GetJSON("/workflows/"+workflowID+"/runs/"+runID, &result)
+}
+
+func (c *Client) ListStepRuns(workflowID string, runID string, page int, pageSize int) (Paginated[StepRun], error) {
+	var result Paginated[StepRun]
+	path := fmt.Sprintf("/workflows/%s/runs/%s/steps?page=%d&pageSize=%d", workflowID, runID, page, pageSize)
+	return result, c.GetJSON(path, &result)
+}
+
+func (c *Client) GetStepRun(workflowID string, runID string, stepID string) (StepRun, error) {
+	var result StepRun
+	return result, c.GetJSON("/workflows/"+workflowID+"/runs/"+runID+"/steps/"+stepID, &result)
+}
+
+func (c *Client) ListSecrets(page int, pageSize int) (Paginated[Secret], error) {
+	var result Paginated[Secret]
+	path := fmt.Sprintf("/secrets?page=%d&pageSize=%d", page, pageSize)
+	return result, c.GetJSON(path, &result)
+}
+
+func (c *Client) GetSecret(id string) (Secret, error) {
+	var result Secret
+	return result, c.GetJSON("/secrets/"+id, &result)
+}
+
+func (c *Client) CreateSecret(payload map[string]any) (Secret, error) {
+	var result Secret
+	return result, c.PostJSON("/secrets", payload, &result)
+}
+
+func (c *Client) UpdateSecret(id string, patch map[string]any) (Secret, error) {
+	var result Secret
+	return result, c.PatchJSON("/secrets/"+id, patch, &result)
+}
+
+func (c *Client) DeleteSecret(id string) (Secret, error) {
+	var result Secret
+	return result, c.DeleteJSON("/secrets/"+id, &result)
+}
+
 func (c *Client) doJSON(method string, path string, body any, out any) error {
 	fullURL, err := c.buildURL(path)
 	if err != nil {

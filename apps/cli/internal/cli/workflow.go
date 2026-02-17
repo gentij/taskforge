@@ -1,40 +1,13 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/url"
 	"os"
-	"strings"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
-
-type workflowItem struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	IsActive        bool    `json:"isActive"`
-	LatestVersionID *string `json:"latestVersionId"`
-	CreatedAt       string  `json:"createdAt"`
-	UpdatedAt       string  `json:"updatedAt"`
-}
-
-type paginationMeta struct {
-	Page       int  `json:"page"`
-	PageSize   int  `json:"pageSize"`
-	Total      int  `json:"total"`
-	TotalPages int  `json:"totalPages"`
-	HasNext    bool `json:"hasNext"`
-	HasPrev    bool `json:"hasPrev"`
-}
-
-type workflowListResponse struct {
-	Items      []workflowItem `json:"items"`
-	Pagination paginationMeta `json:"pagination"`
-}
 
 var workflowCmd = &cobra.Command{
 	Use:   "workflow",
@@ -122,84 +95,57 @@ func init() {
 }
 
 func workflowList(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	result, err := ctx.Client.ListWorkflows(workflowListPage, workflowListPageSize)
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	query := url.Values{}
-	query.Set("page", fmt.Sprintf("%d", workflowListPage))
-	query.Set("pageSize", fmt.Sprintf("%d", workflowListPageSize))
-
-	var result workflowListResponse
-	if err := client.GetJSON("/workflows?"+query.Encode(), &result); err != nil {
-		return err
-	}
-
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
 
-	if quiet {
+	if ctx.Quiet {
 		for _, item := range result.Items {
 			fmt.Fprintln(os.Stdout, item.ID)
 		}
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "ID\tNAME\tACTIVE\tLATEST_VERSION")
+	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
 		latest := ""
 		if item.LatestVersionID != nil {
 			latest = *item.LatestVersionID
 		}
-		fmt.Fprintf(w, "%s\t%s\t%t\t%s\n", item.ID, item.Name, item.IsActive, latest)
+		rows = append(rows, []string{item.ID, item.Name, fmt.Sprintf("%t", item.IsActive), latest})
 	}
-	return w.Flush()
+
+	return output.PrintListTable([]string{"ID", "NAME", "ACTIVE", "LATEST_VERSION"}, rows)
 }
 
 func workflowGet(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	result, err := ctx.Client.GetWorkflow(args[0])
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result workflowItem
-	if err := client.GetJSON("/workflows/"+args[0], &result); err != nil {
-		return err
-	}
-
-	if outputJSON {
-		return output.PrintJSON(result)
-	}
-
-	if quiet {
-		fmt.Fprintln(os.Stdout, result.ID)
-		return nil
-	}
-
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "id\t%s\n", result.ID)
-	fmt.Fprintf(w, "name\t%s\n", result.Name)
-	fmt.Fprintf(w, "isActive\t%t\n", result.IsActive)
-	if result.LatestVersionID != nil {
-		fmt.Fprintf(w, "latestVersionId\t%s\n", *result.LatestVersionID)
-	} else {
-		fmt.Fprintf(w, "latestVersionId\t\n")
-	}
-	fmt.Fprintf(w, "createdAt\t%s\n", result.CreatedAt)
-	fmt.Fprintf(w, "updatedAt\t%s\n", result.UpdatedAt)
-	return w.Flush()
+	return printWorkflow(ctx, result)
 }
 
 func workflowCreate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	definition, err := readJSONFile(workflowCreateDefinition)
@@ -207,24 +153,18 @@ func workflowCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	payload := map[string]any{
-		"name":       workflowCreateName,
-		"definition": definition,
-	}
-
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result workflowItem
-	if err := client.PostJSON("/workflows", payload, &result); err != nil {
+	result, err := ctx.Client.CreateWorkflow(workflowCreateName, definition)
+	if err != nil {
 		return err
 	}
 
-	return printWorkflow(result)
+	return printWorkflow(ctx, result)
 }
 
 func workflowUpdate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	patch := map[string]any{}
@@ -238,34 +178,32 @@ func workflowUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no fields to update")
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result workflowItem
-	if err := client.PatchJSON("/workflows/"+args[0], patch, &result); err != nil {
+	result, err := ctx.Client.UpdateWorkflow(args[0], patch)
+	if err != nil {
 		return err
 	}
 
-	return printWorkflow(result)
+	return printWorkflow(ctx, result)
 }
 
 func workflowDelete(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	result, err := ctx.Client.DeleteWorkflow(args[0])
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result workflowItem
-	if err := client.DeleteJSON("/workflows/"+args[0], &result); err != nil {
-		return err
-	}
-
-	return printWorkflow(result)
+	return printWorkflow(ctx, result)
 }
 
 func workflowRun(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	input, err := readOptionalJSONFile(workflowRunInput)
@@ -278,39 +216,26 @@ func workflowRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	payload := map[string]any{
-		"input":     input,
-		"overrides": overrides,
-	}
-
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result struct {
-		WorkflowRunID string `json:"workflowRunId"`
-		Status        string `json:"status"`
-	}
-	if err := client.PostJSON("/workflows/"+args[0]+"/run", payload, &result); err != nil {
+	result, err := ctx.Client.RunWorkflow(args[0], input, overrides)
+	if err != nil {
 		return err
 	}
 
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-	if quiet {
-		fmt.Fprintln(os.Stdout, result.WorkflowRunID)
+	if ctx.Quiet {
+		fmt.Fprintln(os.Stdout, result["workflowRunId"])
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "workflowRunId\t%s\n", result.WorkflowRunID)
-	fmt.Fprintf(w, "status\t%s\n", result.Status)
-	return w.Flush()
+	return output.PrintKVTable([][2]string{{"workflowRunId", result["workflowRunId"]}, {"status", result["status"]}})
 }
 
 func workflowValidate(cmd *cobra.Command, args []string) error {
-	cfg, _, err := loadConfig()
-	if err != nil {
-		return err
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
 	}
 
 	definition, err := readJSONFile(workflowValidateDefinition)
@@ -318,27 +243,15 @@ func workflowValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	payload := map[string]any{
-		"definition": definition,
-	}
-
-	client := api.NewClient(cfg.ServerURL, cfg.Token)
-	var result struct {
-		Valid                bool                `json:"valid"`
-		Issues               []any               `json:"issues"`
-		InferredDependencies map[string][]string `json:"inferredDependencies"`
-		ExecutionBatches     [][]string          `json:"executionBatches"`
-		ReferencedSecrets    []string            `json:"referencedSecrets"`
-	}
-	if err := client.PostJSON("/workflows/"+args[0]+"/versions/validate", payload, &result); err != nil {
+	result, err := ctx.Client.ValidateWorkflow(args[0], definition)
+	if err != nil {
 		return err
 	}
 
-	if outputJSON {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
-
-	if quiet {
+	if ctx.Quiet {
 		fmt.Fprintln(os.Stdout, result.Valid)
 		return nil
 	}
@@ -348,62 +261,30 @@ func workflowValidate(cmd *cobra.Command, args []string) error {
 		issueCount = len(result.Issues)
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "valid\t%t\n", result.Valid)
-	fmt.Fprintf(w, "issues\t%d\n", issueCount)
-	return w.Flush()
+	return output.PrintKVTable([][2]string{{"valid", fmt.Sprintf("%t", result.Valid)}, {"issues", fmt.Sprintf("%d", issueCount)}})
 }
 
-func printWorkflow(result workflowItem) error {
-	if outputJSON {
+func printWorkflow(ctx *Context, result api.Workflow) error {
+	if ctx.OutputJSON {
 		return output.PrintJSON(result)
 	}
 
-	if quiet {
+	if ctx.Quiet {
 		fmt.Fprintln(os.Stdout, result.ID)
 		return nil
 	}
 
-	w := output.NewTableWriter()
-	fmt.Fprintln(w, "FIELD\tVALUE")
-	fmt.Fprintf(w, "id\t%s\n", result.ID)
-	fmt.Fprintf(w, "name\t%s\n", result.Name)
-	fmt.Fprintf(w, "isActive\t%t\n", result.IsActive)
+	latest := ""
 	if result.LatestVersionID != nil {
-		fmt.Fprintf(w, "latestVersionId\t%s\n", *result.LatestVersionID)
-	} else {
-		fmt.Fprintf(w, "latestVersionId\t\n")
-	}
-	fmt.Fprintf(w, "createdAt\t%s\n", result.CreatedAt)
-	fmt.Fprintf(w, "updatedAt\t%s\n", result.UpdatedAt)
-	return w.Flush()
-}
-
-func readJSONFile(path string) (any, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
+		latest = *result.LatestVersionID
 	}
 
-	var value any
-	if err := json.Unmarshal(data, &value); err != nil {
-		return nil, err
-	}
-
-	return value, nil
-}
-
-func readOptionalJSONFile(path string) (any, error) {
-	if strings.TrimSpace(path) == "" {
-		return map[string]any{}, nil
-	}
-
-	return readJSONFile(path)
+	return output.PrintKVTable([][2]string{
+		{"id", result.ID},
+		{"name", result.Name},
+		{"isActive", fmt.Sprintf("%t", result.IsActive)},
+		{"latestVersionId", latest},
+		{"createdAt", result.CreatedAt},
+		{"updatedAt", result.UpdatedAt},
+	})
 }
