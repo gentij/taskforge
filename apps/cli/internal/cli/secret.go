@@ -100,7 +100,10 @@ func secretList(cmd *cobra.Command, args []string) error {
 	for _, item := range result.Items {
 		rows = append(rows, []string{item.ID, item.Name, item.CreatedAt, item.UpdatedAt})
 	}
-	return output.PrintListTable([]string{"ID", "NAME", "CREATED", "UPDATED"}, rows)
+	if err := output.PrintListTable([]string{"ID", "NAME", "CREATED", "UPDATED"}, rows); err != nil {
+		return err
+	}
+	return output.PrintPagination(result.Pagination)
 }
 
 func secretGet(cmd *cobra.Command, args []string) error {

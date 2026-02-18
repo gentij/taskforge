@@ -24,6 +24,23 @@ type APIError struct {
 	Details any    `json:"details,omitempty"`
 }
 
+func (e *APIError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+func AsAPIError(err error) *APIError {
+	if err == nil {
+		return nil
+	}
+	if apiErr, ok := err.(*APIError); ok {
+		return apiErr
+	}
+	return nil
+}
+
 type Envelope struct {
 	Ok         bool            `json:"ok"`
 	StatusCode int             `json:"statusCode"`
@@ -250,7 +267,7 @@ func (c *Client) doJSON(method string, path string, body any, out any) error {
 
 	if !env.Ok {
 		if env.Error != nil {
-			return fmt.Errorf("%s: %s", env.Error.Code, env.Error.Message)
+			return env.Error
 		}
 		return errors.New("request failed")
 	}

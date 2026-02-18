@@ -75,7 +75,10 @@ func workflowVersionList(cmd *cobra.Command, args []string) error {
 	for _, item := range result.Items {
 		rows = append(rows, []string{fmt.Sprintf("%d", item.Version), item.ID, item.CreatedAt})
 	}
-	return output.PrintListTable([]string{"VERSION", "ID", "CREATED"}, rows)
+	if err := output.PrintListTable([]string{"VERSION", "ID", "CREATED"}, rows); err != nil {
+		return err
+	}
+	return output.PrintPagination(result.Pagination)
 }
 
 func workflowVersionGet(cmd *cobra.Command, args []string) error {

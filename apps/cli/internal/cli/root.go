@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
+	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +41,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		output.PrintError(err)
 		os.Exit(1)
 	}
 }

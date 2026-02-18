@@ -104,9 +104,12 @@ func triggerList(cmd *cobra.Command, args []string) error {
 
 	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
-		rows = append(rows, []string{item.ID, item.Type, item.Name, fmt.Sprintf("%t", item.IsActive)})
+		rows = append(rows, []string{item.ID, item.Type, item.Name, output.BoolLabel(item.IsActive)})
 	}
-	return output.PrintListTable([]string{"ID", "TYPE", "NAME", "ACTIVE"}, rows)
+	if err := output.PrintListTable([]string{"ID", "TYPE", "NAME", "ACTIVE"}, rows); err != nil {
+		return err
+	}
+	return output.PrintPagination(result.Pagination)
 }
 
 func triggerGet(cmd *cobra.Command, args []string) error {
@@ -223,7 +226,7 @@ func printTrigger(ctx *Context, result api.Trigger) error {
 		{"workflowId", result.WorkflowID},
 		{"type", result.Type},
 		{"name", result.Name},
-		{"isActive", fmt.Sprintf("%t", result.IsActive)},
+		{"isActive", output.BoolLabel(result.IsActive)},
 		{"config", configValue},
 		{"createdAt", result.CreatedAt},
 		{"updatedAt", result.UpdatedAt},

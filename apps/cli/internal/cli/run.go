@@ -64,7 +64,10 @@ func runList(cmd *cobra.Command, args []string) error {
 	for _, item := range result.Items {
 		rows = append(rows, []string{item.ID, item.Status, item.WorkflowVersionID, item.CreatedAt})
 	}
-	return output.PrintListTable([]string{"ID", "STATUS", "VERSION", "CREATED"}, rows)
+	if err := output.PrintListTable([]string{"ID", "STATUS", "VERSION", "CREATED"}, rows); err != nil {
+		return err
+	}
+	return output.PrintPagination(result.Pagination)
 }
 
 func runGet(cmd *cobra.Command, args []string) error {

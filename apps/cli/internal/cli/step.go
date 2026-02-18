@@ -69,7 +69,10 @@ func stepList(cmd *cobra.Command, args []string) error {
 		}
 		rows = append(rows, []string{item.ID, item.StepKey, item.Status, started})
 	}
-	return output.PrintListTable([]string{"ID", "STEP_KEY", "STATUS", "STARTED"}, rows)
+	if err := output.PrintListTable([]string{"ID", "STEP_KEY", "STATUS", "STARTED"}, rows); err != nil {
+		return err
+	}
+	return output.PrintPagination(result.Pagination)
 }
 
 func stepGet(cmd *cobra.Command, args []string) error {
