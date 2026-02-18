@@ -33,6 +33,7 @@ The server will be available at `http://localhost:3000`.
 - [Architecture Overview](./docs/Architecture.md)
 - [Workflow Engine Concepts](./docs/Taskforge%20-%20Workflow%20Engine.md)
 - [Queues and Workers Plan](./docs/Taskforge%20-%20Queues%20and%20Workers%20Plan.md)
+- [CLI Guide](./apps/cli/README.md)
 
 ## Project Structure
 
