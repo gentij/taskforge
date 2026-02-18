@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var authCmd = &cobra.Command{
@@ -30,13 +30,22 @@ func init() {
 
 			token := strings.TrimSpace(authToken)
 			if token == "" {
-				fmt.Print("API token: ")
-				reader := bufio.NewReader(os.Stdin)
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					return err
+				if term.IsTerminal(int(os.Stdin.Fd())) {
+					fmt.Fprint(os.Stdout, "API token: ")
+					password, err := term.ReadPassword(int(os.Stdin.Fd()))
+					fmt.Fprintln(os.Stdout)
+					if err != nil {
+						return err
+					}
+					token = strings.TrimSpace(string(password))
+				} else {
+					reader := bufio.NewReader(os.Stdin)
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						return err
+					}
+					token = strings.TrimSpace(line)
 				}
-				token = strings.TrimSpace(line)
 			}
 
 			if token == "" {
@@ -101,30 +110,37 @@ func init() {
 		Use:   "whoami",
 		Short: "Validate token and show identity",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, err := loadConfig()
-			if err != nil {
-				return err
+			ctx := GetContext(cmd.Context())
+			if ctx == nil {
+				return fmt.Errorf("missing context")
 			}
-			if strings.TrimSpace(cfg.Token) == "" {
+			if strings.TrimSpace(ctx.Config.Token) == "" {
 				return fmt.Errorf("token not set")
 			}
 
-			client := api.NewClient(cfg.ServerURL, cfg.Token)
 			var result struct {
 				ID     string   `json:"id"`
 				Name   string   `json:"name"`
 				Scopes []string `json:"scopes"`
 			}
-			if err := client.GetJSON("/auth/whoami", &result); err != nil {
+			if err := ctx.Client.GetJSON("/auth/whoami", &result); err != nil {
 				return err
 			}
 
-			if outputJSON {
+			if IsJSON(ctx) {
 				return output.PrintJSON(result)
+			}
+			if ctx.Quiet {
+				fmt.Fprintln(os.Stdout, result.ID)
+				return nil
+			}
+			scopes := strings.Join(result.Scopes, ",")
+			if scopes == "" {
+				scopes = "(none)"
 			}
 			fmt.Printf("id: %s\n", result.ID)
 			fmt.Printf("name: %s\n", result.Name)
-			fmt.Printf("scopes: %s\n", strings.Join(result.Scopes, ","))
+			fmt.Printf("scopes: %s\n", scopes)
 			return nil
 		},
 	}

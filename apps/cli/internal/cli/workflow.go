@@ -105,7 +105,7 @@ func workflowList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 
@@ -221,7 +221,7 @@ func workflowRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {
@@ -248,7 +248,7 @@ func workflowValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {
@@ -265,7 +265,7 @@ func workflowValidate(cmd *cobra.Command, args []string) error {
 }
 
 func printWorkflow(ctx *Context, result api.Workflow) error {
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 

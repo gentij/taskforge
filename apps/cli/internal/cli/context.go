@@ -8,10 +8,11 @@ import (
 )
 
 type Context struct {
-	Config     config.Config
-	Client     *api.Client
-	OutputJSON bool
-	Quiet      bool
+	Config  config.Config
+	Client  *api.Client
+	Output  string
+	Quiet   bool
+	NoColor bool
 }
 
 type ctxKey struct{}
@@ -31,4 +32,8 @@ func GetContext(ctx context.Context) *Context {
 	}
 
 	return nil
+}
+
+func IsJSON(ctx *Context) bool {
+	return ctx != nil && ctx.Output == "json"
 }

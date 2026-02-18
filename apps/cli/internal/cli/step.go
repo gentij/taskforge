@@ -50,7 +50,7 @@ func stepList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 
@@ -89,7 +89,7 @@ func stepGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {
@@ -110,7 +110,7 @@ func stepGet(cmd *cobra.Command, args []string) error {
 		{"id", result.ID},
 		{"workflowRunId", result.WorkflowRunID},
 		{"stepKey", result.StepKey},
-		{"status", result.Status},
+		{"status", output.ColorStatus(result.Status)},
 		{"startedAt", started},
 		{"finishedAt", finished},
 	})

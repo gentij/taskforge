@@ -61,7 +61,7 @@ func workflowVersionList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {
@@ -118,7 +118,7 @@ func workflowVersionCreate(cmd *cobra.Command, args []string) error {
 }
 
 func printWorkflowVersion(ctx *Context, result api.WorkflowVersion) error {
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {

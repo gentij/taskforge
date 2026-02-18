@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
 	"github.com/gentij/taskforge/apps/cli/internal/output"
@@ -13,8 +15,9 @@ const defaultServerURL = "http://localhost:3000/v1/api"
 var (
 	configPath string
 	serverURL  string
-	outputJSON bool
+	outputMode string
 	quiet      bool
+	noColor    bool
 )
 
 var rootCmd = &cobra.Command{
@@ -27,12 +30,23 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		ctx := &Context{
-			Config:     cfg,
-			Client:     api.NewClient(cfg.ServerURL, cfg.Token),
-			OutputJSON: outputJSON,
-			Quiet:      quiet,
+		if outputMode == "" {
+			outputMode = "table"
 		}
+		outputMode = strings.ToLower(outputMode)
+		if outputMode != "table" && outputMode != "json" {
+			return fmt.Errorf("invalid output format: %s", outputMode)
+		}
+
+		ctx := &Context{
+			Config:  cfg,
+			Client:  api.NewClient(cfg.ServerURL, cfg.Token),
+			Output:  outputMode,
+			Quiet:   quiet,
+			NoColor: noColor,
+		}
+
+		output.SetNoColor(noColor)
 
 		cmd.SetContext(WithContext(cmd.Context(), ctx))
 		return nil
@@ -49,8 +63,14 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "Path to config file")
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", defaultServerURL, "API server URL")
-	rootCmd.PersistentFlags().BoolVar(&outputJSON, "json", false, "Output JSON")
+	rootCmd.PersistentFlags().StringVar(
+		&outputMode,
+		"output",
+		"table",
+		"Output format (table|json)",
+	)
 	rootCmd.PersistentFlags().BoolVar(&quiet, "quiet", false, "Minimal output")
+	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable color output")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(authCmd)

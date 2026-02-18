@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/gentij/taskforge/apps/cli/internal/api"
+	"golang.org/x/term"
 )
 
 type Format string
@@ -42,7 +44,14 @@ func PrintPagination(meta api.Pagination) error {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(os.Stdout, "Page %d/%d · Total %d\n", meta.Page, meta.TotalPages, meta.Total)
+	_, err := fmt.Fprintf(
+		os.Stdout,
+		"Page %d/%d · Total %d · PageSize %d\n",
+		meta.Page,
+		meta.TotalPages,
+		meta.Total,
+		meta.PageSize,
+	)
 	return err
 }
 
@@ -63,4 +72,41 @@ func PrintError(err error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "ERROR %s\n", err.Error())
+}
+
+var noColorOverride bool
+
+func SetNoColor(value bool) {
+	noColorOverride = value
+}
+
+func ColorStatus(status string) string {
+	if !colorEnabled() {
+		return status
+	}
+
+	switch strings.ToUpper(status) {
+	case "SUCCEEDED", "SUCCESS":
+		return colorize(status, "\x1b[32m")
+	case "FAILED", "ERROR":
+		return colorize(status, "\x1b[31m")
+	case "RUNNING", "IN_PROGRESS":
+		return colorize(status, "\x1b[33m")
+	case "CANCELLED", "CANCELED":
+		return colorize(status, "\x1b[90m")
+	default:
+		return status
+	}
+}
+
+func colorEnabled() bool {
+	if noColorOverride || os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+
+func colorize(text string, color string) string {
+	const reset = "\x1b[0m"
+	return color + text + reset
 }

@@ -85,7 +85,7 @@ func secretList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 
@@ -183,7 +183,7 @@ func secretDelete(cmd *cobra.Command, args []string) error {
 }
 
 func printSecret(ctx *Context, result api.Secret) error {
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {

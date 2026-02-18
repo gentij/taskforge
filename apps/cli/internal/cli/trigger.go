@@ -91,7 +91,7 @@ func triggerList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 
@@ -207,7 +207,7 @@ func triggerDelete(cmd *cobra.Command, args []string) error {
 }
 
 func printTrigger(ctx *Context, result api.Trigger) error {
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {

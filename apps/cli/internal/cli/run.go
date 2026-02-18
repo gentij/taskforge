@@ -49,7 +49,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 
@@ -62,7 +62,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	rows := make([][]string, 0, len(result.Items))
 	for _, item := range result.Items {
-		rows = append(rows, []string{item.ID, item.Status, item.WorkflowVersionID, item.CreatedAt})
+		rows = append(rows, []string{item.ID, output.ColorStatus(item.Status), item.WorkflowVersionID, item.CreatedAt})
 	}
 	if err := output.PrintListTable([]string{"ID", "STATUS", "VERSION", "CREATED"}, rows); err != nil {
 		return err
@@ -83,7 +83,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if ctx.OutputJSON {
+	if IsJSON(ctx) {
 		return output.PrintJSON(result)
 	}
 	if ctx.Quiet {
@@ -104,7 +104,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 		{"id", result.ID},
 		{"workflowId", result.WorkflowID},
 		{"workflowVersionId", result.WorkflowVersionID},
-		{"status", result.Status},
+		{"status", output.ColorStatus(result.Status)},
 		{"createdAt", result.CreatedAt},
 		{"startedAt", started},
 		{"finishedAt", finished},
