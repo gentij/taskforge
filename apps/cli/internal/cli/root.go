@@ -73,6 +73,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable color output")
 
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(workflowCmd)
 	rootCmd.AddCommand(triggerCmd)

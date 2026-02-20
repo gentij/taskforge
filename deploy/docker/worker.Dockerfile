@@ -22,7 +22,8 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/packages /app/packages
+COPY --from=builder /app/apps/worker/node_modules /app/apps/worker/node_modules
 COPY --from=builder /app/apps/worker/dist /app/apps/worker/dist
 COPY --from=builder /app/apps/worker/package.json /app/apps/worker/package.json
 
-CMD ["node", "apps/worker/dist/main.js"]
+CMD ["node", "apps/worker/dist/src/main.js"]

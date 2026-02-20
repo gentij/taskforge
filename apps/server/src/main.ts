@@ -42,7 +42,7 @@ async function bootstrap() {
     SwaggerModule.createDocument(app, cleanupOpenApiDoc(openApiDoc));
   SwaggerModule.setup(SWAGGER_ENDPOINT, app, documentFactory);
 
-  await app.listen(configService.get('PORT'));
+  await app.listen(configService.getOrThrow<number>('PORT'), '0.0.0.0');
 }
 
 bootstrap().catch((err) => {
