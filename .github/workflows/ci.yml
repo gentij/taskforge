@@ -40,7 +40,7 @@ jobs:
         run: |
           pnpm -C apps/server prisma:generate
           pnpm -C packages/db-access build
-          pnpm -C packages/queue-config build
+          pnpm -C packages/queue build
           pnpm -C packages/contracts build
 
       - name: Build apps
