@@ -11,7 +11,7 @@ COPY apps ./apps
 RUN pnpm install --frozen-lockfile
 RUN pnpm -C apps/server prisma:generate
 RUN pnpm -C packages/db-access build \
-  && pnpm -C packages/queue-config build \
+  && pnpm -C packages/queue build \
   && pnpm -C packages/contracts build
 RUN pnpm -C apps/worker build
 
