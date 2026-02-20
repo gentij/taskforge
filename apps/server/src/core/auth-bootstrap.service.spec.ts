@@ -3,6 +3,7 @@ import { AuthBootstrapService } from './auth-bootstrap.service';
 import { ApiTokenService } from 'src/api-token/api-token.service';
 import { CryptoService } from 'src/crypto/crypto.service';
 import { PinoLogger } from 'nestjs-pino';
+import { ConfigService } from '@nestjs/config';
 
 import {
   createApiTokenServiceMock,
@@ -34,10 +35,20 @@ describe('AuthBootstrapService', () => {
         { provide: ApiTokenService, useValue: apiTokenServiceMock },
         { provide: CryptoService, useValue: cryptoServiceMock },
         { provide: PinoLogger, useValue: loggerMock },
+        {
+          provide: ConfigService,
+          useValue: {
+            getOrThrow: jest.fn((key: string) => process.env[key]),
+          },
+        },
       ],
     }).compile();
 
     service = moduleRef.get(AuthBootstrapService);
+  });
+
+  afterEach(() => {
+    delete process.env.TASKFORGE_ADMIN_TOKEN;
   });
 
   it('skips bootstrap if an active token already exists', async () => {
@@ -46,7 +57,6 @@ describe('AuthBootstrapService', () => {
     await service.onModuleInit();
 
     expect(apiTokenServiceMock.createAdminToken).not.toHaveBeenCalled();
-    expect(cryptoServiceMock.generateApiToken).not.toHaveBeenCalled();
     expect(cryptoServiceMock.hashApiToken).not.toHaveBeenCalled();
 
     expect(loggerMock.info).toHaveBeenCalled();
@@ -55,17 +65,21 @@ describe('AuthBootstrapService', () => {
 
   it('creates initial admin token if none exists', async () => {
     apiTokenServiceMock.hasAnyActiveToken.mockResolvedValue(false);
-    cryptoServiceMock.generateApiToken.mockReturnValue('tf_raw_token_123');
     cryptoServiceMock.hashApiToken.mockReturnValue('hashed_token_abc');
+
+    process.env.TASKFORGE_ADMIN_TOKEN = 'tf_raw_token_123';
 
     await service.onModuleInit();
 
+    expect(cryptoServiceMock.hashApiToken).toHaveBeenCalledWith(
+      'tf_raw_token_123',
+    );
     expect(apiTokenServiceMock.createAdminToken).toHaveBeenCalledWith({
       name: 'initial-admin',
       tokenHash: 'hashed_token_abc',
     });
 
-    const warnCalls = loggerMock.warn.mock.calls.flat().join(' ');
-    expect(warnCalls).toContain('tf_raw_token_123');
+    const infoCalls = loggerMock.info.mock.calls.flat().join(' ');
+    expect(infoCalls).toContain('initialized from environment');
   });
 });

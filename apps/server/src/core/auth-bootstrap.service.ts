@@ -1,7 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTokenService } from '../api-token/api-token.service';
 import { CryptoService } from 'src/crypto/crypto.service';
 import { PinoLogger } from 'nestjs-pino';
+import { Env } from 'src/config/env';
 
 @Injectable()
 export class AuthBootstrapService implements OnModuleInit {
@@ -9,6 +11,7 @@ export class AuthBootstrapService implements OnModuleInit {
     private readonly apiTokenService: ApiTokenService,
     private readonly cryptoService: CryptoService,
     private readonly logger: PinoLogger,
+    private readonly configService: ConfigService<Env>,
   ) {
     this.logger.setContext(AuthBootstrapService.name);
   }
@@ -21,8 +24,9 @@ export class AuthBootstrapService implements OnModuleInit {
       return;
     }
 
-    const rawToken = this.cryptoService.generateApiToken();
-
+    const rawToken: string = this.configService.getOrThrow(
+      'TASKFORGE_ADMIN_TOKEN',
+    );
     const tokenHash = this.cryptoService.hashApiToken(rawToken);
 
     await this.apiTokenService.createAdminToken({
@@ -30,12 +34,6 @@ export class AuthBootstrapService implements OnModuleInit {
       tokenHash,
     });
 
-    this.logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    this.logger.warn('No API token found — generated admin token');
-    this.logger.warn('');
-    this.logger.warn(`API TOKEN: ${rawToken}`);
-    this.logger.warn('');
-    this.logger.warn('Store this token securely. It will not be shown again.');
-    this.logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    this.logger.info('Admin API token initialized from environment');
   }
 }
