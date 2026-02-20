@@ -10,6 +10,7 @@ import {
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 import { WorkflowController } from 'src/workflow/workflow.controller';
 import { WorkflowService } from 'src/workflow/workflow.service';
@@ -19,11 +20,14 @@ import { ResponseInterceptor } from 'src/common/http/interceptors/response.inter
 import { AllowAuthGuard } from 'test/utils/allow-auth.guard';
 import { WorkflowRepository } from '@taskforge/db-access';
 import { PrismaService } from '@taskforge/db-access';
+import { SecretRepository } from '@taskforge/db-access';
 import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,
 } from 'test/workflow/workflow.repository.mock';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
+import { createSecretRepositoryMock } from 'test/secret/secret.repository.mock';
+import { createCacheManagerMock } from 'test/utils/cache-manager.mock';
 
 describe('Workflow Run (integration e2e)', () => {
   let app: NestFastifyApplication;
@@ -33,6 +37,8 @@ describe('Workflow Run (integration e2e)', () => {
   beforeEach(async () => {
     repo = createWorkflowRepositoryMock();
     orchestration = { startWorkflow: jest.fn() };
+    const secretRepo = createSecretRepositoryMock();
+    const cache = createCacheManagerMock();
 
     const moduleRef = await Test.createTestingModule({
       controllers: [WorkflowController],
@@ -40,6 +46,8 @@ describe('Workflow Run (integration e2e)', () => {
         WorkflowService,
         { provide: WorkflowRepository, useValue: repo },
         { provide: PrismaService, useValue: { $transaction: jest.fn() } },
+        { provide: SecretRepository, useValue: secretRepo },
+        { provide: CACHE_MANAGER, useValue: cache },
         { provide: OrchestrationService, useValue: orchestration },
 
         { provide: APP_PIPE, useClass: ZodValidationPipe },

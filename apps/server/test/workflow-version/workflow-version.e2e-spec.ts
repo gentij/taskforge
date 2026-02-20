@@ -10,6 +10,7 @@ import {
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 import { WorkflowVersionController } from 'src/workflow-version/workflow-version.controller';
 import { WorkflowVersionService } from 'src/workflow-version/workflow-version.service';
@@ -35,6 +36,7 @@ import {
   WorkflowRepository,
   WorkflowVersionRepository,
 } from '@taskforge/db-access';
+import { createCacheManagerMock } from 'test/utils/cache-manager.mock';
 
 describe('WorkflowVersion (e2e)', () => {
   let app: NestFastifyApplication;
@@ -51,6 +53,7 @@ describe('WorkflowVersion (e2e)', () => {
         WorkflowVersionService,
         { provide: WorkflowVersionRepository, useValue: repo },
         { provide: WorkflowRepository, useValue: workflowRepo },
+        { provide: CACHE_MANAGER, useValue: createCacheManagerMock() },
 
         { provide: APP_PIPE, useClass: ZodValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },

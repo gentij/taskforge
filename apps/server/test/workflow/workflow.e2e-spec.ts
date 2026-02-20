@@ -10,6 +10,7 @@ import {
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 import { WorkflowController } from 'src/workflow/workflow.controller';
 import { WorkflowService } from 'src/workflow/workflow.service';
@@ -28,7 +29,13 @@ import {
 import { createWorkflowVersionFixture } from 'test/workflow-version/workflow-version.fixtures';
 import { AllowAuthGuard } from 'test/utils/allow-auth.guard';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
-import { PrismaService, WorkflowRepository } from '@taskforge/db-access';
+import {
+  PrismaService,
+  SecretRepository,
+  WorkflowRepository,
+} from '@taskforge/db-access';
+import { createSecretRepositoryMock } from 'test/secret/secret.repository.mock';
+import { createCacheManagerMock } from 'test/utils/cache-manager.mock';
 
 describe('Workflow (e2e)', () => {
   let app: NestFastifyApplication;
@@ -42,6 +49,9 @@ describe('Workflow (e2e)', () => {
     prisma = {
       $transaction: jest.fn<Promise<unknown>, [(tx: any) => unknown]>(),
     };
+    const secretRepo = createSecretRepositoryMock();
+    secretRepo.findManyByNames.mockResolvedValue([]);
+    const cache = createCacheManagerMock();
 
     const moduleRef = await Test.createTestingModule({
       controllers: [WorkflowController],
@@ -51,8 +61,13 @@ describe('Workflow (e2e)', () => {
           provide: OrchestrationService,
           useValue: { startWorkflow: jest.fn() },
         },
+        {
+          provide: SecretRepository,
+          useValue: secretRepo,
+        },
         { provide: WorkflowRepository, useValue: repo },
         { provide: PrismaService, useValue: prisma },
+        { provide: CACHE_MANAGER, useValue: cache },
 
         { provide: APP_PIPE, useClass: ZodValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
@@ -116,7 +131,7 @@ describe('Workflow (e2e)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/workflows',
-      payload: { name: 'My WF' },
+      payload: { name: 'My WF', definition: version.definition },
     });
 
     expect(res.statusCode).toBe(201);

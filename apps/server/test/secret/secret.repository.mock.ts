@@ -3,6 +3,7 @@ import type { Secret } from '@prisma/client';
 export type SecretRepositoryMock = {
   create: jest.Mock<Promise<Secret>, [any]>;
   findMany: jest.Mock<Promise<Secret[]>, []>;
+  findManyByNames: jest.Mock<Promise<Array<{ name: string }>>, [string[]]>;
   findPage: jest.Mock<
     Promise<{ items: Secret[]; total: number }>,
     [{ page: number; pageSize: number }]
@@ -15,6 +16,7 @@ export type SecretRepositoryMock = {
 export const createSecretRepositoryMock = (): SecretRepositoryMock => ({
   create: jest.fn<Promise<Secret>, [any]>(),
   findMany: jest.fn<Promise<Secret[]>, []>(),
+  findManyByNames: jest.fn<Promise<Array<{ name: string }>>, [string[]]>(),
   findPage: jest.fn<
     Promise<{ items: Secret[]; total: number }>,
     [{ page: number; pageSize: number }]

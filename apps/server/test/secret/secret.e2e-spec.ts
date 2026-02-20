@@ -22,11 +22,13 @@ import {
   createSecretRepositoryMock,
   type SecretRepositoryMock,
 } from 'test/secret/secret.repository.mock';
+import { createCryptoServiceMock } from 'test/crypto/crypto.service.mock';
 import {
   createSecretFixture,
   createSecretListFixture,
 } from 'test/secret/secret.fixtures';
 import { SecretRepository } from '@taskforge/db-access';
+import { CryptoService } from 'src/crypto/crypto.service';
 
 describe('Secret (e2e)', () => {
   let app: NestFastifyApplication;
@@ -40,6 +42,7 @@ describe('Secret (e2e)', () => {
       providers: [
         SecretService,
         { provide: SecretRepository, useValue: repo },
+        { provide: CryptoService, useValue: createCryptoServiceMock() },
 
         { provide: APP_PIPE, useClass: ZodValidationPipe },
         { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
