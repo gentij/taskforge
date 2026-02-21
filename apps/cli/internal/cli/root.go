@@ -74,6 +74,9 @@ func init() {
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(workflowCmd)
 	rootCmd.AddCommand(triggerCmd)
