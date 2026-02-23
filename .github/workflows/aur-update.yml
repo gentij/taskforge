@@ -34,9 +34,9 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.tag.outputs.tag }}"
-          URL="https://github.com/gentij/taskforge/releases/download/${TAG}/taskforge_linux_amd64"
-          curl -fL "$URL" -o taskforge_linux_amd64
-          echo "sha256=$(sha256sum taskforge_linux_amd64 | awk '{print $1}')" >> $GITHUB_OUTPUT
+          URL="https://github.com/gentij/taskforge/releases/download/${TAG}/taskforge_linux_amd64.tar.gz"
+          curl -fL "$URL" -o taskforge_linux_amd64.tar.gz
+          echo "sha256=$(sha256sum taskforge_linux_amd64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
         id: checksum
 
       - name: Set up SSH
@@ -61,7 +61,7 @@ jobs:
           cd aur
 
           sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
-          sed -i "s#^source=.*#source=(\"taskforge::https://github.com/gentij/taskforge/releases/download/v${VERSION}/taskforge_linux_amd64\")#" PKGBUILD
+          sed -i "s#^source=.*#source=(\"https://github.com/gentij/taskforge/releases/download/v${VERSION}/taskforge_linux_amd64.tar.gz\")#" PKGBUILD
           sed -i "s/^sha256sums=.*/sha256sums=('${SHA}')/" PKGBUILD
 
           docker run --rm -v "$(pwd)":/repo archlinux:latest /bin/sh -c "pacman -Sy --noconfirm base-devel && cd /repo && makepkg --printsrcinfo > .SRCINFO"
