@@ -17,7 +17,7 @@ builds:
       - arm64
 
 archives:
-  - id: taskforge
+  - id: archives
     builds:
       - taskforge
     format: tar.gz
@@ -44,7 +44,7 @@ brews:
       bin.install "taskforge"
 
 nfpms:
-  - id: taskforge
+  - id: deb
     package_name: taskforge
     formats:
       - deb
@@ -56,11 +56,35 @@ nfpms:
     homepage: https://github.com/gentij/taskforge
 
 publishers:
-  - name: cloudsmith
+  - name: cloudsmith-ubuntu-jammy
     cmd: |
-      cloudsmith push deb {{ .Env.CLOUDSMITH_REPO }} {{ .ArtifactPath }}
+      cloudsmith push deb {{ .Env.CLOUDSMITH_REPO }}/ubuntu/jammy {{ .ArtifactPath }}
     env:
       - CLOUDSMITH_API_KEY={{ .Env.CLOUDSMITH_API_KEY }}
     dir: .
     ids:
-      - taskforge
+      - deb
+  - name: cloudsmith-ubuntu-focal
+    cmd: |
+      cloudsmith push deb {{ .Env.CLOUDSMITH_REPO }}/ubuntu/focal {{ .ArtifactPath }}
+    env:
+      - CLOUDSMITH_API_KEY={{ .Env.CLOUDSMITH_API_KEY }}
+    dir: .
+    ids:
+      - deb
+  - name: cloudsmith-debian-bookworm
+    cmd: |
+      cloudsmith push deb {{ .Env.CLOUDSMITH_REPO }}/debian/bookworm {{ .ArtifactPath }}
+    env:
+      - CLOUDSMITH_API_KEY={{ .Env.CLOUDSMITH_API_KEY }}
+    dir: .
+    ids:
+      - deb
+  - name: cloudsmith-debian-bullseye
+    cmd: |
+      cloudsmith push deb {{ .Env.CLOUDSMITH_REPO }}/debian/bullseye {{ .ArtifactPath }}
+    env:
+      - CLOUDSMITH_API_KEY={{ .Env.CLOUDSMITH_API_KEY }}
+    dir: .
+    ids:
+      - deb
