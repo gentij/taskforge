@@ -33,7 +33,7 @@ release:
 
 brews:
   - name: taskforge
-    folder: Formula
+    directory: Formula
     repository:
       owner: gentij
       name: homebrew-taskforge
