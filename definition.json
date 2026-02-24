@@ -1,0 +1,29 @@
+{
+  "input": {
+    "content": "Hello from Taskforge!",
+    "embeds": [
+      {
+        "title": "Taskforge Test",
+        "description": "This message was sent by a Taskforge workflow.",
+        "color": 5814783
+      }
+    ]
+  },
+  "steps": [
+    {
+      "key": "discord_webhook",
+      "type": "http",
+      "request": {
+        "method": "POST",
+        "url": "{{secrets.DISCORD_WEBHOOK_URL}}",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "content": "{{input.content}}",
+          "embeds": "{{input.embeds}}"
+        }
+      }
+    }
+  ]
+}

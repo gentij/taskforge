@@ -48,6 +48,18 @@ taskforge auth whoami
 taskforge auth logout
 ```
 
+## Stack
+
+```bash
+taskforge init
+taskforge start
+taskforge start server worker
+taskforge start --foreground
+taskforge status
+taskforge logs --follow
+taskforge stop
+```
+
 ## Workflows
 
 ```bash
