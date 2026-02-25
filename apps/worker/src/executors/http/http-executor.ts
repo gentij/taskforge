@@ -48,7 +48,12 @@ export class HttpExecutor implements StepExecutor {
     headers: Record<string, string>;
     body: unknown;
   }> {
-    const url = new URL(request.url);
+    let url: URL;
+    try {
+      url = new URL(request.url);
+    } catch {
+      throw new Error(`Invalid URL after template resolution: "${request.url}"`);
+    }
 
     if (request.query) {
       for (const [key, value] of Object.entries(request.query)) {

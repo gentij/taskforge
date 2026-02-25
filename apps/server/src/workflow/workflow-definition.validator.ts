@@ -74,6 +74,31 @@ export function validateWorkflowDefinitionStrict(
 
   const stepRefPattern = /\{\{\s*steps\.([a-zA-Z0-9_-]+)(?:\.[^}]*)?\s*\}\}/g;
   const inputRefPattern = /\{\{\s*input\.([a-zA-Z0-9_-]+)(?:\.[^}]*)?\s*\}\}/g;
+  const rootPattern = /\{\{\s*([a-zA-Z0-9_-]+)(?:\.|\}\})/g;
+  const allowedRoots = new Set(['input', 'steps', 'secret']);
+
+  const validateTemplateRoots = (
+    value: string,
+    path: string,
+    stepKey?: string,
+  ) => {
+    rootPattern.lastIndex = 0;
+    let rootMatch: RegExpExecArray | null;
+    while ((rootMatch = rootPattern.exec(value)) !== null) {
+      const root = rootMatch[1];
+      if (!root || allowedRoots.has(root)) continue;
+      issues.push({
+        field: path,
+        stepKey,
+        message: `stepKey=${stepKey ?? 'workflow'}: invalid template root "${root}" (allowed: input, steps, secret)`,
+      });
+    }
+  };
+
+  walk(definition.input ?? {}, 'input', (value, path) => {
+    if (typeof value !== 'string') return;
+    validateTemplateRoots(value, path);
+  });
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -85,6 +110,7 @@ export function validateWorkflowDefinitionStrict(
 
     walk(step.request, `steps[${i}].request`, (value, path) => {
       if (typeof value !== 'string') return;
+      validateTemplateRoots(value, path, step.key);
 
       let m: RegExpExecArray | null;
       stepRefPattern.lastIndex = 0;
@@ -114,6 +140,11 @@ export function validateWorkflowDefinitionStrict(
           });
         }
       }
+    });
+
+    walk(step.input ?? {}, `steps[${i}].input`, (value, path) => {
+      if (typeof value !== 'string') return;
+      validateTemplateRoots(value, path, step.key);
     });
   }
 
