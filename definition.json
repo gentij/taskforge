@@ -15,7 +15,11 @@
       "type": "http",
       "request": {
         "method": "POST",
+<<<<<<< HEAD
         "url": "{{secret.DISCORD_WEBHOOK_URL}}",
+=======
+        "url": "{{secrets.DISCORD_WEBHOOK_URL}}",
+>>>>>>> b9c82dbb2eb927e51eb55e3aca395b45b6c13899
         "headers": {
           "Content-Type": "application/json"
         },

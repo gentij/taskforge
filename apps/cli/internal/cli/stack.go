@@ -12,7 +12,27 @@ import (
 var (
 	logsFollow bool
 	logsTail   int
+	startForeground bool
 )
+
+var startCmd = &cobra.Command{
+	Use:   "start [service...]",
+	Short: "Start the local Taskforge stack",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		baseDir, composePath, envPath, err := resolveInitPaths()
+		if err != nil {
+			return err
+		}
+
+		composeArgs := []string{"--env-file", envPath, "up"}
+		if !startForeground {
+			composeArgs = append(composeArgs, "-d")
+		}
+		composeArgs = append(composeArgs, args...)
+
+		return runDockerCompose(baseDir, composePath, composeArgs...)
+	},
+}
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
@@ -60,6 +80,7 @@ var logsCmd = &cobra.Command{
 }
 
 func init() {
+	startCmd.Flags().BoolVar(&startForeground, "foreground", false, "Run services in foreground")
 	logsCmd.Flags().BoolVar(&logsFollow, "follow", false, "Follow log output")
 	logsCmd.Flags().IntVar(&logsTail, "tail", 200, "Lines to show from the end of logs")
 }
