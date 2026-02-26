@@ -68,3 +68,12 @@ type Secret struct {
 	CreatedAt   string  `json:"createdAt"`
 	UpdatedAt   string  `json:"updatedAt"`
 }
+
+type Health struct {
+	Status  string  `json:"status"`
+	Version string  `json:"version"`
+	Uptime  float64 `json:"uptime"`
+	DB      struct {
+		Ok bool `json:"ok"`
+	} `json:"db"`
+}
