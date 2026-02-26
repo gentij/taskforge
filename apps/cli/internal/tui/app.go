@@ -52,6 +52,9 @@ type model struct {
 	lastUpdated time.Time
 	health      *healthResponse
 	err         error
+	errorMsg    string
+	errorUntil  time.Time
+	showHelp    bool
 }
 
 func newModel(client *api.Client, serverURL string, tokenSet bool) model {
@@ -79,9 +82,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "?":
+			m.showHelp = true
+			return m, nil
+		case "esc":
+			if m.showHelp {
+				m.showHelp = false
+				return m, nil
+			}
 		case "r":
 			m.loading = true
 			m.err = nil
+			m.errorMsg = ""
+			m.errorUntil = time.Time{}
 			return m, tea.Batch(m.spinner.Tick, fetchHealthCmd(m.client))
 		}
 	case spinner.TickMsg:
@@ -93,6 +106,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastUpdated = time.Now()
 		m.health = msg.data
 		m.err = msg.err
+		if msg.err != nil {
+			m.errorMsg = msg.err.Error()
+			m.errorUntil = time.Now().Add(5 * time.Second)
+			return m, clearErrorCmd(m.errorUntil)
+		}
+		return m, nil
+	case clearErrorMsg:
+		if !m.errorUntil.IsZero() && time.Now().After(m.errorUntil) {
+			m.errorMsg = ""
+			m.errorUntil = time.Time{}
+		}
 		return m, nil
 	}
 
@@ -100,24 +124,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	header := lipgloss.NewStyle().Bold(true).Render("Taskforge TUI")
+	header := renderHeader("Taskforge TUI")
 	serverLine := fmt.Sprintf("Server: %s", m.serverURL)
 	tokenLine := "Token: missing"
 	if m.tokenSet {
 		tokenLine = "Token: set"
 	}
 
-	statusBlock := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(
-		fmt.Sprintf("%s\n%s", serverLine, tokenLine),
-	)
+	statusBlock := renderStatus(serverLine, tokenLine)
 
 	body := ""
 	if m.loading {
 		body = fmt.Sprintf("%s Loading health...", m.spinner.View())
-	} else if m.err != nil {
-		body = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(
-			fmt.Sprintf("Error: %s", m.err.Error()),
-		)
 	} else if m.health != nil {
 		dbStatus := "down"
 		if m.health.DB.Ok {
@@ -131,15 +149,7 @@ func (m model) View() string {
 		)
 	}
 
-	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
-		"q quit • r refresh",
-	)
-	if !m.lastUpdated.IsZero() {
-		footer = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(
-			fmt.Sprintf("q quit • r refresh • updated %s", m.lastUpdated.Format("15:04:05")),
-		)
-	}
-
+	footer := renderFooter(m.lastUpdated)
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
@@ -147,11 +157,20 @@ func (m model) View() string {
 		statusBlock,
 		"",
 		body,
-		"",
-		footer,
 	)
 
-	return lipgloss.NewStyle().Padding(1, 2).Render(content)
+	if m.errorMsg != "" {
+		content = lipgloss.JoinVertical(lipgloss.Left, content, "", renderError(m.errorMsg))
+	}
+
+	content = lipgloss.JoinVertical(lipgloss.Left, content, "", footer)
+	content = lipgloss.NewStyle().Padding(1, 2).Render(content)
+
+	if m.showHelp {
+		return renderModal(content, helpModal(), m.width, m.height)
+	}
+
+	return content
 }
 
 func fetchHealthCmd(client *api.Client) tea.Cmd {
@@ -167,4 +186,74 @@ func fetchHealthCmd(client *api.Client) tea.Cmd {
 		}
 		return healthMsg{data: &health}
 	}
+}
+
+type clearErrorMsg struct{}
+
+func clearErrorCmd(until time.Time) tea.Cmd {
+	return tea.Tick(time.Until(until), func(time.Time) tea.Msg {
+		return clearErrorMsg{}
+	})
+}
+
+func renderHeader(title string) string {
+	return lipgloss.NewStyle().Bold(true).Render(title)
+}
+
+func renderStatus(serverLine string, tokenLine string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(
+		fmt.Sprintf("%s\n%s", serverLine, tokenLine),
+	)
+}
+
+func renderFooter(lastUpdated time.Time) string {
+	text := "q quit • r refresh • ? help"
+	if !lastUpdated.IsZero() {
+		text = fmt.Sprintf("%s • updated %s", text, lastUpdated.Format("15:04:05"))
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(text)
+}
+
+func renderError(message string) string {
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	return style.Render("Error: " + message)
+}
+
+type modal struct {
+	Title string
+	Body  string
+}
+
+func helpModal() modal {
+	return modal{
+		Title: "Help",
+		Body:  "q quit\nr refresh\n? help\nesc close",
+	}
+}
+
+func renderModal(content string, m modal, width int, height int) string {
+	modalStyle := lipgloss.NewStyle().
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Background(lipgloss.Color("235"))
+
+	modalContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		lipgloss.NewStyle().Bold(true).Render(m.Title),
+		"",
+		m.Body,
+	)
+
+	box := modalStyle.Render(modalContent)
+	canvasWidth := width
+	canvasHeight := height
+	if canvasWidth == 0 {
+		canvasWidth = lipgloss.Width(content)
+	}
+	if canvasHeight == 0 {
+		canvasHeight = lipgloss.Height(content)
+	}
+
+	return lipgloss.Place(canvasWidth, canvasHeight, lipgloss.Center, lipgloss.Center, box)
 }
