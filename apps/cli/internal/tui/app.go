@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gentij/taskforge/apps/cli/internal/api"
@@ -15,6 +17,13 @@ type App struct {
 	serverURL string
 	tokenSet  bool
 }
+
+type ViewID string
+
+const (
+	ViewHome      ViewID = "home"
+	ViewWorkflows ViewID = "workflows"
+)
 
 func NewApp(client *api.Client, serverURL string, tokenSet bool) *App {
 	return &App{client: client, serverURL: serverURL, tokenSet: tokenSet}
@@ -55,17 +64,42 @@ type model struct {
 	errorMsg    string
 	errorUntil  time.Time
 	showHelp    bool
+	currentView ViewID
+	viewStack   []ViewID
+	viewport    viewport.Model
 }
 
 func newModel(client *api.Client, serverURL string, tokenSet bool) model {
 	spin := spinner.New(spinner.WithSpinner(spinner.Dot))
+	vp := viewport.New(0, 0)
 	return model{
-		client:    client,
-		serverURL: serverURL,
-		tokenSet:  tokenSet,
-		spinner:   spin,
-		loading:   true,
+		client:      client,
+		serverURL:   serverURL,
+		tokenSet:    tokenSet,
+		spinner:     spin,
+		loading:     true,
+		currentView: ViewHome,
+		viewStack:   []ViewID{},
+		viewport:    vp,
 	}
+}
+
+func (m model) pushView(next ViewID) model {
+	if m.currentView != "" {
+		m.viewStack = append(m.viewStack, m.currentView)
+	}
+	m.currentView = next
+	return m
+}
+
+func (m model) popView() model {
+	if len(m.viewStack) == 0 {
+		return m
+	}
+	last := m.viewStack[len(m.viewStack)-1]
+	m.viewStack = m.viewStack[:len(m.viewStack)-1]
+	m.currentView = last
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -77,6 +111,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.viewport.Width = max(0, msg.Width-4)
+		headerHeight := lipgloss.Height(renderHeader("Taskforge TUI", m.serverURL, m.tokenSet, viewTitle(m.currentView)))
+		footerHeight := lipgloss.Height(renderFooter(m.lastUpdated))
+		m.viewport.Height = max(0, msg.Height-headerHeight-footerHeight-6)
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -90,12 +128,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showHelp = false
 				return m, nil
 			}
+		case "b":
+			if m.showHelp {
+				m.showHelp = false
+				return m, nil
+			}
+			m = m.popView()
+			return m, nil
+		case "w":
+			if !m.loading {
+				m = m.pushView(ViewWorkflows)
+			}
+			return m, nil
 		case "r":
 			m.loading = true
 			m.err = nil
 			m.errorMsg = ""
 			m.errorUntil = time.Time{}
 			return m, tea.Batch(m.spinner.Tick, fetchHealthCmd(m.client))
+		}
+
+		if !m.showHelp {
+			var cmd tea.Cmd
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
 		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -124,45 +180,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	header := renderHeader("Taskforge TUI")
-	serverLine := fmt.Sprintf("Server: %s", m.serverURL)
-	tokenLine := "Token: missing"
-	if m.tokenSet {
-		tokenLine = "Token: set"
-	}
+	header := renderHeader("Taskforge TUI", m.serverURL, m.tokenSet, viewTitle(m.currentView))
 
-	statusBlock := renderStatus(serverLine, tokenLine)
-
-	body := ""
-	if m.loading {
-		body = fmt.Sprintf("%s Loading health...", m.spinner.View())
-	} else if m.health != nil {
-		dbStatus := "down"
-		if m.health.DB.Ok {
-			dbStatus = "ok"
-		}
-		body = fmt.Sprintf(
-			"Status: %s\nVersion: %s\nDB: %s",
-			m.health.Status,
-			m.health.Version,
-			dbStatus,
-		)
-	}
-
-	footer := renderFooter(m.lastUpdated)
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		header,
-		"",
-		statusBlock,
-		"",
-		body,
-	)
+	body := renderBody(m)
+	viewContent := m.viewport
+	viewContent.SetContent(body)
+	content := lipgloss.JoinVertical(lipgloss.Left, header, "", viewContent.View())
 
 	if m.errorMsg != "" {
 		content = lipgloss.JoinVertical(lipgloss.Left, content, "", renderError(m.errorMsg))
 	}
 
+	footer := renderFooter(m.lastUpdated)
 	content = lipgloss.JoinVertical(lipgloss.Left, content, "", footer)
 	content = lipgloss.NewStyle().Padding(1, 2).Render(content)
 
@@ -196,18 +225,35 @@ func clearErrorCmd(until time.Time) tea.Cmd {
 	})
 }
 
-func renderHeader(title string) string {
-	return lipgloss.NewStyle().Bold(true).Render(title)
+func renderHeader(title string, serverURL string, tokenSet bool, viewName string) string {
+	left := lipgloss.NewStyle().Bold(true).Render(title)
+	right := lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render(viewName)
+	line := lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
+
+	tokenLine := "Token: missing"
+	if tokenSet {
+		tokenLine = "Token: set"
+	}
+	info := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(
+		fmt.Sprintf("Server: %s\n%s", serverURL, tokenLine),
+	)
+
+	divider := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(strings.Repeat("─", max(0, lipgloss.Width(info))))
+
+	return lipgloss.JoinVertical(lipgloss.Left, line, info, divider)
 }
 
-func renderStatus(serverLine string, tokenLine string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(
-		fmt.Sprintf("%s\n%s", serverLine, tokenLine),
-	)
+func viewTitle(view ViewID) string {
+	switch view {
+	case ViewWorkflows:
+		return "Workflows"
+	default:
+		return "Home"
+	}
 }
 
 func renderFooter(lastUpdated time.Time) string {
-	text := "q quit • r refresh • ? help"
+	text := "q quit • r refresh • w workflows • b back • ? help"
 	if !lastUpdated.IsZero() {
 		text = fmt.Sprintf("%s • updated %s", text, lastUpdated.Format("15:04:05"))
 	}
@@ -256,4 +302,47 @@ func renderModal(content string, m modal, width int, height int) string {
 	}
 
 	return lipgloss.Place(canvasWidth, canvasHeight, lipgloss.Center, lipgloss.Center, box)
+}
+
+func renderBody(m model) string {
+	breadcrumb := renderBreadcrumb(m.currentView)
+	switch m.currentView {
+	case ViewWorkflows:
+		return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", renderWorkflowsView())
+	default:
+		return lipgloss.JoinVertical(lipgloss.Left, breadcrumb, "", renderHomeView(m))
+	}
+}
+
+func renderHomeView(m model) string {
+	if m.loading {
+		return fmt.Sprintf("%s Loading health...", m.spinner.View())
+	}
+	if m.health == nil {
+		return "No health data yet."
+	}
+	dbStatus := "down"
+	if m.health.DB.Ok {
+		dbStatus = "ok"
+	}
+	return fmt.Sprintf(
+		"Status: %s\nVersion: %s\nDB: %s",
+		m.health.Status,
+		m.health.Version,
+		dbStatus,
+	)
+}
+
+func renderWorkflowsView() string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render(
+		"Workflows view (coming soon)",
+	)
+}
+
+func renderBreadcrumb(view ViewID) string {
+	trail := "Home"
+	if view == ViewWorkflows {
+		trail = "Home / Workflows"
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(trail)
 }
