@@ -13,7 +13,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gentij/taskforge/apps/cli/internal/api"
+	"github.com/gentij/taskforge/apps/cli/internal/config"
 	"github.com/gentij/taskforge/apps/cli/internal/tui/components"
 	"github.com/gentij/taskforge/apps/cli/internal/tui/data"
 	"github.com/gentij/taskforge/apps/cli/internal/tui/layout"
@@ -41,6 +43,7 @@ const (
 	paletteToggleRefresh
 	paletteClearFilters
 	paletteRunWorkflow
+	paletteSetTheme
 )
 
 type paletteAction struct {
@@ -49,17 +52,21 @@ type paletteAction struct {
 }
 
 type paletteItem struct {
-	Title  string
-	Desc   string
+	Label  string
+	Detail string
 	Action paletteAction
 }
 
-func (p paletteItem) FilterValue() string { return p.Title }
+func (p paletteItem) FilterValue() string { return p.Label }
+func (p paletteItem) Title() string       { return p.Label }
+func (p paletteItem) Description() string { return p.Detail }
 
 type Model struct {
-	client    *api.Client
-	serverURL string
-	tokenSet  bool
+	client     *api.Client
+	serverURL  string
+	tokenSet   bool
+	config     config.Config
+	configPath string
 
 	width  int
 	height int
@@ -68,8 +75,9 @@ type Model struct {
 	view  ViewID
 	views []ViewID
 
-	theme  styles.Theme
-	styles styles.StyleSet
+	theme     styles.Theme
+	themeName string
+	styles    styles.StyleSet
 
 	store data.Store
 
@@ -110,7 +118,7 @@ type Model struct {
 	paginator paginator.Model
 }
 
-func NewModel(client *api.Client, serverURL string, tokenSet bool) Model {
+func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Config, configPath string) Model {
 	now := time.Now()
 	store := data.MockStore(now)
 	keys := DefaultKeyMap()
@@ -127,10 +135,9 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool) Model {
 	contextSearch.Placeholder = "Search context"
 	contextSearch.CharLimit = 64
 
-	palette := buildPalette()
-
-	theme := styles.DefaultTheme()
-	styleSet := styles.NewStyles(theme)
+	defaultTheme := styles.DefaultTheme()
+	palette := buildPalette(defaultTheme)
+	styleSet := styles.NewStyles(defaultTheme)
 
 	tableModel := components.NewTable(nil, nil, 0, 0, styleSet)
 	contextViewport := viewport.New(0, 0)
@@ -144,9 +151,12 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool) Model {
 		client:             client,
 		serverURL:          serverURL,
 		tokenSet:           tokenSet,
+		config:             cfg,
+		configPath:         configPath,
 		view:               ViewDashboard,
 		views:              []ViewID{ViewDashboard, ViewWorkflows, ViewRuns, ViewTriggers, ViewEvents, ViewSecrets, ViewTokens},
-		theme:              theme,
+		theme:              defaultTheme,
+		themeName:          "taskforge",
 		styles:             styleSet,
 		store:              store,
 		table:              tableModel,
@@ -164,6 +174,8 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool) Model {
 		paginator:          pager,
 		inspector:          NewInspector(styleSet, keys),
 	}
+
+	model.applyTheme(cfg.Theme, false)
 
 	width, height := initialSize()
 	model.resize(width, height)
@@ -235,6 +247,7 @@ func (m *Model) resize(width int, height int) {
 	m.contextViewport.Height = contextBodyHeight
 
 	m.inspector.Resize(width, height)
+	m.resizePalette()
 }
 
 func (m *Model) refreshView() {
@@ -305,6 +318,49 @@ func (m *Model) updateContext() {
 	}
 	m.contextViewport.SetContent(content)
 	m.contextViewport.GotoTop()
+}
+
+func (m *Model) applyTheme(themeKey string, persist bool) {
+	registry := styles.ThemeRegistry()
+	key := strings.ToLower(strings.TrimSpace(themeKey))
+	if key == "" {
+		key = "taskforge"
+	}
+	selected, ok := registry[key]
+	if !ok {
+		selected = styles.DefaultTheme()
+		key = "taskforge"
+	}
+
+	m.theme = selected
+	m.themeName = key
+	m.styles = styles.NewStyles(selected)
+	m.table.SetStyles(components.TableStyles(m.styles))
+	m.inspector.ApplyStyles(m.styles)
+	m.palette = buildPalette(m.theme)
+	m.resizePalette()
+
+	if persist {
+		m.config.Theme = key
+		_ = config.Save(m.configPath, m.config)
+	}
+
+	m.refreshView()
+}
+
+func (m *Model) resizePalette() {
+	if m.width <= 0 || m.height <= 0 {
+		return
+	}
+	width := min(m.width-10, 60)
+	if width < 20 {
+		width = max(m.width-4, 10)
+	}
+	height := min(m.height-6, 12)
+	if height < 6 {
+		height = max(m.height-4, 6)
+	}
+	m.palette.SetSize(width, height)
 }
 
 func (m *Model) selectedRowID() string {
@@ -527,6 +583,8 @@ func (m *Model) runPaletteAction(action paletteAction) {
 		m.applyFilter()
 	case paletteRunWorkflow:
 		m.queueRunForSelectedWorkflow()
+	case paletteSetTheme:
+		m.applyTheme(string(action.View), true)
 	}
 }
 
@@ -604,24 +662,50 @@ func (m *Model) queueRunForSelectedWorkflow() {
 	m.refreshView()
 }
 
-func buildPalette() list.Model {
+func buildPalette(theme styles.Theme) list.Model {
 	items := []list.Item{
-		paletteItem{Title: "Go to Dashboard", Desc: "Overview", Action: paletteAction{Kind: paletteGoToView, View: ViewDashboard}},
-		paletteItem{Title: "Go to Workflows", Desc: "Workflow list", Action: paletteAction{Kind: paletteGoToView, View: ViewWorkflows}},
-		paletteItem{Title: "Go to Runs", Desc: "Workflow runs", Action: paletteAction{Kind: paletteGoToView, View: ViewRuns}},
-		paletteItem{Title: "Go to Triggers", Desc: "Trigger list", Action: paletteAction{Kind: paletteGoToView, View: ViewTriggers}},
-		paletteItem{Title: "Go to Events", Desc: "Event list", Action: paletteAction{Kind: paletteGoToView, View: ViewEvents}},
-		paletteItem{Title: "Go to Secrets", Desc: "Secret registry", Action: paletteAction{Kind: paletteGoToView, View: ViewSecrets}},
-		paletteItem{Title: "Go to API Tokens", Desc: "Token list", Action: paletteAction{Kind: paletteGoToView, View: ViewTokens}},
-		paletteItem{Title: "Run workflow", Desc: "Queue selected workflow", Action: paletteAction{Kind: paletteRunWorkflow}},
-		paletteItem{Title: "Toggle auto refresh", Desc: "Enable/disable polling", Action: paletteAction{Kind: paletteToggleRefresh}},
-		paletteItem{Title: "Clear filters", Desc: "Reset table filters", Action: paletteAction{Kind: paletteClearFilters}},
+		paletteItem{Label: "Go to Dashboard", Detail: "Overview", Action: paletteAction{Kind: paletteGoToView, View: ViewDashboard}},
+		paletteItem{Label: "Go to Workflows", Detail: "Workflow list", Action: paletteAction{Kind: paletteGoToView, View: ViewWorkflows}},
+		paletteItem{Label: "Go to Runs", Detail: "Workflow runs", Action: paletteAction{Kind: paletteGoToView, View: ViewRuns}},
+		paletteItem{Label: "Go to Triggers", Detail: "Trigger list", Action: paletteAction{Kind: paletteGoToView, View: ViewTriggers}},
+		paletteItem{Label: "Go to Events", Detail: "Event list", Action: paletteAction{Kind: paletteGoToView, View: ViewEvents}},
+		paletteItem{Label: "Go to Secrets", Detail: "Secret registry", Action: paletteAction{Kind: paletteGoToView, View: ViewSecrets}},
+		paletteItem{Label: "Go to API Tokens", Detail: "Token list", Action: paletteAction{Kind: paletteGoToView, View: ViewTokens}},
+		paletteItem{Label: "Run workflow", Detail: "Queue selected workflow", Action: paletteAction{Kind: paletteRunWorkflow}},
+		paletteItem{Label: "Toggle auto refresh", Detail: "Enable/disable polling", Action: paletteAction{Kind: paletteToggleRefresh}},
+		paletteItem{Label: "Clear filters", Detail: "Reset table filters", Action: paletteAction{Kind: paletteClearFilters}},
+		paletteItem{Label: "Theme: Catppuccin", Detail: "Warm pastel", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("catppuccin")}},
+		paletteItem{Label: "Theme: Tokyo Night", Detail: "Deep blue", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("tokyo-night")}},
+		paletteItem{Label: "Theme: Fallout (CRT)", Detail: "Green phosphor", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("fallout")}},
 	}
 
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = true
 	delegate.SetHeight(2)
+	selectedBorder := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(theme.Accent)
+	delegate.Styles.SelectedTitle = lipgloss.NewStyle().
+		Foreground(theme.Accent).
+		Background(theme.SurfaceAlt).
+		Bold(true).
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(theme.Accent)
+	delegate.Styles.SelectedDesc = lipgloss.NewStyle().
+		Foreground(theme.Text).
+		Background(theme.SurfaceAlt).
+		Inherit(selectedBorder)
+	delegate.Styles.NormalTitle = lipgloss.NewStyle().Foreground(theme.Text)
+	delegate.Styles.NormalDesc = lipgloss.NewStyle().Foreground(theme.Muted)
 	model := list.New(items, delegate, 60, 12)
+	listStyles := list.DefaultStyles()
+	listStyles.Title = lipgloss.NewStyle().Foreground(theme.Text).Bold(true)
+	listStyles.FilterPrompt = lipgloss.NewStyle().Foreground(theme.Accent)
+	listStyles.FilterCursor = lipgloss.NewStyle().Foreground(theme.Accent)
+	listStyles.PaginationStyle = lipgloss.NewStyle().Foreground(theme.Muted)
+	listStyles.HelpStyle = lipgloss.NewStyle().Foreground(theme.Muted)
+	listStyles.NoItems = lipgloss.NewStyle().Foreground(theme.Muted)
+	model.Styles = listStyles
 	model.SetFilteringEnabled(true)
 	model.SetShowHelp(false)
 	model.SetShowStatusBar(false)

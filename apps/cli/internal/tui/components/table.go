@@ -15,14 +15,17 @@ func NewTable(columns []table.Column, rows []table.Row, width int, height int, s
 	)
 
 	model.SetWidth(width)
+	model.SetStyles(TableStyles(styleSet))
 
+	return model
+}
+
+func TableStyles(styleSet styles.StyleSet) table.Styles {
 	style := table.DefaultStyles()
 	style.Header = styleSet.TableHeader
 	style.Cell = styleSet.TableCell
 	style.Selected = styleSet.TableSelected
-	model.SetStyles(style)
-
-	return model
+	return style
 }
 
 func StyleRows(rows []table.Row, selected int, styleSet styles.StyleSet) []table.Row {

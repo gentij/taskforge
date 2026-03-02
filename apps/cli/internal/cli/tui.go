@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"github.com/gentij/taskforge/apps/cli/internal/config"
 	"github.com/gentij/taskforge/apps/cli/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -15,8 +16,8 @@ var tuiCmd = &cobra.Command{
 		if ctx == nil {
 			return fmt.Errorf("missing context")
 		}
-
-		app := tui.NewApp(ctx.Client, ctx.Config.ServerURL, ctx.Config.Token != "")
+		configPath := config.ResolvePath(configPath)
+		app := tui.NewApp(ctx.Client, ctx.Config.ServerURL, ctx.Config.Token != "", ctx.Config, configPath)
 		return app.Start()
 	},
 }

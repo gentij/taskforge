@@ -58,6 +58,10 @@ func NewInspector(styleSet styles.StyleSet, keys KeyMap) RunInspector {
 	}
 }
 
+func (ri *RunInspector) ApplyStyles(styleSet styles.StyleSet) {
+	ri.styles = styleSet
+}
+
 func (ri *RunInspector) Resize(width int, height int) {
 	ri.Width = width
 	ri.Height = height

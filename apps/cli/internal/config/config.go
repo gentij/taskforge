@@ -11,6 +11,7 @@ type Config struct {
 	ServerURL string `json:"serverUrl"`
 	Token     string `json:"token"`
 	Profile   string `json:"profile,omitempty"`
+	Theme     string `json:"theme,omitempty"`
 }
 
 func DefaultConfigPath() string {

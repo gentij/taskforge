@@ -20,6 +20,9 @@ type Theme struct {
 	ErrorBg    lipgloss.Color
 	InfoBg     lipgloss.Color
 	MutedBg    lipgloss.Color
+	CRT        bool
+	Scanline   lipgloss.Color
+	Glow       lipgloss.Color
 }
 
 type StyleSet struct {
@@ -62,6 +65,9 @@ func DefaultTheme() Theme {
 		ErrorBg:    lipgloss.Color("#2A0F14"),
 		InfoBg:     lipgloss.Color("#0B1F33"),
 		MutedBg:    lipgloss.Color("#111827"),
+		CRT:        false,
+		Scanline:   lipgloss.Color("#0B0F14"),
+		Glow:       lipgloss.Color("#38BDF8"),
 	}
 }
 
@@ -105,6 +111,31 @@ func ThemeRegistry() map[string]Theme {
 			ErrorBg:    lipgloss.Color("#2A151A"),
 			InfoBg:     lipgloss.Color("#13252B"),
 			MutedBg:    lipgloss.Color("#1C1B24"),
+			CRT:        false,
+			Scanline:   lipgloss.Color("#0F0E17"),
+			Glow:       lipgloss.Color("#8AADF4"),
+		},
+		"fallout": {
+			Name:       "Fallout",
+			Background: lipgloss.Color("#050A05"),
+			Surface:    lipgloss.Color("#0B140B"),
+			SurfaceAlt: lipgloss.Color("#081108"),
+			Border:     lipgloss.Color("#3BFF6A"),
+			Text:       lipgloss.Color("#B8FFB0"),
+			Muted:      lipgloss.Color("#6FBF6A"),
+			Accent:     lipgloss.Color("#7CFF6B"),
+			Success:    lipgloss.Color("#7CFF6B"),
+			Warning:    lipgloss.Color("#F2E94E"),
+			Error:      lipgloss.Color("#FF6B6B"),
+			Info:       lipgloss.Color("#7CFF6B"),
+			SuccessBg:  lipgloss.Color("#0B2A0B"),
+			WarningBg:  lipgloss.Color("#2A2405"),
+			ErrorBg:    lipgloss.Color("#2A0F0F"),
+			InfoBg:     lipgloss.Color("#0A2A0A"),
+			MutedBg:    lipgloss.Color("#0B140B"),
+			CRT:        true,
+			Scanline:   lipgloss.Color("#0A160A"),
+			Glow:       lipgloss.Color("#7CFF6B"),
 		},
 	}
 }

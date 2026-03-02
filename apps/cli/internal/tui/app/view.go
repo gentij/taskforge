@@ -31,16 +31,19 @@ func Render(m Model) string {
 	base := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	base = clampToViewport(base, m.width, m.height)
 
+	output := base
 	if m.showPalette {
 		modal := components.RenderModal("Command Palette", m.palette.View(), m.width, m.height, m.styles)
-		return renderOverlay(base, modal, m)
+		output = renderOverlay(base, modal, m)
 	}
 	if m.showHelp {
 		modal := components.RenderModal("Help", m.help.View(m.keys), m.width, m.height, m.styles)
-		return renderOverlay(base, modal, m)
+		output = renderOverlay(base, modal, m)
 	}
-
-	return base
+	if m.theme.CRT {
+		output = applyScanlines(output, m.width, m.theme.Scanline)
+	}
+	return output
 }
 
 func renderHeader(m Model) string {
@@ -75,7 +78,13 @@ func renderHeader(m Model) string {
 
 	line1 = " " + ansi.Truncate(line1, m.width-1, "")
 	line2 = " " + ansi.Truncate(line2, m.width-1, "")
-	content := m.styles.Header.Width(m.width).Render(line1) + "\n" + m.styles.Header.Width(m.width).Render(line2)
+	line1 = m.styles.Header.Width(m.width).Render(line1)
+	if m.theme.CRT {
+		glowStyle := lipgloss.NewStyle().Foreground(m.theme.Glow).Faint(true)
+		line2 = glowStyle.Render(line2)
+	}
+	line2 = m.styles.Header.Width(m.width).Render(line2)
+	content := line1 + "\n" + line2
 	return clampSection(content, m.width, m.layout.HeaderHeight)
 }
 
@@ -199,6 +208,52 @@ func mergeOverlay(base string, overlay string, height int) string {
 		lines = append(lines, overlayLine)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func applyScanlines(content string, width int, color lipgloss.Color) string {
+	lines := strings.Split(content, "\n")
+	scanStyle := lipgloss.NewStyle().Foreground(color).Faint(true)
+	scanChar := scanStyle.Render(".")
+	for i, line := range lines {
+		if i%2 == 1 {
+			lines[i] = scanlineLine(line, width, scanChar)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func scanlineLine(line string, width int, scanChar string) string {
+	if width < 1 {
+		width = 1
+	}
+	var builder strings.Builder
+	builder.Grow(len(line) + width)
+	inEscape := false
+	for i := 0; i < len(line); i++ {
+		ch := line[i]
+		if ch == '\x1b' {
+			inEscape = true
+			builder.WriteByte(ch)
+			continue
+		}
+		if inEscape {
+			builder.WriteByte(ch)
+			if ch == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+		if ch == ' ' {
+			builder.WriteString(scanChar)
+		} else {
+			builder.WriteByte(ch)
+		}
+	}
+	padding := width - ansi.StringWidth(line)
+	for i := 0; i < padding; i++ {
+		builder.WriteString(scanChar)
+	}
+	return builder.String()
 }
 
 func clampToViewport(content string, width int, height int) string {
