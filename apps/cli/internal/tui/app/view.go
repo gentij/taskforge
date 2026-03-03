@@ -25,8 +25,7 @@ func Render(m Model) string {
 
 	output := base
 	if m.showPalette {
-		modal := components.RenderModal("Command Palette", m.palette.View(), m.width, m.height, m.styles)
-		output = renderOverlay(base, modal, m)
+		output = renderPaletteScreen(m)
 	}
 	if m.showHelp {
 		modal := components.RenderModal("Help", m.help.View(m.keys), m.width, m.height, m.styles)
@@ -242,6 +241,24 @@ func renderOverlay(base string, modal string, m Model) string {
 	background := m.styles.Dim.Render(base)
 	overlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modal)
 	return clampToViewport(mergeOverlay(background, overlay, m.height), m.width, m.height)
+}
+
+func renderPaletteScreen(m Model) string {
+	innerWidth := max(m.width-2, 1)
+	innerHeight := max(m.height-2, 1)
+	headerTitle := m.styles.PanelTitle.Render("Command Palette")
+	headerHint := m.styles.Dim.Render("Type to filter  |  / manual filter  |  enter select  |  esc close")
+	divider := m.styles.Divider.Render(strings.Repeat("─", innerWidth))
+
+	listHeight := max(innerHeight-3, 1)
+	paletteView := strings.TrimRight(m.palette.View(), "\n")
+	paletteView = clampSection(paletteView, innerWidth, listHeight)
+
+	body := strings.Join([]string{headerTitle, headerHint, divider, paletteView}, "\n")
+	filled := applyBackgroundLayer(body, innerWidth, innerHeight, m.styles.PanelFill)
+	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
+	panel := m.styles.PanelBorderFocus.Width(innerWidth).Height(innerHeight).Render(content)
+	return clampToViewport(panel, m.width, m.height)
 }
 
 func itoa(value int) string {

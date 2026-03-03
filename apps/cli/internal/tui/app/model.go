@@ -408,14 +408,8 @@ func (m *Model) resizePalette() {
 	if m.width <= 0 || m.height <= 0 {
 		return
 	}
-	width := min(m.width-10, 60)
-	if width < 20 {
-		width = max(m.width-4, 10)
-	}
-	height := min(m.height-6, 12)
-	if height < 6 {
-		height = max(m.height-4, 6)
-	}
+	width := max(m.width-2, 1)
+	height := max(m.height-5, 1)
 	m.palette.SetSize(width, height)
 }
 
@@ -458,6 +452,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Palette) {
+		m.resizePalette()
+		m.palette.ResetFilter()
 		m.showPalette = true
 		return m, nil
 	}
@@ -649,14 +645,37 @@ func (m *Model) updatePalette(msg tea.Msg) (tea.Model, tea.Cmd) {
 			item, ok := m.palette.SelectedItem().(paletteItem)
 			if ok {
 				m.runPaletteAction(item.Action)
+				m.showPalette = false
 			}
-			m.showPalette = false
 			return m, nil
+		}
+		if shouldAutoStartPaletteFilter(keyMsg, m.palette.SettingFilter()) {
+			startMsg := tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'/'}})
+			var startCmd tea.Cmd
+			m.palette, startCmd = m.palette.Update(startMsg)
+			var typeCmd tea.Cmd
+			m.palette, typeCmd = m.palette.Update(keyMsg)
+			return m, tea.Batch(startCmd, typeCmd)
 		}
 	}
 	var cmd tea.Cmd
 	m.palette, cmd = m.palette.Update(msg)
 	return m, cmd
+}
+
+func shouldAutoStartPaletteFilter(msg tea.KeyMsg, alreadyFiltering bool) bool {
+	if alreadyFiltering {
+		return false
+	}
+	if msg.Type != tea.KeyRunes || len(msg.Runes) == 0 || msg.Alt {
+		return false
+	}
+	for _, r := range msg.Runes {
+		if r >= 32 && r != '/' {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model) runPaletteAction(action paletteAction) {
@@ -804,25 +823,25 @@ func (m *Model) queueRunForSelectedWorkflow() {
 
 func buildPalette(theme styles.Theme) list.Model {
 	items := []list.Item{
-		paletteItem{Label: "Go to Dashboard", Detail: "Overview", Action: paletteAction{Kind: paletteGoToView, View: ViewDashboard}},
-		paletteItem{Label: "Go to Workflows", Detail: "Workflow list", Action: paletteAction{Kind: paletteGoToView, View: ViewWorkflows}},
-		paletteItem{Label: "Go to Runs", Detail: "Workflow runs", Action: paletteAction{Kind: paletteGoToView, View: ViewRuns}},
-		paletteItem{Label: "Go to Triggers", Detail: "Trigger list", Action: paletteAction{Kind: paletteGoToView, View: ViewTriggers}},
-		paletteItem{Label: "Go to Events", Detail: "Event list", Action: paletteAction{Kind: paletteGoToView, View: ViewEvents}},
-		paletteItem{Label: "Go to Secrets", Detail: "Secret registry", Action: paletteAction{Kind: paletteGoToView, View: ViewSecrets}},
-		paletteItem{Label: "Go to API Tokens", Detail: "Token list", Action: paletteAction{Kind: paletteGoToView, View: ViewTokens}},
-		paletteItem{Label: "Run workflow", Detail: "Queue selected workflow", Action: paletteAction{Kind: paletteRunWorkflow}},
-		paletteItem{Label: "Toggle auto refresh", Detail: "Enable/disable polling", Action: paletteAction{Kind: paletteToggleRefresh}},
-		paletteItem{Label: "Clear filters", Detail: "Reset table filters", Action: paletteAction{Kind: paletteClearFilters}},
-		paletteItem{Label: "Theme: Catppuccin", Detail: "Warm pastel", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("catppuccin")}},
-		paletteItem{Label: "Theme: Tokyo Night", Detail: "Deep blue", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("tokyo-night")}},
-		paletteItem{Label: "Theme: Fallout (CRT)", Detail: "Green phosphor", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("fallout")}},
-		paletteItem{Label: "Theme: Retro Amber", Detail: "Warm CRT", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("retro-amber")}},
+		paletteItem{Label: "Go: Dashboard", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewDashboard}},
+		paletteItem{Label: "Go: Workflows", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewWorkflows}},
+		paletteItem{Label: "Go: Runs", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewRuns}},
+		paletteItem{Label: "Go: Triggers", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewTriggers}},
+		paletteItem{Label: "Go: Events", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewEvents}},
+		paletteItem{Label: "Go: Secrets", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewSecrets}},
+		paletteItem{Label: "Go: API Tokens", Detail: "Navigation", Action: paletteAction{Kind: paletteGoToView, View: ViewTokens}},
+		paletteItem{Label: "Action: Run selected workflow", Detail: "Workflow", Action: paletteAction{Kind: paletteRunWorkflow}},
+		paletteItem{Label: "Action: Clear filters", Detail: "Table", Action: paletteAction{Kind: paletteClearFilters}},
+		paletteItem{Label: "Toggle: Auto refresh", Detail: "System", Action: paletteAction{Kind: paletteToggleRefresh}},
+		paletteItem{Label: "Theme: Catppuccin", Detail: "Theme", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("catppuccin")}},
+		paletteItem{Label: "Theme: Tokyo Night", Detail: "Theme", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("tokyo-night")}},
+		paletteItem{Label: "Theme: Fallout (CRT)", Detail: "Theme", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("fallout")}},
+		paletteItem{Label: "Theme: Retro Amber", Detail: "Theme", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("retro-amber")}},
 	}
 
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = true
-	delegate.SetHeight(2)
+	delegate.SetHeight(1)
 	selectedBorder := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, false, true).
 		BorderForeground(theme.Accent)
@@ -838,7 +857,7 @@ func buildPalette(theme styles.Theme) list.Model {
 		Inherit(selectedBorder)
 	delegate.Styles.NormalTitle = lipgloss.NewStyle().Foreground(theme.Text)
 	delegate.Styles.NormalDesc = lipgloss.NewStyle().Foreground(theme.Muted)
-	model := list.New(items, delegate, 60, 12)
+	model := list.New(items, delegate, 64, 16)
 	listStyles := list.DefaultStyles()
 	listStyles.Title = lipgloss.NewStyle().Foreground(theme.Text).Bold(true)
 	listStyles.FilterPrompt = lipgloss.NewStyle().Foreground(theme.Accent)
