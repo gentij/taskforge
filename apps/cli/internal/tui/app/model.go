@@ -117,6 +117,11 @@ type paletteItem struct {
 	Section bool
 }
 
+type SortConfig struct {
+	Column int
+	Desc   bool
+}
+
 func (p paletteItem) FilterValue() string {
 	if p.Section {
 		return ""
@@ -172,6 +177,8 @@ type Model struct {
 	contextViewport    viewport.Model
 	contextCollapsed   bool
 	contextTab         ContextTab
+	contextOffsets     map[ContextTab]int
+	contextSelectedID  string
 	contextSearchInput textinput.Model
 	contextSearching   bool
 	contextQuery       string
@@ -202,6 +209,10 @@ type Model struct {
 	contextState SurfaceState
 	toast        ToastState
 	uiReady      bool
+
+	sortByView map[ViewID]SortConfig
+	sortColumn int
+	sortDesc   bool
 
 	paginator paginator.Model
 }
@@ -254,6 +265,7 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		searchInput:        search,
 		contextViewport:    contextViewport,
 		contextTab:         ContextTabOverview,
+		contextOffsets:     map[ContextTab]int{},
 		contextSearchInput: contextSearch,
 		palette:            palette,
 		sidebar:            sidebar,
@@ -273,6 +285,9 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		mainState:          SurfaceLoading,
 		contextState:       SurfaceLoading,
 		uiReady:            false,
+		sortByView:         map[ViewID]SortConfig{},
+		sortColumn:         -1,
+		sortDesc:           true,
 	}
 
 	model.applyTheme(cfg.Theme, false)
@@ -372,7 +387,7 @@ func (m *Model) resize(width int, height int) {
 
 	m.paginator.PerPage = m.layout.PrimaryTableHeight
 
-	contextBodyHeight := max(m.layout.ContextHeight-3, 1)
+	contextBodyHeight := max(m.layout.ContextHeight-4, 1)
 	contextWidth := max(innerWidth-2, 1)
 	if m.layout.ContextHeight == 0 {
 		contextBodyHeight = 0
@@ -401,6 +416,14 @@ func (m *Model) resize(width int, height int) {
 
 func (m *Model) refreshView() {
 	columns, rows, rowIDs := BuildRowsForView(m.view, &m.store, m.styles, max(m.layout.MainWidth-2, 1))
+	cfg, ok := m.sortByView[m.view]
+	if !ok || cfg.Column < 0 || cfg.Column >= len(columns) {
+		cfg = defaultSortConfig(columns)
+		m.sortByView[m.view] = cfg
+	}
+	m.sortColumn = cfg.Column
+	m.sortDesc = cfg.Desc
+	rows, rowIDs = SortRowsForView(m.view, &m.store, columns, rows, rowIDs, cfg.Column, cfg.Desc)
 	m.columns = columns
 	m.baseRows = rows
 	m.baseRowIDs = rowIDs
@@ -418,7 +441,7 @@ func (m *Model) applyFilter() {
 
 func (m *Model) applyTableRows() {
 	m.table.SetRows(nil)
-	m.table.SetColumns(m.columns)
+	m.table.SetColumns(columnsWithSortIndicators(m.columns, m.sortColumn, m.sortDesc))
 	if len(m.filteredRows) == 0 {
 		m.updatePaginator()
 		m.updateContext()
@@ -463,13 +486,18 @@ func (m *Model) updatePaginator() {
 
 func (m *Model) updateContext() {
 	selectedID := m.selectedRowID()
+	if selectedID != m.contextSelectedID {
+		m.contextSelectedID = selectedID
+		m.contextOffsets = map[ContextTab]int{}
+	}
 	content := BuildContextTabContent(m.view, &m.store, selectedID, m.contextTab)
 	content = utils.FilterLines(content, m.contextQuery)
 	if m.contextViewport.Width > 0 {
 		content = utils.WrapText(content, m.contextViewport.Width)
 	}
 	m.contextViewport.SetContent(content)
-	m.contextViewport.GotoTop()
+	offset := m.contextOffsets[m.contextTab]
+	m.contextViewport.SetYOffset(offset)
 	m.syncSurfaceStates()
 	m.updateMainPanel()
 }
@@ -653,6 +681,26 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if key.Matches(keyMsg, m.keys.SortColumn) {
+			m.cycleSortColumn()
+			return m, nil
+		}
+		if key.Matches(keyMsg, m.keys.SortDirection) {
+			m.toggleSortDirection()
+			return m, nil
+		}
+		if key.Matches(keyMsg, m.keys.JumpTop) {
+			m.table.SetCursor(0)
+			m.applyTableRows()
+			return m, nil
+		}
+		if key.Matches(keyMsg, m.keys.JumpBottom) {
+			if n := len(m.filteredRows); n > 0 {
+				m.table.SetCursor(n - 1)
+				m.applyTableRows()
+			}
+			return m, nil
+		}
 		if m.handleMainScroll(keyMsg) {
 			return m, nil
 		}
@@ -674,26 +722,32 @@ func (m *Model) handleContextScroll(msg tea.KeyMsg) bool {
 	switch msg.String() {
 	case "up", "k", "shift+up", "shift+k":
 		m.contextViewport.LineUp(1)
+		m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 		m.updateMainPanel()
 		return true
 	case "down", "j", "shift+down", "shift+j":
 		m.contextViewport.LineDown(1)
+		m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 		m.updateMainPanel()
 		return true
 	case "pgup", "pageup", "shift+pgup", "shift+pageup", "ctrl+u":
 		m.contextViewport.LineUp(m.contextViewport.Height)
+		m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 		m.updateMainPanel()
 		return true
 	case "pgdown", "pagedown", "pgdn", "shift+pgdown", "shift+pagedown", "shift+pgdn", "ctrl+d":
 		m.contextViewport.LineDown(m.contextViewport.Height)
+		m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 		m.updateMainPanel()
 		return true
 	case "home":
 		m.contextViewport.GotoTop()
+		m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 		m.updateMainPanel()
 		return true
 	case "end":
 		m.contextViewport.GotoBottom()
+		m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 		m.updateMainPanel()
 		return true
 	}
@@ -730,16 +784,19 @@ func (m *Model) updateContextPane(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) nextContextTab() {
+	m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 	m.contextTab = (m.contextTab + 1) % 4
 	m.updateContext()
 }
 
 func (m *Model) prevContextTab() {
+	m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 	m.contextTab = (m.contextTab + 3) % 4
 	m.updateContext()
 }
 
 func (m *Model) setContextTab(tab ContextTab) {
+	m.contextOffsets[m.contextTab] = m.contextViewport.YOffset
 	m.contextTab = tab
 	m.updateContext()
 }
@@ -1315,6 +1372,60 @@ func filterRows(rows []table.Row, rowIDs []string, query string) ([]table.Row, [
 		}
 	}
 	return filtered, filteredIDs
+}
+
+func defaultSortConfig(columns []table.Column) SortConfig {
+	if len(columns) == 0 {
+		return SortConfig{Column: -1, Desc: true}
+	}
+	preferred := []string{"Started", "Updated", "Received", "Created", "Last Used"}
+	for _, target := range preferred {
+		for i, col := range columns {
+			if strings.EqualFold(strings.TrimSpace(col.Title), target) {
+				return SortConfig{Column: i, Desc: true}
+			}
+		}
+	}
+	return SortConfig{Column: 0, Desc: true}
+}
+
+func columnsWithSortIndicators(columns []table.Column, sortColumn int, desc bool) []table.Column {
+	decorated := make([]table.Column, len(columns))
+	copy(decorated, columns)
+	if sortColumn < 0 || sortColumn >= len(decorated) {
+		return decorated
+	}
+	arrow := " ▲"
+	if desc {
+		arrow = " ▼"
+	}
+	decorated[sortColumn].Title = strings.TrimSpace(decorated[sortColumn].Title) + arrow
+	return decorated
+}
+
+func (m *Model) cycleSortColumn() {
+	if len(m.columns) == 0 {
+		return
+	}
+	if m.sortColumn < 0 {
+		m.sortColumn = 0
+	} else {
+		m.sortColumn = (m.sortColumn + 1) % len(m.columns)
+	}
+	cfg := m.sortByView[m.view]
+	cfg.Column = m.sortColumn
+	cfg.Desc = m.sortDesc
+	m.sortByView[m.view] = cfg
+	m.refreshView()
+}
+
+func (m *Model) toggleSortDirection() {
+	m.sortDesc = !m.sortDesc
+	cfg := m.sortByView[m.view]
+	cfg.Column = m.sortColumn
+	cfg.Desc = m.sortDesc
+	m.sortByView[m.view] = cfg
+	m.refreshView()
 }
 
 func truncateRows(rows []table.Row, columns []table.Column) []table.Row {

@@ -158,16 +158,17 @@ func renderMainBody(m Model, width int) string {
 		parts = append(parts, renderDashboard(m, width))
 	} else {
 		label := m.styles.SidebarSection.Render("List")
+		meta := renderTableMeta(m, width)
 		if m.mainState == SurfaceLoading {
-			parts = append(parts, label, renderLoadingState(m, width))
+			parts = append(parts, label, meta, renderLoadingState(m, width))
 		} else if m.mainState == SurfaceError {
-			parts = append(parts, label, renderErrorState(m, width, "Unable to load data", "Press ctrl+r to retry"))
+			parts = append(parts, label, meta, renderErrorState(m, width, "Unable to load data", "Press ctrl+r to retry"))
 		} else if m.mainState == SurfaceStale && len(m.filteredRows) == 0 {
-			parts = append(parts, label, renderErrorState(m, width, "Showing stale data", "Press ctrl+r to refresh"))
+			parts = append(parts, label, meta, renderErrorState(m, width, "Showing stale data", "Press ctrl+r to refresh"))
 		} else if len(m.filteredRows) == 0 {
-			parts = append(parts, label, renderEmptyState(m, width))
+			parts = append(parts, label, meta, renderEmptyState(m, width))
 		} else {
-			parts = append(parts, label, strings.TrimRight(m.table.View(), "\n"))
+			parts = append(parts, label, meta, strings.TrimRight(m.table.View(), "\n"))
 		}
 	}
 	return strings.Join(parts, "\n")
@@ -204,21 +205,23 @@ func renderDashboard(m Model, width int) string {
 		{Title: "Failures", Value: itoa(failed), Subtitle: "needs attention"},
 	}, width, m.styles)
 	label := m.styles.SidebarSection.Render("Recent Runs")
+	meta := renderTableMeta(m, width)
 	if m.mainState == SurfaceLoading {
-		return strings.Join([]string{cards, label, renderLoadingState(m, width)}, "\n")
+		return strings.Join([]string{cards, label, meta, renderLoadingState(m, width)}, "\n")
 	}
 	if m.mainState == SurfaceError {
-		return strings.Join([]string{cards, label, renderErrorState(m, width, "Unable to load recent runs", "Press ctrl+r to retry")}, "\n")
+		return strings.Join([]string{cards, label, meta, renderErrorState(m, width, "Unable to load recent runs", "Press ctrl+r to retry")}, "\n")
 	}
 	if len(m.filteredRows) == 0 {
-		return strings.Join([]string{cards, label, renderEmptyState(m, width)}, "\n")
+		return strings.Join([]string{cards, label, meta, renderEmptyState(m, width)}, "\n")
 	}
-	return strings.Join([]string{cards, label, strings.TrimRight(m.table.View(), "\n")}, "\n")
+	return strings.Join([]string{cards, label, meta, strings.TrimRight(m.table.View(), "\n")}, "\n")
 }
 
 func renderContextDrawer(m Model, width int) string {
 	innerWidth := max(width-2, 1)
 	tabs := renderTabs(m, []string{"Overview", "JSON", "Steps", "Logs"}, contextTabLabel(m.contextTab))
+	meta := renderContextMeta(m, innerWidth)
 	content := strings.TrimRight(m.contextViewport.View(), "\n")
 	if m.contextState == SurfaceLoading {
 		content = renderContextLoading(m, innerWidth)
@@ -230,7 +233,7 @@ func renderContextDrawer(m Model, width int) string {
 		content = renderContextError(m, innerWidth, "Context may be stale", "Press ctrl+r to refresh")
 	}
 	body := lipgloss.Place(innerWidth, max(m.layout.ContextHeight-4, 1), lipgloss.Left, lipgloss.Top, content)
-	inner := lipgloss.JoinVertical(lipgloss.Left, tabs, body)
+	inner := lipgloss.JoinVertical(lipgloss.Left, tabs, meta, body)
 	inner = applyBackgroundLayer(inner, innerWidth, max(m.layout.ContextHeight-2, 1), m.styles.ContextFill)
 	box := m.styles.PanelBorder.Width(innerWidth).Height(max(m.layout.ContextHeight-2, 1))
 	if m.focus == FocusContext {
@@ -265,7 +268,7 @@ func contextTabLabel(tab ContextTab) string {
 }
 
 func renderFooter(m Model) string {
-	left := m.help.View(m.keys)
+	left := renderFooterHints(m)
 	if m.toast.Active {
 		left = toastLabel(m) + "  " + m.styles.Dim.Render("•") + "  " + left
 	}
@@ -273,6 +276,53 @@ func renderFooter(m Model) string {
 	line := joinLeftRight(left, right, m.width)
 	content := m.styles.Footer.Width(m.width).Render(line)
 	return clampSection(content, m.width, m.layout.FooterHeight)
+}
+
+func renderTableMeta(m Model, width int) string {
+	rows := len(m.baseRows)
+	filtered := len(m.filteredRows)
+	page := m.paginator.Page + 1
+	totalPages := m.paginator.TotalPages
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	sortLabel := "none"
+	if m.sortColumn >= 0 && m.sortColumn < len(m.columns) {
+		dir := "asc"
+		if m.sortDesc {
+			dir = "desc"
+		}
+		sortLabel = strings.ToLower(strings.TrimSpace(m.columns[m.sortColumn].Title)) + " " + dir
+	}
+	text := "rows " + itoa(rows) + "  " + m.styles.Dim.Render("•") + "  filtered " + itoa(filtered) + "  " + m.styles.Dim.Render("•") + "  page " + itoa(page) + "/" + itoa(totalPages) + "  " + m.styles.Dim.Render("•") + "  sort " + sortLabel
+	text = ansi.Truncate(text, width, "")
+	return m.styles.Dim.Width(width).Render(text)
+}
+
+func renderContextMeta(m Model, width int) string {
+	selected := m.selectedRowID()
+	if selected == "" {
+		selected = "none"
+	}
+	left := "selected " + selected
+	right := "tabs [ ] 1-4  " + m.styles.Dim.Render("•") + "  scroll j/k pgup/pgdn"
+	line := joinLeftRight(left, right, width)
+	return m.styles.Dim.Width(width).Render(line)
+}
+
+func renderFooterHints(m Model) string {
+	hint := "? help"
+	if m.focus == FocusSidebar {
+		hint = "sidebar  ↑/↓ select  •  enter/right focus main  •  tab next pane"
+	} else if m.focus == FocusMain {
+		hint = "main  ↑/↓ select  •  s col  S dir  •  g/G top/bottom  •  tab next pane"
+	} else {
+		hint = "context  j/k scroll  •  [/] or 1-4 tabs  •  ctrl+f search"
+	}
+	if m.canRetry() {
+		hint += "  •  ctrl+r retry"
+	}
+	return hint
 }
 
 func chip(m Model, text string, active bool) string {

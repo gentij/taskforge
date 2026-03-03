@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -86,6 +87,167 @@ func BuildRowsForView(view ViewID, store *data.Store, styleSet styles.StyleSet, 
 	default:
 		return nil, nil, nil
 	}
+}
+
+func SortRowsForView(view ViewID, store *data.Store, columns []table.Column, rows []table.Row, rowIDs []string, columnIdx int, desc bool) ([]table.Row, []string) {
+	if len(rows) == 0 || len(rows) != len(rowIDs) || columnIdx < 0 || columnIdx >= len(columns) {
+		return rows, rowIDs
+	}
+	title := strings.TrimSpace(columns[columnIdx].Title)
+	indexes := make([]int, len(rows))
+	for i := range rows {
+		indexes[i] = i
+	}
+	sort.SliceStable(indexes, func(i int, j int) bool {
+		a := indexes[i]
+		b := indexes[j]
+		less := sortLess(view, store, rowIDs[a], rowIDs[b], title, rows[a], rows[b], columnIdx)
+		greater := sortLess(view, store, rowIDs[b], rowIDs[a], title, rows[b], rows[a], columnIdx)
+		if !less && !greater {
+			return false
+		}
+		if desc {
+			return greater
+		}
+		return less
+	})
+	sortedRows := make([]table.Row, len(rows))
+	sortedIDs := make([]string, len(rowIDs))
+	for i, idx := range indexes {
+		sortedRows[i] = rows[idx]
+		sortedIDs[i] = rowIDs[idx]
+	}
+	return sortedRows, sortedIDs
+}
+
+func sortLess(view ViewID, store *data.Store, aID string, bID string, title string, aRow table.Row, bRow table.Row, col int) bool {
+	switch view {
+	case ViewDashboard, ViewRuns:
+		ar, aok := runByID(store, aID)
+		br, bok := runByID(store, bID)
+		if aok && bok {
+			switch title {
+			case "Started":
+				return ar.StartedAt.Before(br.StartedAt)
+			case "Duration":
+				return ar.Duration < br.Duration
+			case "Status":
+				return ar.Status < br.Status
+			case "Workflow":
+				return workflowName(store, ar.WorkflowID) < workflowName(store, br.WorkflowID)
+			case "Trigger":
+				return ar.TriggerType < br.TriggerType
+			case "Run ID":
+				return ar.ID < br.ID
+			}
+		}
+	case ViewWorkflows:
+		aw, aok := workflowByID(store, aID)
+		bw, bok := workflowByID(store, bID)
+		if aok && bok {
+			switch title {
+			case "Name":
+				return aw.Name < bw.Name
+			case "Active":
+				return !aw.Active && bw.Active
+			case "Latest Version":
+				return aw.LatestVersion < bw.LatestVersion
+			case "Triggers":
+				return countTriggers(store, aw.ID) < countTriggers(store, bw.ID)
+			case "Updated":
+				return aw.UpdatedAt.Before(bw.UpdatedAt)
+			}
+		}
+	case ViewTriggers:
+		at, aok := triggerByID(store, aID)
+		bt, bok := triggerByID(store, bID)
+		if aok && bok {
+			switch title {
+			case "Name":
+				return at.Name < bt.Name
+			case "Type":
+				return at.Type < bt.Type
+			case "Workflow":
+				return workflowName(store, at.WorkflowID) < workflowName(store, bt.WorkflowID)
+			case "Active":
+				return !at.Active && bt.Active
+			case "Created":
+				return at.CreatedAt.Before(bt.CreatedAt)
+			}
+		}
+	case ViewEvents:
+		ae, aok := eventByID(store, aID)
+		be, bok := eventByID(store, bID)
+		if aok && bok {
+			switch title {
+			case "Event ID":
+				return ae.ID < be.ID
+			case "Trigger":
+				return ae.TriggerID < be.TriggerID
+			case "Type":
+				return ae.Type < be.Type
+			case "Received":
+				return ae.ReceivedAt.Before(be.ReceivedAt)
+			case "Linked Run":
+				ar := ""
+				br := ""
+				if ae.RunID != nil {
+					ar = *ae.RunID
+				}
+				if be.RunID != nil {
+					br = *be.RunID
+				}
+				return ar < br
+			}
+		}
+	case ViewSecrets:
+		as, aok := secretByID(store, aID)
+		bs, bok := secretByID(store, bID)
+		if aok && bok {
+			switch title {
+			case "Name":
+				return as.Name < bs.Name
+			case "Description":
+				return as.Description < bs.Description
+			case "Created":
+				return as.CreatedAt.Before(bs.CreatedAt)
+			}
+		}
+	case ViewTokens:
+		at, aok := tokenByID(store, aID)
+		bt, bok := tokenByID(store, bID)
+		if aok && bok {
+			switch title {
+			case "Name":
+				return at.Name < bt.Name
+			case "Scopes":
+				return strings.Join(at.Scopes, ",") < strings.Join(bt.Scopes, ",")
+			case "Created":
+				return at.CreatedAt.Before(bt.CreatedAt)
+			case "Last Used":
+				aTime := time.Time{}
+				bTime := time.Time{}
+				if at.LastUsedAt != nil {
+					aTime = *at.LastUsedAt
+				}
+				if bt.LastUsedAt != nil {
+					bTime = *bt.LastUsedAt
+				}
+				return aTime.Before(bTime)
+			case "Status":
+				return at.Revoked && !bt.Revoked
+			}
+		}
+	}
+	aVal := ""
+	bVal := ""
+	if col < len(aRow) {
+		aVal = aRow[col]
+	}
+	if col < len(bRow) {
+		bVal = bRow[col]
+	}
+	return aVal < bVal
 }
 
 func BuildContextContent(view ViewID, store *data.Store, selectedID string) string {

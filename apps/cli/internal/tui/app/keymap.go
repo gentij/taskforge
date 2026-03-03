@@ -20,6 +20,10 @@ type KeyMap struct {
 	Back          key.Binding
 	Clear         key.Binding
 	Retry         key.Binding
+	SortColumn    key.Binding
+	SortDirection key.Binding
+	JumpTop       key.Binding
+	JumpBottom    key.Binding
 	RunWorkflow   key.Binding
 	ToggleActive  key.Binding
 	ViewVersions  key.Binding
@@ -47,6 +51,10 @@ func DefaultKeyMap() KeyMap {
 		Back:          key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		Clear:         key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl+u", "clear")),
 		Retry:         key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "retry")),
+		SortColumn:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sort column")),
+		SortDirection: key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "sort dir")),
+		JumpTop:       key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "top")),
+		JumpBottom:    key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")),
 		RunWorkflow:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "run now")),
 		ToggleActive:  key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "toggle active")),
 		ViewVersions:  key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view versions")),
@@ -75,6 +83,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Enter, k.Back},
 		{k.NextScreen, k.PrevScreen, k.ToggleContext, k.Search, k.ContextSearch},
 		{k.PanelScroll, k.ContextScroll, k.ContextTabs, k.Palette, k.Help, k.Quit, k.Clear, k.Retry},
+		{k.SortColumn, k.SortDirection, k.JumpTop, k.JumpBottom},
 		{k.RunWorkflow, k.ToggleActive, k.ViewVersions, k.RevokeToken},
 		{k.ToggleWrap, k.LogSearch},
 	}
