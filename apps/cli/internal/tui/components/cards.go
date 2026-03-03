@@ -53,6 +53,6 @@ func renderCard(card StatCard, width int, styleSet styles.StyleSet) string {
 		lipgloss.NewStyle().Width(innerWidth).Render(line2),
 		lipgloss.NewStyle().Width(innerWidth).Render(line3),
 	)
-	box := styleSet.PanelBorder.Width(width).Height(5)
+	box := styleSet.PanelBorder.Width(innerWidth).Height(3)
 	return box.Render(content)
 }

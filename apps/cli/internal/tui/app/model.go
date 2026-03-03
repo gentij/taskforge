@@ -368,6 +368,7 @@ func (m *Model) updateMainPanel() {
 		return
 	}
 	content := buildMainContent(*m)
+	content = sanitizeRenderable(content)
 	content = truncateLines(content, max(m.mainPanel.Width, 1))
 	content = clampSection(content, max(m.mainPanel.Width, 1), max(m.mainPanel.Height, 1))
 	m.mainPanel.SetContent(content)

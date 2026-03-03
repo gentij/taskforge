@@ -81,7 +81,7 @@ func renderSidebar(m Model) string {
 	)
 	filled := applyBackgroundLayer(content, innerWidth, innerHeight, m.styles.SidebarFill)
 	body := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
-	return border.Width(width).Height(height).Render(body)
+	return border.Width(innerWidth).Height(innerHeight).Render(body)
 }
 
 func joinSidebarContent(top []string, middle []string, bottom []string, height int) string {
@@ -111,7 +111,7 @@ func renderMainPanel(m Model) string {
 	panelContent = clampSection(panelContent, innerWidth, innerHeight)
 	filled := applyBackgroundLayer(panelContent, innerWidth, innerHeight, m.styles.PanelFill)
 	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
-	return border.Width(width).Height(height).Render(content)
+	return border.Width(innerWidth).Height(innerHeight).Render(content)
 }
 
 func renderMainHeader(m Model, width int) string {
@@ -186,7 +186,7 @@ func renderContextDrawer(m Model, width int) string {
 	body := lipgloss.Place(innerWidth, max(m.layout.ContextHeight-4, 1), lipgloss.Left, lipgloss.Top, content)
 	inner := lipgloss.JoinVertical(lipgloss.Left, tabs, body)
 	inner = applyBackgroundLayer(inner, innerWidth, max(m.layout.ContextHeight-2, 1), m.styles.ContextFill)
-	box := m.styles.PanelBorder.Width(width).Height(m.layout.ContextHeight)
+	box := m.styles.PanelBorder.Width(innerWidth).Height(max(m.layout.ContextHeight-2, 1))
 	return box.Render(inner)
 }
 
@@ -276,6 +276,46 @@ func truncateLines(content string, width int) string {
 		lines[i] = ansi.Truncate(lines[i], width, "")
 	}
 	return strings.Join(lines, "\n")
+}
+
+func sanitizeRenderable(content string) string {
+	content = strings.ReplaceAll(content, "\r", "")
+	return stripNonSGRANSI(content)
+}
+
+func stripNonSGRANSI(content string) string {
+	var builder strings.Builder
+	builder.Grow(len(content))
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+		if ch != '\x1b' {
+			builder.WriteByte(ch)
+			continue
+		}
+		if i+1 >= len(content) {
+			break
+		}
+		next := content[i+1]
+		if next != '[' {
+			continue
+		}
+		j := i + 2
+		for j < len(content) {
+			final := content[j]
+			if final >= 0x40 && final <= 0x7E {
+				if final == 'm' {
+					builder.WriteString(content[i : j+1])
+				}
+				i = j
+				break
+			}
+			j++
+		}
+		if j >= len(content) {
+			break
+		}
+	}
+	return builder.String()
 }
 
 func applyBackgroundLayer(content string, width int, height int, style lipgloss.Style) string {
