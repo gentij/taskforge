@@ -58,6 +58,44 @@ const (
 
 type pulseMsg struct{}
 
+type uiLoadDoneMsg struct{}
+
+type mockRefreshDoneMsg struct {
+	failed bool
+}
+
+type toastClearMsg struct {
+	id int
+}
+
+type SurfaceState int
+
+const (
+	SurfaceIdle SurfaceState = iota
+	SurfaceLoading
+	SurfaceRefreshing
+	SurfaceSuccess
+	SurfaceError
+	SurfaceStale
+	SurfaceEmpty
+)
+
+type ToastLevel int
+
+const (
+	ToastInfo ToastLevel = iota
+	ToastSuccess
+	ToastWarn
+	ToastError
+)
+
+type ToastState struct {
+	ID      int
+	Active  bool
+	Level   ToastLevel
+	Message string
+}
+
 type paletteAction struct {
 	Kind paletteActionType
 	View ViewID
@@ -149,14 +187,21 @@ type Model struct {
 	help     help.Model
 	keys     KeyMap
 
-	autoRefresh   bool
-	refreshEvery  time.Duration
-	lastRefresh   time.Time
-	pulseOn       bool
-	workspaceName string
-	workerCount   int
-	apiStatus     string
-	paletteRecent []paletteAction
+	autoRefresh    bool
+	refreshEvery   time.Duration
+	lastRefresh    time.Time
+	pulseOn        bool
+	refreshPending bool
+	refreshCount   int
+	workspaceName  string
+	workerCount    int
+	apiStatus      string
+	paletteRecent  []paletteAction
+
+	mainState    SurfaceState
+	contextState SurfaceState
+	toast        ToastState
+	uiReady      bool
 
 	paginator paginator.Model
 }
@@ -218,11 +263,16 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		refreshEvery:       2 * time.Second,
 		lastRefresh:        now,
 		pulseOn:            false,
+		refreshPending:     false,
+		refreshCount:       0,
 		workspaceName:      "personal",
 		workerCount:        2,
 		apiStatus:          apiStatus(tokenSet),
 		paginator:          pager,
 		inspector:          NewInspector(styleSet, keys),
+		mainState:          SurfaceLoading,
+		contextState:       SurfaceLoading,
+		uiReady:            false,
 	}
 
 	model.applyTheme(cfg.Theme, false)
@@ -239,7 +289,7 @@ func (m Model) Init() tea.Cmd {
 		width, height := initialSize()
 		return tea.WindowSizeMsg{Width: width, Height: height}
 	}
-	return tea.Batch(windowSizeCmd, pulseTick())
+	return tea.Batch(windowSizeCmd, pulseTick(), initialLoadTick())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -256,7 +306,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 	case pulseMsg:
 		m.pulseOn = !m.pulseOn
-		return m, pulseTick()
+		cmds := []tea.Cmd{pulseTick()}
+		if m.autoRefresh && !m.refreshPending && time.Since(m.lastRefresh) >= m.refreshEvery {
+			m.startMockRefresh(false)
+			cmds = append(cmds, mockRefreshTick(m.refreshCount%5 == 4))
+		}
+		return m, tea.Batch(cmds...)
+	case uiLoadDoneMsg:
+		m.uiReady = true
+		m.refreshView()
+		m.syncSurfaceStates()
+		return m, nil
+	case mockRefreshDoneMsg:
+		m.refreshPending = false
+		m.lastRefresh = time.Now()
+		if msg.failed {
+			m.mainState = SurfaceStale
+			m.contextState = SurfaceStale
+			return m, m.pushToast(ToastWarn, "Refresh failed; showing cached data (ctrl+r retry)")
+		}
+		m.mainState = SurfaceIdle
+		m.contextState = SurfaceIdle
+		m.refreshView()
+		m.syncSurfaceStates()
+		return m, nil
+	case toastClearMsg:
+		if m.toast.Active && m.toast.ID == msg.id {
+			m.toast = ToastState{}
+		}
+		return m, nil
 	}
 
 	if m.searching {
@@ -334,6 +412,7 @@ func (m *Model) applyFilter() {
 	rows, rowIDs := filterRows(m.baseRows, m.baseRowIDs, m.searchQuery)
 	m.filteredRows = rows
 	m.filteredRowIDs = rowIDs
+	m.syncSurfaceStates()
 	m.applyTableRows()
 }
 
@@ -391,6 +470,7 @@ func (m *Model) updateContext() {
 	}
 	m.contextViewport.SetContent(content)
 	m.contextViewport.GotoTop()
+	m.syncSurfaceStates()
 	m.updateMainPanel()
 }
 
@@ -482,6 +562,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.help.ShowAll = true
 		return m, nil
 	}
+	if key.Matches(msg, m.keys.Retry) && m.canRetry() {
+		m.startMockRefresh(true)
+		clearToastCmd := m.pushToast(ToastInfo, "Retrying refresh...")
+		return m, tea.Batch(mockRefreshTick(false), clearToastCmd)
+	}
 	if key.Matches(msg, m.keys.Palette) {
 		m.palette = buildPalette(m.theme, m.paletteRecent)
 		m.resizePalette()
@@ -546,15 +631,15 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.view == ViewWorkflows && key.Matches(msg, m.keys.RunWorkflow) {
 		m.queueRunForSelectedWorkflow()
-		return m, nil
+		return m, m.pushToast(ToastSuccess, "Workflow run queued")
 	}
 	if m.view == ViewWorkflows && key.Matches(msg, m.keys.ToggleActive) {
 		m.toggleWorkflowActive()
-		return m, nil
+		return m, m.pushToast(ToastInfo, "Workflow status updated")
 	}
 	if m.view == ViewTokens && key.Matches(msg, m.keys.RevokeToken) {
 		m.toggleTokenRevoked()
-		return m, nil
+		return m, m.pushToast(ToastInfo, "Token status updated")
 	}
 
 	if m.focus == FocusSidebar {
@@ -838,6 +923,64 @@ func pulseTick() tea.Cmd {
 	return tea.Tick(650*time.Millisecond, func(time.Time) tea.Msg {
 		return pulseMsg{}
 	})
+}
+
+func initialLoadTick() tea.Cmd {
+	return tea.Tick(220*time.Millisecond, func(time.Time) tea.Msg {
+		return uiLoadDoneMsg{}
+	})
+}
+
+func mockRefreshTick(failed bool) tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(time.Time) tea.Msg {
+		return mockRefreshDoneMsg{failed: failed}
+	})
+}
+
+func (m *Model) startMockRefresh(manual bool) {
+	m.refreshPending = true
+	m.refreshCount++
+	m.mainState = SurfaceRefreshing
+	m.contextState = SurfaceRefreshing
+	if manual {
+		m.toast = ToastState{}
+	}
+}
+
+func (m *Model) syncSurfaceStates() {
+	if !m.uiReady {
+		return
+	}
+	if m.mainState != SurfaceRefreshing && m.mainState != SurfaceError && m.mainState != SurfaceStale {
+		if len(m.filteredRows) == 0 {
+			m.mainState = SurfaceEmpty
+		} else {
+			m.mainState = SurfaceSuccess
+		}
+	}
+	if m.contextState != SurfaceRefreshing && m.contextState != SurfaceError && m.contextState != SurfaceStale {
+		content := strings.TrimSpace(m.contextViewport.View())
+		if content == "" {
+			m.contextState = SurfaceEmpty
+		} else {
+			m.contextState = SurfaceSuccess
+		}
+	}
+}
+
+func (m *Model) pushToast(level ToastLevel, message string) tea.Cmd {
+	m.toast.ID++
+	m.toast.Active = true
+	m.toast.Level = level
+	m.toast.Message = message
+	id := m.toast.ID
+	return tea.Tick(2400*time.Millisecond, func(time.Time) tea.Msg {
+		return toastClearMsg{id: id}
+	})
+}
+
+func (m *Model) canRetry() bool {
+	return m.mainState == SurfaceError || m.mainState == SurfaceStale || m.contextState == SurfaceError || m.contextState == SurfaceStale
 }
 
 func (m *Model) rememberPaletteAction(action paletteAction) {

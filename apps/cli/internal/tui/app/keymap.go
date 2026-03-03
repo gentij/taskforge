@@ -19,6 +19,7 @@ type KeyMap struct {
 	Enter         key.Binding
 	Back          key.Binding
 	Clear         key.Binding
+	Retry         key.Binding
 	RunWorkflow   key.Binding
 	ToggleActive  key.Binding
 	ViewVersions  key.Binding
@@ -45,6 +46,7 @@ func DefaultKeyMap() KeyMap {
 		Enter:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Back:          key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		Clear:         key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl+u", "clear")),
+		Retry:         key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "retry")),
 		RunWorkflow:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "run now")),
 		ToggleActive:  key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "toggle active")),
 		ViewVersions:  key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view versions")),
@@ -72,7 +74,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Back},
 		{k.NextScreen, k.PrevScreen, k.ToggleContext, k.Search, k.ContextSearch},
-		{k.PanelScroll, k.ContextScroll, k.ContextTabs, k.Palette, k.Help, k.Quit, k.Clear},
+		{k.PanelScroll, k.ContextScroll, k.ContextTabs, k.Palette, k.Help, k.Quit, k.Clear, k.Retry},
 		{k.RunWorkflow, k.ToggleActive, k.ViewVersions, k.RevokeToken},
 		{k.ToggleWrap, k.LogSearch},
 	}

@@ -137,6 +137,9 @@ func renderMainHeader(m Model, width int) string {
 		chip(m, "Workers "+itoa(m.workerCount), false),
 		chip(m, refreshChip(m), false),
 	}
+	if state := surfaceStateLabel(m.mainState); state != "" {
+		chips = append(chips, chip(m, state, m.mainState == SurfaceError || m.mainState == SurfaceStale))
+	}
 	if m.searchQuery != "" {
 		chips = append(chips, chip(m, "Filter", true))
 	}
@@ -155,7 +158,13 @@ func renderMainBody(m Model, width int) string {
 		parts = append(parts, renderDashboard(m, width))
 	} else {
 		label := m.styles.SidebarSection.Render("List")
-		if len(m.filteredRows) == 0 {
+		if m.mainState == SurfaceLoading {
+			parts = append(parts, label, renderLoadingState(m, width))
+		} else if m.mainState == SurfaceError {
+			parts = append(parts, label, renderErrorState(m, width, "Unable to load data", "Press ctrl+r to retry"))
+		} else if m.mainState == SurfaceStale && len(m.filteredRows) == 0 {
+			parts = append(parts, label, renderErrorState(m, width, "Showing stale data", "Press ctrl+r to refresh"))
+		} else if len(m.filteredRows) == 0 {
 			parts = append(parts, label, renderEmptyState(m, width))
 		} else {
 			parts = append(parts, label, strings.TrimRight(m.table.View(), "\n"))
@@ -166,6 +175,12 @@ func renderMainBody(m Model, width int) string {
 
 func renderDashboard(m Model, width int) string {
 	if m.layout.DashboardCardsHeight == 0 {
+		if m.mainState == SurfaceLoading {
+			return renderLoadingState(m, width)
+		}
+		if m.mainState == SurfaceError {
+			return renderErrorState(m, width, "Unable to load dashboard", "Press ctrl+r to retry")
+		}
 		if len(m.filteredRows) == 0 {
 			return renderEmptyState(m, width)
 		}
@@ -189,6 +204,12 @@ func renderDashboard(m Model, width int) string {
 		{Title: "Failures", Value: itoa(failed), Subtitle: "needs attention"},
 	}, width, m.styles)
 	label := m.styles.SidebarSection.Render("Recent Runs")
+	if m.mainState == SurfaceLoading {
+		return strings.Join([]string{cards, label, renderLoadingState(m, width)}, "\n")
+	}
+	if m.mainState == SurfaceError {
+		return strings.Join([]string{cards, label, renderErrorState(m, width, "Unable to load recent runs", "Press ctrl+r to retry")}, "\n")
+	}
 	if len(m.filteredRows) == 0 {
 		return strings.Join([]string{cards, label, renderEmptyState(m, width)}, "\n")
 	}
@@ -199,6 +220,15 @@ func renderContextDrawer(m Model, width int) string {
 	innerWidth := max(width-2, 1)
 	tabs := renderTabs(m, []string{"Overview", "JSON", "Steps", "Logs"}, contextTabLabel(m.contextTab))
 	content := strings.TrimRight(m.contextViewport.View(), "\n")
+	if m.contextState == SurfaceLoading {
+		content = renderContextLoading(m, innerWidth)
+	}
+	if m.contextState == SurfaceError {
+		content = renderContextError(m, innerWidth, "Context unavailable", "Press ctrl+r to retry")
+	}
+	if m.contextState == SurfaceStale {
+		content = renderContextError(m, innerWidth, "Context may be stale", "Press ctrl+r to refresh")
+	}
 	body := lipgloss.Place(innerWidth, max(m.layout.ContextHeight-4, 1), lipgloss.Left, lipgloss.Top, content)
 	inner := lipgloss.JoinVertical(lipgloss.Left, tabs, body)
 	inner = applyBackgroundLayer(inner, innerWidth, max(m.layout.ContextHeight-2, 1), m.styles.ContextFill)
@@ -236,6 +266,9 @@ func contextTabLabel(tab ContextTab) string {
 
 func renderFooter(m Model) string {
 	left := m.help.View(m.keys)
+	if m.toast.Active {
+		left = toastLabel(m) + "  " + m.styles.Dim.Render("•") + "  " + left
+	}
 	right := m.paginator.View()
 	line := joinLeftRight(left, right, m.width)
 	content := m.styles.Footer.Width(m.width).Render(line)
@@ -276,6 +309,68 @@ func renderEmptyState(m Model, width int) string {
 	line2 := m.styles.Dim.Render(hint)
 	inner := strings.Join([]string{line1, "", line2}, "\n")
 	return applyBackgroundLayer(inner, width, 6, m.styles.ContextFill)
+}
+
+func renderLoadingState(m Model, width int) string {
+	lines := []string{
+		m.styles.Dim.Render("Loading data..."),
+		"",
+		m.styles.Dim.Render("··························"),
+		m.styles.Dim.Render("··················"),
+		m.styles.Dim.Render("·····················"),
+	}
+	return applyBackgroundLayer(strings.Join(lines, "\n"), width, 6, m.styles.ContextFill)
+}
+
+func renderErrorState(m Model, width int, title string, hint string) string {
+	line1 := m.styles.ChipActive.Render(" " + title + " ")
+	line2 := m.styles.Dim.Render(hint)
+	inner := strings.Join([]string{line1, "", line2}, "\n")
+	return applyBackgroundLayer(inner, width, 6, m.styles.ContextFill)
+}
+
+func renderContextLoading(m Model, width int) string {
+	lines := []string{m.styles.Dim.Render("Loading context..."), "", m.styles.Dim.Render("················")}
+	return clampSection(strings.Join(lines, "\n"), width, max(m.layout.ContextHeight-4, 1))
+}
+
+func renderContextError(m Model, width int, title string, hint string) string {
+	lines := []string{m.styles.ChipActive.Render(" " + title + " "), "", m.styles.Dim.Render(hint)}
+	return clampSection(strings.Join(lines, "\n"), width, max(m.layout.ContextHeight-4, 1))
+}
+
+func surfaceStateLabel(state SurfaceState) string {
+	switch state {
+	case SurfaceLoading:
+		return "Loading"
+	case SurfaceRefreshing:
+		return "Refreshing"
+	case SurfaceError:
+		return "Error"
+	case SurfaceStale:
+		return "Stale"
+	case SurfaceEmpty:
+		return "Empty"
+	default:
+		return ""
+	}
+}
+
+func toastLabel(m Model) string {
+	if !m.toast.Active {
+		return ""
+	}
+	prefix := "i"
+	if m.toast.Level == ToastSuccess {
+		prefix = "+"
+	}
+	if m.toast.Level == ToastWarn {
+		prefix = "!"
+	}
+	if m.toast.Level == ToastError {
+		prefix = "x"
+	}
+	return m.styles.ChipActive.Render(" " + prefix + " " + m.toast.Message + " ")
 }
 
 func joinLeftRight(left string, right string, width int) string {
