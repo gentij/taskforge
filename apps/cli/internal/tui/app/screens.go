@@ -109,6 +109,123 @@ func BuildContextContent(view ViewID, store *data.Store, selectedID string) stri
 	}
 }
 
+func BuildContextTabContent(view ViewID, store *data.Store, selectedID string, tab ContextTab) string {
+	switch tab {
+	case ContextTabJSON:
+		return contextJSONContent(view, store, selectedID)
+	case ContextTabSteps:
+		return contextStepsContent(view, store, selectedID)
+	case ContextTabLogs:
+		return contextLogsContent(view, store, selectedID)
+	default:
+		return BuildContextContent(view, store, selectedID)
+	}
+}
+
+func contextJSONContent(view ViewID, store *data.Store, selectedID string) string {
+	switch view {
+	case ViewDashboard, ViewRuns:
+		run, ok := runByID(store, selectedID)
+		if !ok {
+			return "No run selected"
+		}
+		parts := []string{
+			"Input JSON",
+			utils.Indent(utils.PrettyJSON(run.InputJSON), "  "),
+			"",
+			"Output JSON",
+			utils.Indent(utils.PrettyJSON(run.OutputJSON), "  "),
+		}
+		if strings.TrimSpace(run.ErrorJSON) != "" {
+			parts = append(parts, "", "Error JSON", utils.Indent(utils.PrettyJSON(run.ErrorJSON), "  "))
+		}
+		return strings.Join(parts, "\n")
+	case ViewWorkflows:
+		wf, ok := workflowByID(store, selectedID)
+		if !ok {
+			return "No workflow selected"
+		}
+		versions := versionsForWorkflow(store, selectedID)
+		def := latestDefinition(versions)
+		return strings.Join([]string{
+			"Workflow",
+			utils.Indent(utils.PrettyJSON(fmt.Sprintf(`{"id":"%s","name":"%s","active":%t,"latestVersion":%d}`, wf.ID, wf.Name, wf.Active, wf.LatestVersion)), "  "),
+			"",
+			"Latest Definition",
+			utils.Indent(utils.PrettyJSON(def), "  "),
+		}, "\n")
+	case ViewTriggers:
+		trg, ok := triggerByID(store, selectedID)
+		if !ok {
+			return "No trigger selected"
+		}
+		return strings.Join([]string{"Trigger Config", utils.Indent(utils.PrettyJSON(trg.ConfigJSON), "  ")}, "\n")
+	case ViewEvents:
+		evt, ok := eventByID(store, selectedID)
+		if !ok {
+			return "No event selected"
+		}
+		return strings.Join([]string{
+			"Payload",
+			utils.Indent(utils.PrettyJSON(evt.PayloadJSON), "  "),
+			"",
+			"Metadata",
+			utils.Indent(utils.PrettyJSON(evt.Metadata), "  "),
+		}, "\n")
+	case ViewSecrets:
+		sec, ok := secretByID(store, selectedID)
+		if !ok {
+			return "No secret selected"
+		}
+		return strings.Join([]string{
+			"Secret Metadata",
+			utils.Indent(utils.PrettyJSON(fmt.Sprintf(`{"id":"%s","name":"%s","description":"%s"}`, sec.ID, sec.Name, sec.Description)), "  "),
+		}, "\n")
+	case ViewTokens:
+		tok, ok := tokenByID(store, selectedID)
+		if !ok {
+			return "No token selected"
+		}
+		return strings.Join([]string{
+			"Token Metadata",
+			utils.Indent(utils.PrettyJSON(fmt.Sprintf(`{"id":"%s","name":"%s","revoked":%t}`, tok.ID, tok.Name, tok.Revoked)), "  "),
+		}, "\n")
+	default:
+		return "No JSON view available"
+	}
+}
+
+func contextStepsContent(view ViewID, store *data.Store, selectedID string) string {
+	if view != ViewRuns && view != ViewDashboard {
+		return "Steps are available for workflow runs. Open Runs and select a run."
+	}
+	steps := stepsForRun(store, selectedID)
+	if len(steps) == 0 {
+		return "No step data for selected run"
+	}
+	lines := []string{"Steps"}
+	for _, step := range steps {
+		lines = append(lines, fmt.Sprintf("- %s  %s  %s", step.StepKey, strings.ToLower(step.Status), formatDuration(step.Duration)))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func contextLogsContent(view ViewID, store *data.Store, selectedID string) string {
+	if view != ViewRuns && view != ViewDashboard {
+		return "Logs are available for workflow runs. Open Runs and select a run."
+	}
+	steps := stepsForRun(store, selectedID)
+	if len(steps) == 0 {
+		return "No logs for selected run"
+	}
+	lines := []string{"Step Logs"}
+	for _, step := range steps {
+		lines = append(lines, "", step.StepKey)
+		lines = append(lines, utils.Indent(step.Log, "  "))
+	}
+	return strings.Join(lines, "\n")
+}
+
 func recentRunRows(store *data.Store, styleSet styles.StyleSet, now time.Time, limit int) ([]table.Row, []string) {
 	rows := []table.Row{}
 	ids := []string{}

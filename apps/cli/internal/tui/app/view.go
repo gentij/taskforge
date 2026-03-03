@@ -43,9 +43,6 @@ func buildMainContent(m Model) string {
 	body := renderMainBody(m, width)
 	divider := m.styles.Divider.Render(strings.Repeat("─", width))
 	sections := []string{header, divider, body}
-	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
-		sections = append(sections, renderContextDrawer(m, width))
-	}
 	return strings.Join(sections, "\n")
 }
 
@@ -68,7 +65,7 @@ func renderSidebar(m Model) string {
 		m.styles.SidebarSection.Render("Status"),
 		chip(m, "API "+m.apiStatus, m.apiStatus == "CONNECTED"),
 		chip(m, "Workers "+itoa(m.workerCount), false),
-		chip(m, "⟳ "+refreshLabel(m), false),
+		chip(m, refreshChip(m), false),
 		chip(m, "Theme "+strings.Title(strings.ReplaceAll(m.themeName, "-", " ")), false),
 	}
 
@@ -107,9 +104,22 @@ func renderMainPanel(m Model) string {
 		border = m.styles.PanelBorderFocus
 	}
 	panelContent := strings.TrimRight(m.mainPanel.View(), "\n")
-	panelContent = clampSection(panelContent, innerWidth, innerHeight)
-	filled := applyBackgroundLayer(panelContent, innerWidth, innerHeight, m.styles.PanelFill)
-	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
+	topHeight := innerHeight
+	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
+		topHeight -= m.layout.ContextHeight
+	}
+	if topHeight < 1 {
+		topHeight = 1
+	}
+	panelContent = clampSection(panelContent, innerWidth, topHeight)
+	top := applyBackgroundLayer(panelContent, innerWidth, topHeight, m.styles.PanelFill)
+	contentParts := []string{top}
+	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
+		contentParts = append(contentParts, renderContextDrawer(m, innerWidth))
+	}
+	composed := strings.Join(contentParts, "\n")
+	composed = clampSection(composed, innerWidth, innerHeight)
+	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, composed)
 	return border.Width(innerWidth).Height(innerHeight).Render(content)
 }
 
@@ -125,7 +135,7 @@ func renderMainHeader(m Model, width int) string {
 	chips := []string{
 		chip(m, "API "+m.apiStatus, m.apiStatus == "CONNECTED"),
 		chip(m, "Workers "+itoa(m.workerCount), false),
-		chip(m, "⟳ "+refreshLabel(m), false),
+		chip(m, refreshChip(m), false),
 	}
 	if m.searchQuery != "" {
 		chips = append(chips, chip(m, "Filter", true))
@@ -145,16 +155,20 @@ func renderMainBody(m Model, width int) string {
 		parts = append(parts, renderDashboard(m, width))
 	} else {
 		label := m.styles.SidebarSection.Render("List")
-		parts = append(parts, label, strings.TrimRight(m.table.View(), "\n"))
-	}
-	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
-		parts = append(parts, "", renderContextDrawer(m, width))
+		if len(m.filteredRows) == 0 {
+			parts = append(parts, label, renderEmptyState(m, width))
+		} else {
+			parts = append(parts, label, strings.TrimRight(m.table.View(), "\n"))
+		}
 	}
 	return strings.Join(parts, "\n")
 }
 
 func renderDashboard(m Model, width int) string {
 	if m.layout.DashboardCardsHeight == 0 {
+		if len(m.filteredRows) == 0 {
+			return renderEmptyState(m, width)
+		}
 		return strings.TrimRight(m.table.View(), "\n")
 	}
 	active := 0
@@ -175,17 +189,23 @@ func renderDashboard(m Model, width int) string {
 		{Title: "Failures", Value: itoa(failed), Subtitle: "needs attention"},
 	}, width, m.styles)
 	label := m.styles.SidebarSection.Render("Recent Runs")
+	if len(m.filteredRows) == 0 {
+		return strings.Join([]string{cards, label, renderEmptyState(m, width)}, "\n")
+	}
 	return strings.Join([]string{cards, label, strings.TrimRight(m.table.View(), "\n")}, "\n")
 }
 
 func renderContextDrawer(m Model, width int) string {
 	innerWidth := max(width-2, 1)
-	tabs := renderTabs(m, []string{"Overview", "JSON", "Steps", "Logs"}, "Overview")
+	tabs := renderTabs(m, []string{"Overview", "JSON", "Steps", "Logs"}, contextTabLabel(m.contextTab))
 	content := strings.TrimRight(m.contextViewport.View(), "\n")
 	body := lipgloss.Place(innerWidth, max(m.layout.ContextHeight-4, 1), lipgloss.Left, lipgloss.Top, content)
 	inner := lipgloss.JoinVertical(lipgloss.Left, tabs, body)
 	inner = applyBackgroundLayer(inner, innerWidth, max(m.layout.ContextHeight-2, 1), m.styles.ContextFill)
 	box := m.styles.PanelBorder.Width(innerWidth).Height(max(m.layout.ContextHeight-2, 1))
+	if m.focus == FocusContext {
+		box = m.styles.PanelBorderFocus.Width(innerWidth).Height(max(m.layout.ContextHeight-2, 1))
+	}
 	return box.Render(inner)
 }
 
@@ -199,6 +219,19 @@ func renderTabs(m Model, tabs []string, active string) string {
 		}
 	}
 	return strings.Join(items, " ")
+}
+
+func contextTabLabel(tab ContextTab) string {
+	switch tab {
+	case ContextTabJSON:
+		return "JSON"
+	case ContextTabSteps:
+		return "Steps"
+	case ContextTabLogs:
+		return "Logs"
+	default:
+		return "Overview"
+	}
 }
 
 func renderFooter(m Model) string {
@@ -221,6 +254,28 @@ func refreshLabel(m Model) string {
 		return "2s"
 	}
 	return "OFF"
+}
+
+func refreshChip(m Model) string {
+	if !m.autoRefresh {
+		return "⟳ " + refreshLabel(m)
+	}
+	if m.pulseOn {
+		return "↻ " + refreshLabel(m)
+	}
+	return "⟳ " + refreshLabel(m)
+}
+
+func renderEmptyState(m Model, width int) string {
+	title := "No items to display"
+	if m.searchQuery != "" {
+		title = "No matches for \"" + m.searchQuery + "\""
+	}
+	hint := "Try a different filter, or open the command palette with ctrl+k"
+	line1 := m.styles.Dim.Bold(true).Render(title)
+	line2 := m.styles.Dim.Render(hint)
+	inner := strings.Join([]string{line1, "", line2}, "\n")
+	return applyBackgroundLayer(inner, width, 6, m.styles.ContextFill)
 }
 
 func joinLeftRight(left string, right string, width int) string {
