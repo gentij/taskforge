@@ -26,24 +26,36 @@ type Theme struct {
 }
 
 type StyleSet struct {
-	Header        lipgloss.Style
-	Footer        lipgloss.Style
-	PanelBorder   lipgloss.Style
-	PanelTitle    lipgloss.Style
-	BorderColor   lipgloss.Color
-	Accent        lipgloss.Style
-	TableHeader   lipgloss.Style
-	TableCell     lipgloss.Style
-	TableSelected lipgloss.Style
-	RowAlt        lipgloss.Style
-	CardTitle     lipgloss.Style
-	CardValue     lipgloss.Style
-	BadgeSuccess  lipgloss.Style
-	BadgeFailed   lipgloss.Style
-	BadgeRunning  lipgloss.Style
-	BadgeQueued   lipgloss.Style
-	BadgeMuted    lipgloss.Style
-	Dim           lipgloss.Style
+	Header           lipgloss.Style
+	Footer           lipgloss.Style
+	PanelBorder      lipgloss.Style
+	PanelBorderFocus lipgloss.Style
+	PanelTitle       lipgloss.Style
+	BorderColor      lipgloss.Color
+	Accent           lipgloss.Style
+	SidebarTitle     lipgloss.Style
+	SidebarMuted     lipgloss.Style
+	SidebarSection   lipgloss.Style
+	SidebarFill      lipgloss.Style
+	Chip             lipgloss.Style
+	ChipActive       lipgloss.Style
+	TabActive        lipgloss.Style
+	TabInactive      lipgloss.Style
+	Divider          lipgloss.Style
+	PanelFill        lipgloss.Style
+	ContextFill      lipgloss.Style
+	TableHeader      lipgloss.Style
+	TableCell        lipgloss.Style
+	TableSelected    lipgloss.Style
+	RowAlt           lipgloss.Style
+	CardTitle        lipgloss.Style
+	CardValue        lipgloss.Style
+	BadgeSuccess     lipgloss.Style
+	BadgeFailed      lipgloss.Style
+	BadgeRunning     lipgloss.Style
+	BadgeQueued      lipgloss.Style
+	BadgeMuted       lipgloss.Style
+	Dim              lipgloss.Style
 }
 
 func DefaultTheme() Theme {
@@ -137,6 +149,28 @@ func ThemeRegistry() map[string]Theme {
 			Scanline:   lipgloss.Color("#0A160A"),
 			Glow:       lipgloss.Color("#7CFF6B"),
 		},
+		"retro-amber": {
+			Name:       "Retro Amber",
+			Background: lipgloss.Color("#120A05"),
+			Surface:    lipgloss.Color("#1A0F08"),
+			SurfaceAlt: lipgloss.Color("#140B06"),
+			Border:     lipgloss.Color("#F3A83A"),
+			Text:       lipgloss.Color("#FCE9C1"),
+			Muted:      lipgloss.Color("#C98D4A"),
+			Accent:     lipgloss.Color("#F2B24C"),
+			Success:    lipgloss.Color("#F2B24C"),
+			Warning:    lipgloss.Color("#F59E0B"),
+			Error:      lipgloss.Color("#FF9A6B"),
+			Info:       lipgloss.Color("#F2B24C"),
+			SuccessBg:  lipgloss.Color("#2B1A08"),
+			WarningBg:  lipgloss.Color("#2B1A05"),
+			ErrorBg:    lipgloss.Color("#2A1208"),
+			InfoBg:     lipgloss.Color("#2B1A08"),
+			MutedBg:    lipgloss.Color("#1A0F08"),
+			CRT:        false,
+			Scanline:   lipgloss.Color("#120A05"),
+			Glow:       lipgloss.Color("#F2B24C"),
+		},
 	}
 }
 
@@ -152,6 +186,10 @@ func NewStyles(theme Theme) StyleSet {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Border).
 			Background(theme.Surface),
+		PanelBorderFocus: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.Accent).
+			Background(theme.Surface),
 		PanelTitle: lipgloss.NewStyle().
 			Foreground(theme.Text).
 			Bold(true),
@@ -159,6 +197,38 @@ func NewStyles(theme Theme) StyleSet {
 		Accent: lipgloss.NewStyle().
 			Foreground(theme.Accent).
 			Bold(true),
+		SidebarTitle: lipgloss.NewStyle().
+			Foreground(theme.Accent).
+			Bold(true),
+		SidebarMuted: lipgloss.NewStyle().
+			Foreground(theme.Muted),
+		SidebarSection: lipgloss.NewStyle().
+			Foreground(theme.Muted).
+			Bold(true),
+		SidebarFill: lipgloss.NewStyle().
+			Background(theme.SurfaceAlt),
+		Chip: lipgloss.NewStyle().
+			Foreground(theme.Text).
+			Background(theme.SurfaceAlt).
+			Padding(0, 1),
+		ChipActive: lipgloss.NewStyle().
+			Foreground(theme.Background).
+			Background(theme.Accent).
+			Padding(0, 1).
+			Bold(true),
+		TabActive: lipgloss.NewStyle().
+			Foreground(theme.Background).
+			Background(theme.Accent).
+			Bold(true),
+		TabInactive: lipgloss.NewStyle().
+			Foreground(theme.Muted).
+			Background(theme.SurfaceAlt),
+		Divider: lipgloss.NewStyle().
+			Foreground(theme.Border),
+		PanelFill: lipgloss.NewStyle().
+			Background(theme.Surface),
+		ContextFill: lipgloss.NewStyle().
+			Background(theme.SurfaceAlt),
 		TableHeader: lipgloss.NewStyle().
 			Foreground(theme.Muted).
 			Bold(true),
@@ -166,10 +236,9 @@ func NewStyles(theme Theme) StyleSet {
 			Foreground(theme.Text),
 		TableSelected: lipgloss.NewStyle().
 			Foreground(theme.Text).
-			Background(theme.Border).
 			Bold(true),
 		RowAlt: lipgloss.NewStyle().
-			Background(theme.SurfaceAlt),
+			Foreground(theme.Text),
 		CardTitle: lipgloss.NewStyle().
 			Foreground(theme.Muted).
 			Bold(true),

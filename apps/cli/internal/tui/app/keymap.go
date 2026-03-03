@@ -11,6 +11,7 @@ type KeyMap struct {
 	Search        key.Binding
 	ContextSearch key.Binding
 	PanelScroll   key.Binding
+	ContextScroll key.Binding
 	Palette       key.Binding
 	Help          key.Binding
 	Quit          key.Binding
@@ -29,12 +30,13 @@ func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Up:            key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
 		Down:          key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
-		NextScreen:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next screen")),
-		PrevScreen:    key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev screen")),
+		NextScreen:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "focus")),
+		PrevScreen:    key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "focus")),
 		ToggleContext: key.NewBinding(key.WithKeys("ctrl+j"), key.WithHelp("ctrl+j", "toggle context")),
 		Search:        key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 		ContextSearch: key.NewBinding(key.WithKeys("ctrl+f"), key.WithHelp("ctrl+f", "panel search")),
-		PanelScroll:   key.NewBinding(key.WithKeys("alt+up", "alt+down", "pgup", "pgdown"), key.WithHelp("alt+↑/↓", "panel scroll")),
+		PanelScroll:   key.NewBinding(key.WithKeys("alt+up", "alt+down", "pgup", "pgdown"), key.WithHelp("alt+↑/↓", "main scroll")),
+		ContextScroll: key.NewBinding(key.WithKeys("shift+up", "shift+down", "shift+pgup", "shift+pgdown"), key.WithHelp("shift+↑/↓", "context scroll")),
 		Palette:       key.NewBinding(key.WithKeys("ctrl+k"), key.WithHelp("ctrl+k", "command palette")),
 		Help:          key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:          key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
@@ -68,7 +70,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Back},
 		{k.NextScreen, k.PrevScreen, k.ToggleContext, k.Search, k.ContextSearch},
-		{k.PanelScroll, k.Palette, k.Help, k.Quit, k.Clear},
+		{k.PanelScroll, k.ContextScroll, k.Palette, k.Help, k.Quit, k.Clear},
 		{k.RunWorkflow, k.ToggleActive, k.ViewVersions, k.RevokeToken},
 		{k.ToggleWrap, k.LogSearch},
 	}

@@ -26,6 +26,8 @@ import (
 
 type ViewID string
 
+type FocusPane int
+
 const (
 	ViewDashboard ViewID = "dashboard"
 	ViewWorkflows ViewID = "workflows"
@@ -34,6 +36,11 @@ const (
 	ViewEvents    ViewID = "events"
 	ViewSecrets   ViewID = "secrets"
 	ViewTokens    ViewID = "tokens"
+)
+
+const (
+	FocusSidebar FocusPane = iota
+	FocusMain
 )
 
 type paletteActionType int
@@ -61,12 +68,23 @@ func (p paletteItem) FilterValue() string { return p.Label }
 func (p paletteItem) Title() string       { return p.Label }
 func (p paletteItem) Description() string { return p.Detail }
 
+type navItem struct {
+	ID    ViewID
+	Label string
+}
+
+func (n navItem) FilterValue() string { return n.Label }
+func (n navItem) Title() string       { return n.Label }
+func (n navItem) Description() string { return "" }
+
 type Model struct {
 	client     *api.Client
 	serverURL  string
 	tokenSet   bool
 	config     config.Config
 	configPath string
+
+	focus FocusPane
 
 	width  int
 	height int
@@ -101,6 +119,8 @@ type Model struct {
 
 	palette     list.Model
 	showPalette bool
+	sidebar     list.Model
+	mainPanel   viewport.Model
 
 	inspector RunInspector
 
@@ -137,10 +157,12 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 
 	defaultTheme := styles.DefaultTheme()
 	palette := buildPalette(defaultTheme)
+	sidebar := buildSidebar(defaultTheme, ViewDashboard)
 	styleSet := styles.NewStyles(defaultTheme)
 
 	tableModel := components.NewTable(nil, nil, 0, 0, styleSet)
 	contextViewport := viewport.New(0, 0)
+	mainPanel := viewport.New(0, 0)
 
 	pager := paginator.New()
 	pager.Type = paginator.Arabic
@@ -153,6 +175,7 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		tokenSet:           tokenSet,
 		config:             cfg,
 		configPath:         configPath,
+		focus:              FocusSidebar,
 		view:               ViewDashboard,
 		views:              []ViewID{ViewDashboard, ViewWorkflows, ViewRuns, ViewTriggers, ViewEvents, ViewSecrets, ViewTokens},
 		theme:              defaultTheme,
@@ -164,6 +187,8 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		contextViewport:    contextViewport,
 		contextSearchInput: contextSearch,
 		palette:            palette,
+		sidebar:            sidebar,
+		mainPanel:          mainPanel,
 		help:               helper,
 		keys:               keys,
 		refreshEvery:       2 * time.Second,
@@ -215,7 +240,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updatePalette(msg)
 	}
 
-	return m.updateTable(msg)
+	return m.updateMain(msg)
 }
 
 func (m Model) View() string {
@@ -233,29 +258,45 @@ func (m *Model) resize(width int, height int) {
 	m.height = height
 	m.layout = layout.Compute(width, height, m.contextCollapsed)
 
-	m.table.SetWidth(width)
+	innerWidth := max(m.layout.MainWidth-2, 1)
+	innerHeight := max(m.layout.MainHeight-2, 1)
+	m.table.SetWidth(innerWidth)
 	m.table.SetHeight(m.layout.PrimaryTableHeight)
 
 	m.paginator.PerPage = m.layout.PrimaryTableHeight
 
 	contextBodyHeight := max(m.layout.ContextHeight-3, 1)
-	contextWidth := max(width-2, 1)
+	contextWidth := max(innerWidth-2, 1)
 	if m.layout.ContextHeight == 0 {
 		contextBodyHeight = 0
 	}
 	m.contextViewport.Width = contextWidth
 	m.contextViewport.Height = contextBodyHeight
 
+	m.sidebar.SetSize(max(m.layout.SidebarWidth-2, 1), max(m.layout.SidebarHeight-10, 1))
+	mainHeaderLines := m.layout.MainHeader + 1
+	mainBodyHeight := innerHeight - mainHeaderLines
+	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
+		mainBodyHeight -= m.layout.ContextHeight
+	}
+	if mainBodyHeight < 1 {
+		mainBodyHeight = 1
+	}
+	m.mainPanel.Width = innerWidth
+	m.mainPanel.Height = mainBodyHeight
+
 	m.inspector.Resize(width, height)
 	m.resizePalette()
+	m.updateMainPanel()
 }
 
 func (m *Model) refreshView() {
-	columns, rows, rowIDs := BuildRowsForView(m.view, &m.store, m.styles, m.width)
+	columns, rows, rowIDs := BuildRowsForView(m.view, &m.store, m.styles, max(m.layout.MainWidth-2, 1))
 	m.columns = columns
 	m.baseRows = rows
 	m.baseRowIDs = rowIDs
 	m.applyFilter()
+	m.syncSidebarSelection()
 }
 
 func (m *Model) applyFilter() {
@@ -286,10 +327,11 @@ func (m *Model) applyTableRows() {
 		cursor = 0
 		m.table.SetCursor(0)
 	}
-	styled := components.StyleRows(truncated, cursor, m.styles)
+	styled := components.StyleRows(truncated, m.columns, cursor, m.styles)
 	m.table.SetRows(styled)
 	m.updatePaginator()
 	m.updateContext()
+	m.updateMainPanel()
 }
 
 func (m *Model) updatePaginator() {
@@ -318,6 +360,18 @@ func (m *Model) updateContext() {
 	}
 	m.contextViewport.SetContent(content)
 	m.contextViewport.GotoTop()
+	m.updateMainPanel()
+}
+
+func (m *Model) updateMainPanel() {
+	if m.mainPanel.Width == 0 || m.mainPanel.Height == 0 {
+		return
+	}
+	content := buildMainContent(*m)
+	content = truncateLines(content, max(m.mainPanel.Width, 1))
+	content = clampSection(content, max(m.mainPanel.Width, 1), max(m.mainPanel.Height, 1))
+	m.mainPanel.SetContent(content)
+	m.mainPanel.GotoTop()
 }
 
 func (m *Model) applyTheme(themeKey string, persist bool) {
@@ -338,6 +392,7 @@ func (m *Model) applyTheme(themeKey string, persist bool) {
 	m.table.SetStyles(components.TableStyles(m.styles))
 	m.inspector.ApplyStyles(m.styles)
 	m.palette = buildPalette(m.theme)
+	m.sidebar = buildSidebar(m.theme, m.view)
 	m.resizePalette()
 
 	if persist {
@@ -425,12 +480,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.updateContext()
 		return m, nil
 	}
-	if key.Matches(msg, m.keys.NextScreen) {
-		m.nextView()
+	if key.Matches(msg, m.keys.NextScreen) || key.Matches(msg, m.keys.PrevScreen) {
+		m.toggleFocus()
 		return m, nil
 	}
-	if key.Matches(msg, m.keys.PrevScreen) {
-		m.prevView()
+	if msg.String() == "left" {
+		m.focus = FocusSidebar
 		return m, nil
 	}
 	if m.view == ViewRuns && key.Matches(msg, m.keys.Enter) {
@@ -450,12 +505,18 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	return m.updateTable(msg)
+	if m.focus == FocusSidebar {
+		return m.updateSidebar(msg)
+	}
+	return m.updateMain(msg)
 }
 
-func (m *Model) updateTable(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if m.handleContextScroll(keyMsg) {
+			return m, nil
+		}
+		if m.handleMainScroll(keyMsg) {
 			return m, nil
 		}
 	}
@@ -474,16 +535,16 @@ func (m *Model) handleContextScroll(msg tea.KeyMsg) bool {
 		return false
 	}
 	switch msg.String() {
-	case "alt+up", "alt+k", "shift+up", "shift+k":
+	case "shift+up", "shift+k":
 		m.contextViewport.LineUp(1)
 		return true
-	case "alt+down", "alt+j", "shift+down", "shift+j":
+	case "shift+down", "shift+j":
 		m.contextViewport.LineDown(1)
 		return true
-	case "pgup", "pageup":
+	case "shift+pgup", "shift+pageup":
 		m.contextViewport.LineUp(m.contextViewport.Height)
 		return true
-	case "pgdown", "pagedown", "pgdn":
+	case "shift+pgdown", "shift+pagedown", "shift+pgdn":
 		m.contextViewport.LineDown(m.contextViewport.Height)
 		return true
 	case "home":
@@ -491,6 +552,33 @@ func (m *Model) handleContextScroll(msg tea.KeyMsg) bool {
 		return true
 	case "end":
 		m.contextViewport.GotoBottom()
+		return true
+	}
+	return false
+}
+
+func (m *Model) handleMainScroll(msg tea.KeyMsg) bool {
+	if m.mainPanel.Height <= 0 {
+		return false
+	}
+	switch msg.String() {
+	case "alt+up", "alt+k":
+		m.mainPanel.LineUp(1)
+		return true
+	case "alt+down", "alt+j":
+		m.mainPanel.LineDown(1)
+		return true
+	case "pgup", "pageup":
+		m.mainPanel.LineUp(m.mainPanel.Height)
+		return true
+	case "pgdown", "pagedown", "pgdn":
+		m.mainPanel.LineDown(m.mainPanel.Height)
+		return true
+	case "home":
+		m.mainPanel.GotoTop()
+		return true
+	case "end":
+		m.mainPanel.GotoBottom()
 		return true
 	}
 	return false
@@ -640,6 +728,57 @@ func (m *Model) toggleTokenRevoked() {
 	}
 }
 
+func (m *Model) toggleFocus() {
+	if m.focus == FocusSidebar {
+		m.focus = FocusMain
+		return
+	}
+	m.focus = FocusSidebar
+}
+
+func (m *Model) updateSidebar(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
+		case "right", "enter":
+			m.focus = FocusMain
+			return m, nil
+		}
+	}
+	prev := m.sidebar.Index()
+	var cmd tea.Cmd
+	m.sidebar, cmd = m.sidebar.Update(msg)
+	if m.sidebar.Index() != prev {
+		m.syncViewFromSidebar()
+	}
+	return m, cmd
+}
+
+func (m *Model) syncViewFromSidebar() {
+	item, ok := m.sidebar.SelectedItem().(navItem)
+	if !ok {
+		return
+	}
+	if item.ID == m.view {
+		return
+	}
+	m.view = item.ID
+	m.refreshView()
+}
+
+func (m *Model) syncSidebarSelection() {
+	items := m.sidebar.Items()
+	for i, item := range items {
+		nav, ok := item.(navItem)
+		if !ok {
+			continue
+		}
+		if nav.ID == m.view {
+			m.sidebar.Select(i)
+			return
+		}
+	}
+}
+
 func (m *Model) queueRunForSelectedWorkflow() {
 	if m.view != ViewWorkflows {
 		return
@@ -677,6 +816,7 @@ func buildPalette(theme styles.Theme) list.Model {
 		paletteItem{Label: "Theme: Catppuccin", Detail: "Warm pastel", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("catppuccin")}},
 		paletteItem{Label: "Theme: Tokyo Night", Detail: "Deep blue", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("tokyo-night")}},
 		paletteItem{Label: "Theme: Fallout (CRT)", Detail: "Green phosphor", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("fallout")}},
+		paletteItem{Label: "Theme: Retro Amber", Detail: "Warm CRT", Action: paletteAction{Kind: paletteSetTheme, View: ViewID("retro-amber")}},
 	}
 
 	delegate := list.NewDefaultDelegate()
@@ -711,6 +851,39 @@ func buildPalette(theme styles.Theme) list.Model {
 	model.SetShowStatusBar(false)
 	model.SetShowTitle(false)
 	model.DisableQuitKeybindings()
+	return model
+}
+
+func buildSidebar(theme styles.Theme, selected ViewID) list.Model {
+	items := []list.Item{
+		navItem{ID: ViewDashboard, Label: "Dashboard"},
+		navItem{ID: ViewWorkflows, Label: "Workflows"},
+		navItem{ID: ViewRuns, Label: "Runs"},
+		navItem{ID: ViewTriggers, Label: "Triggers"},
+		navItem{ID: ViewEvents, Label: "Events"},
+		navItem{ID: ViewSecrets, Label: "Secrets"},
+		navItem{ID: ViewTokens, Label: "API Tokens"},
+	}
+	delegate := list.NewDefaultDelegate()
+	delegate.ShowDescription = false
+	delegate.SetHeight(1)
+	delegate.Styles.SelectedTitle = lipgloss.NewStyle().Foreground(theme.Background).Background(theme.Accent).Bold(true)
+	delegate.Styles.NormalTitle = lipgloss.NewStyle().Foreground(theme.Muted)
+	model := list.New(items, delegate, 20, 10)
+	model.SetShowHelp(false)
+	model.SetShowStatusBar(false)
+	model.SetFilteringEnabled(false)
+	model.SetShowTitle(false)
+	model.SetShowPagination(false)
+	model.DisableQuitKeybindings()
+
+	for i, item := range items {
+		nav, ok := item.(navItem)
+		if ok && nav.ID == selected {
+			model.Select(i)
+			break
+		}
+	}
 	return model
 }
 

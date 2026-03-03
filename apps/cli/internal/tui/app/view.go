@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/gentij/taskforge/apps/cli/internal/tui/components"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/styles"
 )
 
 func Render(m Model) string {
@@ -15,20 +14,13 @@ func Render(m Model) string {
 		return m.inspector.Render(m.width, m.height)
 	}
 
-	header := renderHeader(m)
-	primary := renderPrimary(m)
+	sidebar := renderSidebar(m)
+	mainPanel := renderMainPanel(m)
 	footer := renderFooter(m)
-	context := ""
-	if m.layout.ContextHeight > 0 {
-		context = renderContext(m)
-	}
 
-	sections := []string{header, primary}
-	if context != "" {
-		sections = append(sections, context)
-	}
-	sections = append(sections, footer)
-	base := lipgloss.JoinVertical(lipgloss.Left, sections...)
+	row := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, mainPanel)
+	row = clampSection(row, m.width, m.layout.MainHeight)
+	base := lipgloss.JoinVertical(lipgloss.Left, row, footer)
 	base = clampToViewport(base, m.width, m.height)
 
 	output := base
@@ -46,59 +38,123 @@ func Render(m Model) string {
 	return output
 }
 
-func renderHeader(m Model) string {
+func buildMainContent(m Model) string {
+	width := max(m.layout.MainWidth-2, 1)
+	header := renderMainHeader(m, width)
+	body := renderMainBody(m, width)
+	divider := m.styles.Divider.Render(strings.Repeat("─", width))
+	sections := []string{header, divider, body}
+	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
+		sections = append(sections, renderContextDrawer(m, width))
+	}
+	return strings.Join(sections, "\n")
+}
+
+func renderSidebar(m Model) string {
+	width := m.layout.SidebarWidth
+	height := m.layout.SidebarHeight
+	innerWidth := max(width-2, 1)
+	innerHeight := max(height-2, 1)
+	border := m.styles.PanelBorder
+	if m.focus == FocusSidebar {
+		border = m.styles.PanelBorderFocus
+	}
+
+	brand := m.styles.SidebarTitle.Render("TASKFORGE")
+	workspace := m.styles.SidebarMuted.Render("WS: " + m.workspaceName)
+	section := m.styles.SidebarSection.Render("Navigation")
+	listView := strings.TrimRight(m.sidebar.View(), "\n")
+
+	status := []string{
+		m.styles.SidebarSection.Render("Status"),
+		chip(m, "API "+m.apiStatus, m.apiStatus == "CONNECTED"),
+		chip(m, "Workers "+itoa(m.workerCount), false),
+		chip(m, "⟳ "+refreshLabel(m), false),
+		chip(m, "Theme "+strings.Title(strings.ReplaceAll(m.themeName, "-", " ")), false),
+	}
+
+	content := joinSidebarContent(
+		[]string{brand, workspace, "", section},
+		strings.Split(listView, "\n"),
+		status,
+		innerHeight,
+	)
+	filled := applyBackgroundLayer(content, innerWidth, innerHeight, m.styles.SidebarFill)
+	body := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
+	return border.Width(width).Height(height).Render(body)
+}
+
+func joinSidebarContent(top []string, middle []string, bottom []string, height int) string {
+	lines := append([]string{}, top...)
+	lines = append(lines, middle...)
+	remaining := height - len(lines) - len(bottom)
+	if remaining < 0 {
+		remaining = 0
+	}
+	for i := 0; i < remaining; i++ {
+		lines = append(lines, "")
+	}
+	lines = append(lines, bottom...)
+	return strings.Join(lines, "\n")
+}
+
+func renderMainPanel(m Model) string {
+	width := m.layout.MainWidth
+	height := m.layout.MainHeight
+	innerWidth := max(width-2, 1)
+	innerHeight := max(height-2, 1)
+	border := m.styles.PanelBorder
+	if m.focus == FocusMain {
+		border = m.styles.PanelBorderFocus
+	}
+	panelContent := strings.TrimRight(m.mainPanel.View(), "\n")
+	panelContent = clampSection(panelContent, innerWidth, innerHeight)
+	filled := applyBackgroundLayer(panelContent, innerWidth, innerHeight, m.styles.PanelFill)
+	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
+	return border.Width(width).Height(height).Render(content)
+}
+
+func renderMainHeader(m Model, width int) string {
 	section := viewTitle(m.view)
-	refresh := "OFF"
-	if m.autoRefresh {
-		refresh = "2s"
-	}
-	apiBadge := styles.Badge(m.styles.BadgeMuted, m.apiStatus)
-	if m.apiStatus == "CONNECTED" {
-		apiBadge = styles.Badge(m.styles.BadgeSuccess, m.apiStatus)
-	}
-	accent := m.styles.Accent.Render("▌")
-	appName := m.styles.Accent.Render("TASKFORGE")
-	sectionLabel := m.styles.PanelTitle.Render(section)
-	left := accent + " " + appName + "  " + m.styles.Dim.Render("•") + " " + sectionLabel
-	right := "WS: " + m.workspaceName + "  Workers: " + itoa(m.workerCount) + "  ⟳ " + refresh + "  API: " + apiBadge
-	line1 := joinLeftRight(left, right, m.width)
-
-	summaryLeft := viewSummary(m)
-	summaryRight := ""
+	summary := viewSummary(m)
+	left := m.styles.PanelTitle.Render(section) + "  " + m.styles.Dim.Render("•") + "  " + summary
+	filter := ""
 	if m.searchQuery != "" {
-		summaryRight = "Filter: " + m.searchQuery
+		filter = "Filter: " + m.searchQuery
 	}
-	if m.contextCollapsed {
-		if summaryRight != "" {
-			summaryRight += "  "
-		}
-		summaryRight += "Context: hidden"
+	line1 := joinLeftRight(left, filter, width)
+	chips := []string{
+		chip(m, "API "+m.apiStatus, m.apiStatus == "CONNECTED"),
+		chip(m, "Workers "+itoa(m.workerCount), false),
+		chip(m, "⟳ "+refreshLabel(m), false),
 	}
-	line2 := joinLeftRight(summaryLeft, summaryRight, m.width)
+	if m.searchQuery != "" {
+		chips = append(chips, chip(m, "Filter", true))
+	}
+	line2 := strings.Join(chips, " ")
 
-	line1 = " " + ansi.Truncate(line1, m.width-1, "")
-	line2 = " " + ansi.Truncate(line2, m.width-1, "")
-	line1 = m.styles.Header.Width(m.width).Render(line1)
-	if m.theme.CRT {
-		glowStyle := lipgloss.NewStyle().Foreground(m.theme.Glow).Faint(true)
-		line2 = glowStyle.Render(line2)
-	}
-	line2 = m.styles.Header.Width(m.width).Render(line2)
-	content := line1 + "\n" + line2
-	return clampSection(content, m.width, m.layout.HeaderHeight)
+	line1 = ansi.Truncate(line1, width, "")
+	line2 = ansi.Truncate(line2, width, "")
+	line1 = m.styles.Header.Width(width).Render(line1)
+	line2 = m.styles.Header.Width(width).Render(line2)
+	return strings.Join([]string{line1, line2}, "\n")
 }
 
-func renderPrimary(m Model) string {
-	content := ""
+func renderMainBody(m Model, width int) string {
+	parts := []string{}
 	if m.view == ViewDashboard {
-		content = renderDashboard(m)
+		parts = append(parts, renderDashboard(m, width))
 	} else {
-		content = strings.TrimRight(m.table.View(), "\n")
+		label := m.styles.SidebarSection.Render("List")
+		parts = append(parts, label, strings.TrimRight(m.table.View(), "\n"))
 	}
-	return clampSection(content, m.width, m.layout.PrimaryHeight)
+	if !m.contextCollapsed && m.layout.ContextHeight > 0 {
+		parts = append(parts, "", renderContextDrawer(m, width))
+	}
+	return strings.Join(parts, "\n")
 }
 
-func renderDashboard(m Model) string {
+func renderDashboard(m Model, width int) string {
 	if m.layout.DashboardCardsHeight == 0 {
 		return strings.TrimRight(m.table.View(), "\n")
 	}
@@ -118,50 +174,54 @@ func renderDashboard(m Model) string {
 		{Title: "Workflows", Value: itoa(active) + " active", Subtitle: itoa(len(m.store.Workflows)) + " total"},
 		{Title: "Runs 24h", Value: itoa(len(m.store.Runs)) + " total", Subtitle: "recent activity"},
 		{Title: "Failures", Value: itoa(failed), Subtitle: "needs attention"},
-	}, m.width, m.styles)
-	label := m.styles.Dim.Render("Recent Runs")
-	tableView := strings.TrimRight(m.table.View(), "\n")
-	rows := []string{cards}
-	for i := 0; i < m.layout.DashboardGap; i++ {
-		rows = append(rows, "")
-	}
-	rows = append(rows, label, tableView)
-	return strings.Join(rows, "\n")
+	}, width, m.styles)
+	label := m.styles.SidebarSection.Render("Recent Runs")
+	return strings.Join([]string{cards, label, strings.TrimRight(m.table.View(), "\n")}, "\n")
 }
 
-func renderContext(m Model) string {
-	width := m.width
-	height := m.layout.ContextHeight
-	if height <= 0 {
-		return ""
-	}
+func renderContextDrawer(m Model, width int) string {
 	innerWidth := max(width-2, 1)
-	innerHeight := max(height-2, 1)
-	bodyHeight := max(innerHeight-1, 1)
+	tabs := renderTabs(m, []string{"Overview", "JSON", "Steps", "Logs"}, "Overview")
 	content := strings.TrimRight(m.contextViewport.View(), "\n")
-	body := lipgloss.Place(innerWidth, bodyHeight, lipgloss.Left, lipgloss.Top, content)
-	accent := m.styles.Accent.Render("▌")
-	title := accent + " " + m.styles.PanelTitle.Render(contextTitle(m))
-	inner := lipgloss.JoinVertical(lipgloss.Left, title, body)
-	box := m.styles.PanelBorder.Width(width).Height(height).MaxHeight(height).MaxWidth(width)
-	return clampSection(box.Render(inner), width, height)
+	body := lipgloss.Place(innerWidth, max(m.layout.ContextHeight-4, 1), lipgloss.Left, lipgloss.Top, content)
+	inner := lipgloss.JoinVertical(lipgloss.Left, tabs, body)
+	inner = applyBackgroundLayer(inner, innerWidth, max(m.layout.ContextHeight-2, 1), m.styles.ContextFill)
+	box := m.styles.PanelBorder.Width(width).Height(m.layout.ContextHeight)
+	return box.Render(inner)
+}
+
+func renderTabs(m Model, tabs []string, active string) string {
+	items := make([]string, 0, len(tabs))
+	for _, tab := range tabs {
+		if tab == active {
+			items = append(items, m.styles.TabActive.Render(" "+tab+" "))
+		} else {
+			items = append(items, m.styles.TabInactive.Render(" "+tab+" "))
+		}
+	}
+	return strings.Join(items, " ")
 }
 
 func renderFooter(m Model) string {
 	left := m.help.View(m.keys)
-	rightParts := []string{}
-	if m.searching {
-		rightParts = append(rightParts, m.searchInput.View())
-	} else if m.contextSearching {
-		rightParts = append(rightParts, m.contextSearchInput.View())
-	} else if m.searchQuery != "" {
-		rightParts = append(rightParts, "Filter: "+m.searchQuery)
-	}
-	rightParts = append(rightParts, m.paginator.View())
-	right := strings.TrimSpace(strings.Join(rightParts, " │ "))
+	right := m.paginator.View()
 	line := joinLeftRight(left, right, m.width)
 	content := m.styles.Footer.Width(m.width).Render(line)
 	return clampSection(content, m.width, m.layout.FooterHeight)
+}
+
+func chip(m Model, text string, active bool) string {
+	if active {
+		return m.styles.ChipActive.Render(" " + text + " ")
+	}
+	return m.styles.Chip.Render(" " + text + " ")
+}
+
+func refreshLabel(m Model) string {
+	if m.autoRefresh {
+		return "2s"
+	}
+	return "OFF"
 }
 
 func joinLeftRight(left string, right string, width int) string {
@@ -208,6 +268,59 @@ func mergeOverlay(base string, overlay string, height int) string {
 		lines = append(lines, overlayLine)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func truncateLines(content string, width int) string {
+	lines := strings.Split(content, "\n")
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], width, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
+func applyBackgroundLayer(content string, width int, height int, style lipgloss.Style) string {
+	if width < 1 {
+		width = 1
+	}
+	if height < 1 {
+		height = 1
+	}
+	prefix, reset := backgroundCodes(style)
+	lines := strings.Split(content, "\n")
+	filled := make([]string, 0, height)
+	for i := 0; i < height; i++ {
+		line := ""
+		if i < len(lines) {
+			line = ansi.Truncate(lines[i], width, "")
+		}
+		if prefix != "" {
+			line = strings.ReplaceAll(line, reset, reset+prefix)
+			line = strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+prefix)
+			line = strings.ReplaceAll(line, "\x1b[49m", "\x1b[49m"+prefix)
+			line = strings.ReplaceAll(line, "\x1b[39m", "\x1b[39m"+prefix)
+		}
+		pad := width - ansi.StringWidth(line)
+		if pad < 0 {
+			pad = 0
+		}
+		line = prefix + line + strings.Repeat(" ", pad) + reset
+		filled = append(filled, line)
+	}
+	return strings.Join(filled, "\n")
+}
+
+func backgroundCodes(style lipgloss.Style) (string, string) {
+	sample := style.Render("X")
+	idx := strings.Index(sample, "X")
+	if idx == -1 {
+		return "", "\x1b[0m"
+	}
+	prefix := sample[:idx]
+	suffix := sample[idx+1:]
+	if suffix == "" {
+		suffix = "\x1b[0m"
+	}
+	return prefix, suffix
 }
 
 func applyScanlines(content string, width int, color lipgloss.Color) string {
@@ -363,12 +476,4 @@ func viewSummary(m Model) string {
 	default:
 		return ""
 	}
-}
-
-func contextTitle(m Model) string {
-	selected := m.selectedRowID()
-	if selected == "" {
-		return "Context Panel"
-	}
-	return "Context — " + selected
 }
