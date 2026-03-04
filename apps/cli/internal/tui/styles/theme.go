@@ -129,25 +129,25 @@ func ThemeRegistry() map[string]Theme {
 		},
 		"fallout": {
 			Name:       "Fallout",
-			Background: lipgloss.Color("#050A05"),
-			Surface:    lipgloss.Color("#0B140B"),
-			SurfaceAlt: lipgloss.Color("#081108"),
-			Border:     lipgloss.Color("#2D7A3C"),
-			Text:       lipgloss.Color("#B8FFB0"),
-			Muted:      lipgloss.Color("#6FBF6A"),
-			Accent:     lipgloss.Color("#7CFF6B"),
-			Success:    lipgloss.Color("#7CFF6B"),
-			Warning:    lipgloss.Color("#F2E94E"),
-			Error:      lipgloss.Color("#FF6B6B"),
-			Info:       lipgloss.Color("#7CFF6B"),
-			SuccessBg:  lipgloss.Color("#0B2A0B"),
-			WarningBg:  lipgloss.Color("#2A2405"),
-			ErrorBg:    lipgloss.Color("#2A0F0F"),
-			InfoBg:     lipgloss.Color("#0A2A0A"),
-			MutedBg:    lipgloss.Color("#0B140B"),
+			Background: lipgloss.Color("#040804"),
+			Surface:    lipgloss.Color("#091109"),
+			SurfaceAlt: lipgloss.Color("#0C170C"),
+			Border:     lipgloss.Color("#3A8F4A"),
+			Text:       lipgloss.Color("#C9F7BE"),
+			Muted:      lipgloss.Color("#86C884"),
+			Accent:     lipgloss.Color("#8CFF78"),
+			Success:    lipgloss.Color("#8CFF78"),
+			Warning:    lipgloss.Color("#F3DB5D"),
+			Error:      lipgloss.Color("#FF7A7A"),
+			Info:       lipgloss.Color("#9CEF95"),
+			SuccessBg:  lipgloss.Color("#113015"),
+			WarningBg:  lipgloss.Color("#31290B"),
+			ErrorBg:    lipgloss.Color("#311515"),
+			InfoBg:     lipgloss.Color("#123016"),
+			MutedBg:    lipgloss.Color("#0D190D"),
 			CRT:        true,
-			Scanline:   lipgloss.Color("#0A160A"),
-			Glow:       lipgloss.Color("#7CFF6B"),
+			Scanline:   lipgloss.Color("#0C1A0C"),
+			Glow:       lipgloss.Color("#A8FF9A"),
 		},
 		"retro-amber": {
 			Name:       "Retro Amber",
@@ -175,6 +175,38 @@ func ThemeRegistry() map[string]Theme {
 }
 
 func NewStyles(theme Theme) StyleSet {
+	borderShape := lipgloss.RoundedBorder()
+	focusBorderShape := lipgloss.ThickBorder()
+	titleColor := theme.Text
+	accentColor := theme.Accent
+	chipActiveForeground := theme.Background
+	chipActiveBackground := theme.Accent
+	tableHeaderColor := theme.Muted
+	tableSelectedForeground := theme.Text
+	tableSelectedBackground := theme.SurfaceAlt
+	rowAltBackground := theme.MutedBg
+	panelFillBackground := theme.Surface
+	contextFillBackground := theme.SurfaceAlt
+	tableSelectedUnderline := false
+	dimFaint := true
+
+	if theme.CRT {
+		borderShape = lipgloss.NormalBorder()
+		focusBorderShape = lipgloss.NormalBorder()
+		titleColor = theme.Glow
+		accentColor = theme.Glow
+		chipActiveForeground = theme.Surface
+		chipActiveBackground = theme.Glow
+		tableHeaderColor = theme.Glow
+		tableSelectedForeground = theme.Glow
+		tableSelectedBackground = theme.SuccessBg
+		tableSelectedUnderline = true
+		rowAltBackground = theme.SurfaceAlt
+		panelFillBackground = theme.SurfaceAlt
+		contextFillBackground = theme.Surface
+		dimFaint = false
+	}
+
 	return StyleSet{
 		Header: lipgloss.NewStyle().
 			Background(theme.SurfaceAlt).
@@ -183,22 +215,23 @@ func NewStyles(theme Theme) StyleSet {
 			Background(theme.SurfaceAlt).
 			Foreground(theme.Muted),
 		PanelBorder: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(borderShape).
 			BorderForeground(theme.Muted).
 			Background(theme.Surface),
 		PanelBorderFocus: lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
-			BorderForeground(theme.Accent).
+			Border(focusBorderShape).
+			BorderForeground(accentColor).
+			Bold(theme.CRT).
 			Background(theme.Surface),
 		PanelTitle: lipgloss.NewStyle().
-			Foreground(theme.Text).
+			Foreground(titleColor).
 			Bold(true),
 		BorderColor: theme.Border,
 		Accent: lipgloss.NewStyle().
-			Foreground(theme.Accent).
+			Foreground(accentColor).
 			Bold(true),
 		SidebarTitle: lipgloss.NewStyle().
-			Foreground(theme.Accent).
+			Foreground(accentColor).
 			Bold(true),
 		SidebarMuted: lipgloss.NewStyle().
 			Foreground(theme.Muted),
@@ -212,13 +245,13 @@ func NewStyles(theme Theme) StyleSet {
 			Background(theme.SurfaceAlt).
 			Padding(0, 1),
 		ChipActive: lipgloss.NewStyle().
-			Foreground(theme.Background).
-			Background(theme.Accent).
+			Foreground(chipActiveForeground).
+			Background(chipActiveBackground).
 			Padding(0, 1).
 			Bold(true),
 		TabActive: lipgloss.NewStyle().
-			Foreground(theme.Background).
-			Background(theme.Accent).
+			Foreground(chipActiveForeground).
+			Background(chipActiveBackground).
 			Bold(true),
 		TabInactive: lipgloss.NewStyle().
 			Foreground(theme.Muted).
@@ -226,19 +259,21 @@ func NewStyles(theme Theme) StyleSet {
 		Divider: lipgloss.NewStyle().
 			Foreground(theme.Border),
 		PanelFill: lipgloss.NewStyle().
-			Background(theme.Surface),
+			Background(panelFillBackground),
 		ContextFill: lipgloss.NewStyle().
-			Background(theme.SurfaceAlt),
+			Background(contextFillBackground),
 		TableHeader: lipgloss.NewStyle().
-			Foreground(theme.Muted).
+			Foreground(tableHeaderColor).
 			Bold(true),
 		TableCell: lipgloss.NewStyle().
 			Foreground(theme.Text),
 		TableSelected: lipgloss.NewStyle().
-			Foreground(theme.Text).
+			Foreground(tableSelectedForeground).
+			Background(tableSelectedBackground).
+			Underline(tableSelectedUnderline).
 			Bold(true),
 		RowAlt: lipgloss.NewStyle().
-			Foreground(theme.Text),
+			Background(rowAltBackground),
 		CardTitle: lipgloss.NewStyle().
 			Foreground(theme.Muted).
 			Bold(true),
@@ -267,7 +302,7 @@ func NewStyles(theme Theme) StyleSet {
 			Bold(true),
 		Dim: lipgloss.NewStyle().
 			Foreground(theme.Muted).
-			Faint(true),
+			Faint(dimFaint),
 	}
 }
 

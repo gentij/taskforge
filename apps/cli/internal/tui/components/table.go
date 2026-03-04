@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/gentij/taskforge/apps/cli/internal/tui/styles"
 )
@@ -27,7 +26,7 @@ func TableStyles(styleSet styles.StyleSet) table.Styles {
 	style := table.DefaultStyles()
 	style.Header = styleSet.TableHeader
 	style.Cell = styleSet.TableCell
-	style.Selected = styleSet.TableSelected
+	style.Selected = styleSet.TableCell
 	return style
 }
 
@@ -39,19 +38,28 @@ func StyleRows(rows []table.Row, columns []table.Column, selected int, styleSet 
 	}
 	for i, row := range rows {
 		styledRow := make(table.Row, len(row))
-		applyAlt := false
-		var rowStyle lipgloss.Style
 		for j, cell := range row {
 			width := 0
 			if j < len(widths) {
 				width = widths[j]
 			}
-			cell = padCell(cell, width)
-			if applyAlt {
-				styledRow[j] = rowStyle.Render(cell)
-			} else {
-				styledRow[j] = cell
+			effectiveWidth := width
+			if j > 0 {
+				effectiveWidth = max(width-1, 1)
 			}
+			if j == 0 {
+				marker := "  "
+				if i == selected {
+					marker = "> "
+				}
+				cell = marker + padCell(cell, max(effectiveWidth-len(marker), 1))
+			} else {
+				cell = padCell(cell, effectiveWidth)
+			}
+			if j > 0 {
+				cell = " " + cell
+			}
+			styledRow[j] = cell
 		}
 		styled[i] = styledRow
 	}
@@ -62,7 +70,15 @@ func padCell(value string, width int) string {
 	if width <= 0 {
 		return value
 	}
-	value = ansi.Truncate(value, width, "")
+	tail := ""
+	if ansi.StringWidth(value) > width {
+		if width >= 6 {
+			tail = "..."
+		} else if width >= 2 {
+			tail = "."
+		}
+	}
+	value = ansi.Truncate(value, width, tail)
 	pad := width - ansi.StringWidth(value)
 	if pad < 0 {
 		pad = 0

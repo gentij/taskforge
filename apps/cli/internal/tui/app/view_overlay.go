@@ -208,17 +208,17 @@ func backgroundCodes(style lipgloss.Style) (string, string) {
 
 func applyScanlines(content string, width int, color lipgloss.Color) string {
 	lines := strings.Split(content, "\n")
-	scanStyle := lipgloss.NewStyle().Foreground(color).Faint(true)
-	scanChar := scanStyle.Render(".")
+	scanStyle := lipgloss.NewStyle().Background(color)
+	scanCell := scanStyle.Render(" ")
 	for i, line := range lines {
-		if i%2 == 1 {
-			lines[i] = scanlineLine(line, width, scanChar)
+		if i%3 == 1 {
+			lines[i] = scanlineLine(line, width, scanCell)
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
-func scanlineLine(line string, width int, scanChar string) string {
+func scanlineLine(line string, width int, scanCell string) string {
 	if width < 1 {
 		width = 1
 	}
@@ -240,14 +240,14 @@ func scanlineLine(line string, width int, scanChar string) string {
 			continue
 		}
 		if ch == ' ' {
-			builder.WriteString(scanChar)
+			builder.WriteString(scanCell)
 		} else {
 			builder.WriteByte(ch)
 		}
 	}
 	padding := width - ansi.StringWidth(line)
 	for i := 0; i < padding; i++ {
-		builder.WriteString(scanChar)
+		builder.WriteString(scanCell)
 	}
 	return builder.String()
 }

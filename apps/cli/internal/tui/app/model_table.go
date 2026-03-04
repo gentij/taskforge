@@ -53,14 +53,20 @@ func defaultSortConfig(columns []table.Column) SortConfig {
 func columnsWithSortIndicators(columns []table.Column, sortColumn int, desc bool) []table.Column {
 	decorated := make([]table.Column, len(columns))
 	copy(decorated, columns)
-	if sortColumn < 0 || sortColumn >= len(decorated) {
-		return decorated
+	for i := range decorated {
+		title := strings.TrimSpace(decorated[i].Title)
+		if i == sortColumn && sortColumn >= 0 && sortColumn < len(decorated) {
+			arrow := " ▲"
+			if desc {
+				arrow = " ▼"
+			}
+			title += arrow
+		}
+		if i > 0 {
+			title = " " + title
+		}
+		decorated[i].Title = title
 	}
-	arrow := " ▲"
-	if desc {
-		arrow = " ▼"
-	}
-	decorated[sortColumn].Title = strings.TrimSpace(decorated[sortColumn].Title) + arrow
 	return decorated
 }
 
