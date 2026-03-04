@@ -59,6 +59,8 @@ const (
 	paletteCreateTrigger
 	paletteRenameTrigger
 	paletteToggleTrigger
+	paletteDeleteWorkflow
+	paletteDeleteTrigger
 	paletteShowCLIHandoff
 	paletteClearRecent
 	paletteSetTheme
@@ -799,6 +801,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.view == ViewTriggers && key.Matches(msg, m.keys.ToggleActive) {
 		return m, m.toggleTriggerActiveCmd()
 	}
+	if m.view == ViewWorkflows && key.Matches(msg, m.keys.RevokeToken) {
+		return m, m.openDeleteWorkflowModalCmd()
+	}
+	if m.view == ViewTriggers && key.Matches(msg, m.keys.RevokeToken) {
+		return m, m.openDeleteTriggerModalCmd()
+	}
 	if m.view == ViewTokens && key.Matches(msg, m.keys.RevokeToken) {
 		return m, m.pushToast(ToastWarn, "API tokens are not available yet")
 	}
@@ -1133,6 +1141,12 @@ func (m *Model) runPaletteAction(action paletteAction) tea.Cmd {
 	case paletteToggleTrigger:
 		m.rememberPaletteAction(action)
 		return m.toggleTriggerActiveCmd()
+	case paletteDeleteWorkflow:
+		m.rememberPaletteAction(action)
+		return m.openDeleteWorkflowModalCmd()
+	case paletteDeleteTrigger:
+		m.rememberPaletteAction(action)
+		return m.openDeleteTriggerModalCmd()
 	case paletteShowCLIHandoff:
 		m.rememberPaletteAction(action)
 		return m.openCLIHandoffModalCmd(action.Value)
@@ -1367,6 +1381,20 @@ func paletteItemFromAction(action paletteAction, state paletteBuildState) palett
 			item.Detail = "Unavailable: select trigger row"
 			item.DisabledReason = "Select a trigger row in Triggers first"
 		}
+	case paletteDeleteWorkflow:
+		item.Label = "Action: Delete selected workflow"
+		if !(state.View == ViewWorkflows && state.HasSelection) {
+			item.Enabled = false
+			item.Detail = "Unavailable: select workflow row"
+			item.DisabledReason = "Select a workflow row in Workflows first"
+		}
+	case paletteDeleteTrigger:
+		item.Label = "Action: Delete selected trigger"
+		if !(state.View == ViewTriggers && state.HasSelection) {
+			item.Enabled = false
+			item.Detail = "Unavailable: select trigger row"
+			item.DisabledReason = "Select a trigger row in Triggers first"
+		}
 	case paletteShowCLIHandoff:
 		switch action.Value {
 		case "workflow-create":
@@ -1526,6 +1554,51 @@ func (m *Model) toggleTriggerActiveCmd() tea.Cmd {
 			return mutationResultMsg{err: err}
 		}
 		return mutationResultMsg{successMessage: "Trigger status updated", refresh: true}
+	}
+}
+
+func (m *Model) deleteWorkflowCmd(workflowID string) tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	workflowID = strings.TrimSpace(workflowID)
+	if workflowID == "" {
+		return m.pushToast(ToastWarn, "Select a workflow first")
+	}
+	client := m.client
+	m.mutationPending = true
+	return func() tea.Msg {
+		if client == nil {
+			return mutationResultMsg{err: fmt.Errorf("api client unavailable")}
+		}
+		_, err := client.DeleteWorkflow(workflowID)
+		if err != nil {
+			return mutationResultMsg{err: err}
+		}
+		return mutationResultMsg{successMessage: "Workflow deleted", refresh: true}
+	}
+}
+
+func (m *Model) deleteTriggerCmd(workflowID string, triggerID string) tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	workflowID = strings.TrimSpace(workflowID)
+	triggerID = strings.TrimSpace(triggerID)
+	if workflowID == "" || triggerID == "" {
+		return m.pushToast(ToastWarn, "Select a trigger first")
+	}
+	client := m.client
+	m.mutationPending = true
+	return func() tea.Msg {
+		if client == nil {
+			return mutationResultMsg{err: fmt.Errorf("api client unavailable")}
+		}
+		_, err := client.DeleteTrigger(workflowID, triggerID)
+		if err != nil {
+			return mutationResultMsg{err: err}
+		}
+		return mutationResultMsg{successMessage: "Trigger deleted", refresh: true}
 	}
 }
 
@@ -1698,6 +1771,42 @@ func (m *Model) openCreateTriggerModalCmd() tea.Cmd {
 	return nil
 }
 
+func (m *Model) openDeleteWorkflowModalCmd() tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	if m.view != ViewWorkflows {
+		return m.pushToast(ToastWarn, "Open Workflows to delete")
+	}
+	selected := m.selectedRowID()
+	wf, ok := workflowByID(&m.store, selected)
+	if !ok {
+		return m.pushToast(ToastWarn, "Select a workflow first")
+	}
+	phrase := "DELETE " + wf.ID
+	description := "Delete workflow \"" + wf.Name + "\" (" + wf.ID + ")"
+	m.openDeleteConfirmModal("Delete Workflow", description, phrase, wf.ID, "")
+	return nil
+}
+
+func (m *Model) openDeleteTriggerModalCmd() tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	if m.view != ViewTriggers {
+		return m.pushToast(ToastWarn, "Open Triggers to delete")
+	}
+	selected := m.selectedRowID()
+	trg, ok := triggerByID(&m.store, selected)
+	if !ok {
+		return m.pushToast(ToastWarn, "Select a trigger first")
+	}
+	phrase := "DELETE " + trg.ID
+	description := "Delete trigger \"" + trg.Name + "\" (" + trg.ID + ")"
+	m.openDeleteConfirmModal("Delete Trigger", description, phrase, trg.WorkflowID, trg.ID)
+	return nil
+}
+
 func (m *Model) openCLIHandoffModalCmd(topic string) tea.Cmd {
 	description := "Use the CLI for definition authoring"
 	command := ""
@@ -1797,6 +1906,9 @@ func (m *Model) actionModalValidationError() string {
 			return "Trigger config must be a valid JSON object"
 		}
 	case actionModalConfirmDelete:
+		if strings.TrimSpace(m.action.WorkflowID) == "" {
+			return "Missing delete target"
+		}
 		if strings.TrimSpace(m.action.ConfirmPhrase) == "" {
 			return "Confirmation phrase is required"
 		}
@@ -1816,8 +1928,8 @@ func isAllowedTriggerType(value string) bool {
 	}
 }
 
-func (m *Model) openDeleteConfirmModal(title string, description string, phrase string) {
-	confirmInput := newActionInput("confirm> ", "Type: "+phrase, "", 80)
+func (m *Model) openDeleteConfirmModal(title string, description string, phrase string, workflowID string, triggerID string) {
+	confirmInput := newActionInput("confirm> ", "", "", 80)
 	m.action = actionModalState{
 		Active:        true,
 		Mode:          actionModalConfirmDelete,
@@ -1825,6 +1937,8 @@ func (m *Model) openDeleteConfirmModal(title string, description string, phrase 
 		Description:   description,
 		Confirm:       confirmInput,
 		Focus:         0,
+		WorkflowID:    workflowID,
+		TriggerID:     triggerID,
 		ConfirmPhrase: phrase,
 	}
 	m.syncActionModalFocus()
@@ -1997,8 +2111,13 @@ func (m *Model) submitActionModal() tea.Cmd {
 			m.action.ShowValidation = true
 			return nil
 		}
+		workflowID := m.action.WorkflowID
+		triggerID := m.action.TriggerID
 		m.action = actionModalState{}
-		return nil
+		if strings.TrimSpace(triggerID) != "" {
+			return m.deleteTriggerCmd(workflowID, triggerID)
+		}
+		return m.deleteWorkflowCmd(workflowID)
 	case actionModalCLIHandoff:
 		m.action = actionModalState{}
 		return nil
@@ -2189,6 +2308,20 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		toggleTrigger.DisabledReason = "Select a trigger row in Triggers first"
 	}
 
+	deleteWorkflow := command("Action: Delete selected workflow", "Workflow", paletteAction{Kind: paletteDeleteWorkflow}, "delete", "workflow", "remove")
+	if !(state.View == ViewWorkflows && state.HasSelection) {
+		deleteWorkflow.Enabled = false
+		deleteWorkflow.Detail = "Unavailable: select workflow row"
+		deleteWorkflow.DisabledReason = "Select a workflow row in Workflows first"
+	}
+
+	deleteTrigger := command("Action: Delete selected trigger", "Trigger", paletteAction{Kind: paletteDeleteTrigger}, "delete", "trigger", "remove")
+	if !(state.View == ViewTriggers && state.HasSelection) {
+		deleteTrigger.Enabled = false
+		deleteTrigger.Detail = "Unavailable: select trigger row"
+		deleteTrigger.DisabledReason = "Select a trigger row in Triggers first"
+	}
+
 	clearFilters := command("Action: Clear filters", "Table", paletteAction{Kind: paletteClearFilters}, "clear", "filter", "reset")
 	if !state.HasFilter {
 		clearFilters.Enabled = false
@@ -2226,6 +2359,8 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		createTrigger,
 		renameTrigger,
 		toggleTrigger,
+		deleteWorkflow,
+		deleteTrigger,
 		clearFilters,
 		command("Toggle: Auto refresh", "System ("+autoStatus+")", paletteAction{Kind: paletteToggleRefresh}, "refresh", "polling", "live"),
 		section(":: CLI Handoff"),

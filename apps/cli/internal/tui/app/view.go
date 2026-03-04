@@ -326,10 +326,10 @@ func renderFooterHints(m Model) string {
 	} else if m.focus == FocusMain {
 		hint = "focus: main  " + themedDivider(m) + "  ↑/↓ select  " + themedDivider(m) + "  s col  S dir  " + themedDivider(m) + "  g/G top/bottom  " + themedDivider(m) + "  tab next pane"
 		if m.view == ViewWorkflows {
-			hint += "  " + themedDivider(m) + "  r run  e toggle  n rename  c trigger"
+			hint += "  " + themedDivider(m) + "  r run  e toggle  n rename  c trigger  d delete"
 		}
 		if m.view == ViewTriggers {
-			hint += "  " + themedDivider(m) + "  e toggle  n rename  c create"
+			hint += "  " + themedDivider(m) + "  e toggle  n rename  c create  d delete"
 		}
 	} else {
 		hint = "focus: context  " + themedDivider(m) + "  j/k scroll  " + themedDivider(m) + "  [/] or 1-4 tabs  " + themedDivider(m) + "  ctrl+f search"
@@ -496,14 +496,29 @@ func renderOverlay(base string, modal string, m Model) string {
 	basePlain := ansi.Strip(base)
 	baseLines := padPlainLines(basePlain, m.width, m.height)
 
-	modalLines := strings.Split(modal, "\n")
-	modalW, modalH := lipgloss.Size(modal)
+	modalW, modalH := ansiBlockSize(modal)
+	if modalW < 1 {
+		modalW = 1
+	}
+	if modalH < 1 {
+		modalH = 1
+	}
 	if modalW > m.width {
 		modalW = m.width
 	}
 	if modalH > m.height {
 		modalH = m.height
 	}
+	modalBlock := lipgloss.Place(
+		modalW,
+		modalH,
+		lipgloss.Left,
+		lipgloss.Top,
+		modal,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceBackground(m.theme.Surface),
+	)
+	modalLines := strings.Split(modalBlock, "\n")
 	x := max((m.width-modalW)/2, 0)
 	y := max((m.height-modalH)/2, 0)
 
@@ -519,9 +534,8 @@ func renderOverlay(base string, modal string, m Model) string {
 		if modalIdx >= 0 && modalIdx < len(modalLines) {
 			modalLine = ansi.Truncate(modalLines[modalIdx], modalW, "")
 		}
-		segmentW := ansi.StringWidth(modalLine)
 		leftW := min(max(x, 0), m.width)
-		rightStart := min(leftW+segmentW, m.width)
+		rightStart := min(leftW+modalW, m.width)
 		left := plainSlice(line, 0, leftW)
 		right := plainSlice(line, rightStart, m.width)
 		composed := m.styles.Dim.Render(left) + modalLine + m.styles.Dim.Render(right)
@@ -537,13 +551,13 @@ func renderActionModal(m Model) string {
 	switch m.action.Mode {
 	case actionModalRenameWorkflow:
 		body = strings.Join([]string{
-			m.styles.Dim.Render("Workflow ID: " + m.action.WorkflowID),
+			"Workflow ID: " + m.action.WorkflowID,
 			"",
 			m.action.Primary.View(),
 		}, "\n")
 	case actionModalRenameTrigger:
 		body = strings.Join([]string{
-			m.styles.Dim.Render("Trigger ID: " + m.action.TriggerID),
+			"Trigger ID: " + m.action.TriggerID,
 			"",
 			m.action.Primary.View(),
 		}, "\n")
@@ -561,7 +575,7 @@ func renderActionModal(m Model) string {
 		}
 		hint = "tab next  |  ←/→ type  |  space toggle active  |  enter submit  |  esc cancel"
 		body = strings.Join([]string{
-			m.styles.Dim.Render("Workflow ID: " + m.action.WorkflowID),
+			"Workflow ID: " + m.action.WorkflowID,
 			"",
 			typeLine,
 			m.action.Primary.View(),
@@ -571,7 +585,7 @@ func renderActionModal(m Model) string {
 	case actionModalCLIHandoff:
 		hint = "enter/esc close"
 		body = strings.Join([]string{
-			m.styles.Dim.Render(m.action.Description),
+			m.action.Description,
 			"",
 			m.styles.PanelTitle.Render("Command"),
 			m.action.CLICommand,
@@ -579,8 +593,8 @@ func renderActionModal(m Model) string {
 	case actionModalConfirmDelete:
 		hint = "enter confirm  |  esc cancel"
 		body = strings.Join([]string{
-			m.styles.Dim.Render(m.action.Description),
-			m.styles.Dim.Render("Type exactly: " + m.action.ConfirmPhrase),
+			m.action.Description,
+			"Type exactly: " + m.action.ConfirmPhrase,
 			"",
 			m.action.Confirm.View(),
 		}, "\n")
@@ -680,6 +694,18 @@ func plainSlice(line string, start int, end int) string {
 		return ""
 	}
 	return string(r[start:end])
+}
+
+func ansiBlockSize(content string) (int, int) {
+	lines := strings.Split(content, "\n")
+	maxWidth := 0
+	for _, line := range lines {
+		w := ansi.StringWidth(line)
+		if w > maxWidth {
+			maxWidth = w
+		}
+	}
+	return maxWidth, len(lines)
 }
 
 func truncateLines(content string, width int) string {

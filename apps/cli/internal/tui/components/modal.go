@@ -1,7 +1,8 @@
 package components
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"strings"
+
 	"github.com/gentij/taskforge/apps/cli/internal/tui/styles"
 )
 
@@ -22,14 +23,10 @@ func RenderModalWithHint(title string, body string, hint string, width int, heig
 		Width(contentWidth).
 		Padding(1, 2).
 		BorderForeground(styleSet.BorderColor)
+	titleLine := styleSet.PanelTitle.Render(title)
 	hintLine := styleSet.Dim.Render(hint)
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		styleSet.PanelTitle.Render(title),
-		hintLine,
-		"",
-		body,
-	)
+	rawContent := strings.Join([]string{titleLine, hintLine, "", body}, "\n")
+	content := styleSet.PanelFill.Copy().Width(contentWidth).Render(rawContent)
 	return box.Render(content)
 }
 

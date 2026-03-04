@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -49,5 +50,47 @@ func TestParseJSONObject_RequiresObject(t *testing.T) {
 	}
 	if _, err := parseJSONObject(`[1,2,3]`); err == nil {
 		t.Fatal("expected array payload to be rejected")
+	}
+}
+
+func TestDeleteConfirmModal_RequiresExactPhrase(t *testing.T) {
+	m := NewModel(nil, "", false, config.Config{}, "")
+	m.openDeleteConfirmModal("Delete Workflow", "Delete test workflow", "DELETE wf_test", "wf_test", "")
+
+	if got := m.actionModalValidationError(); got == "" {
+		t.Fatal("expected validation error when phrase is empty")
+	}
+
+	m.action.Confirm.SetValue("DELETE something-else")
+	if got := m.actionModalValidationError(); got == "" {
+		t.Fatal("expected validation error for mismatched phrase")
+	}
+
+	m.action.Confirm.SetValue("DELETE wf_test")
+	if got := m.actionModalValidationError(); got != "" {
+		t.Fatalf("expected valid confirmation phrase, got error: %q", got)
+	}
+}
+
+func TestSubmitDeleteConfirmDispatchesDeleteCmd(t *testing.T) {
+	m := NewModel(nil, "", false, config.Config{}, "")
+	m.openDeleteConfirmModal("Delete Trigger", "Delete test trigger", "DELETE trg_test", "wf_test", "trg_test")
+	m.action.Confirm.SetValue("DELETE trg_test")
+
+	cmd := m.submitActionModal()
+	if cmd == nil {
+		t.Fatal("expected delete command to be returned")
+	}
+
+	msg := cmd()
+	result, ok := msg.(mutationResultMsg)
+	if !ok {
+		t.Fatalf("expected mutationResultMsg, got %T", msg)
+	}
+	if result.err == nil {
+		t.Fatal("expected command to fail without API client")
+	}
+	if !strings.Contains(result.err.Error(), "api client unavailable") {
+		t.Fatalf("unexpected error: %v", result.err)
 	}
 }
