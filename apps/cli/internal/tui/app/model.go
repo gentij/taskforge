@@ -61,10 +61,19 @@ const (
 	paletteToggleTrigger
 	paletteDeleteWorkflow
 	paletteDeleteTrigger
+	paletteSetStatusScope
 	paletteShowCLIHandoff
 	paletteClearRecent
 	paletteSetTheme
 	paletteSetNetworkProfile
+)
+
+type statusScope int
+
+const (
+	statusScopeAll statusScope = iota
+	statusScopeActive
+	statusScopeInactive
 )
 
 type pulseMsg struct{}
@@ -170,6 +179,8 @@ type paletteBuildState struct {
 	View         ViewID
 	HasSelection bool
 	HasFilter    bool
+	HasScope     bool
+	Scope        statusScope
 	AutoRefresh  bool
 	Profile      NetworkProfile
 	HasRecent    bool
@@ -279,6 +290,8 @@ type Model struct {
 	sortColumn int
 	sortDesc   bool
 
+	statusScopeByView map[ViewID]statusScope
+
 	paginator paginator.Model
 }
 
@@ -356,6 +369,7 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		sortByView:         map[ViewID]SortConfig{},
 		sortColumn:         -1,
 		sortDesc:           true,
+		statusScopeByView:  map[ViewID]statusScope{},
 	}
 	model.setNetworkProfile(NetworkNormal)
 
@@ -532,12 +546,55 @@ func (m *Model) applyFilter() {
 }
 
 func (m *Model) applyFilterWithSelection(selectedID string, cursor int) {
-	rows, rowIDs := filterRows(m.baseRows, m.baseRowIDs, m.searchQuery)
+	rows, rowIDs := m.scopeRowsForCurrentView(m.baseRows, m.baseRowIDs)
+	rows, rowIDs = filterRows(rows, rowIDs, m.searchQuery)
 	m.filteredRows = rows
 	m.filteredRowIDs = rowIDs
 	m.restoreSelection(selectedID, cursor)
 	m.syncSurfaceStates()
 	m.applyTableRows()
+}
+
+func (m *Model) scopeRowsForCurrentView(rows []table.Row, rowIDs []string) ([]table.Row, []string) {
+	scope := m.currentStatusScope(m.view)
+	if scope == statusScopeAll || !supportsStatusScope(m.view) {
+		return rows, rowIDs
+	}
+	filteredRows := make([]table.Row, 0, len(rows))
+	filteredIDs := make([]string, 0, len(rowIDs))
+	for i, id := range rowIDs {
+		if i >= len(rows) {
+			break
+		}
+		active, ok := m.isRowActiveForScope(m.view, id)
+		if !ok {
+			continue
+		}
+		if (scope == statusScopeActive && active) || (scope == statusScopeInactive && !active) {
+			filteredRows = append(filteredRows, rows[i])
+			filteredIDs = append(filteredIDs, id)
+		}
+	}
+	return filteredRows, filteredIDs
+}
+
+func (m *Model) isRowActiveForScope(view ViewID, rowID string) (bool, bool) {
+	switch view {
+	case ViewWorkflows:
+		wf, ok := workflowByID(&m.store, rowID)
+		if !ok {
+			return false, false
+		}
+		return wf.Active, true
+	case ViewTriggers:
+		trg, ok := triggerByID(&m.store, rowID)
+		if !ok {
+			return false, false
+		}
+		return trg.Active, true
+	default:
+		return false, false
+	}
 }
 
 func (m *Model) restoreSelection(selectedID string, cursor int) {
@@ -822,6 +879,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if key.Matches(keyMsg, m.keys.CycleStatus) {
+			if supportsStatusScope(m.view) {
+				return m, m.cycleStatusScopeForCurrentViewCmd()
+			}
+		}
 		if key.Matches(keyMsg, m.keys.SortColumn) {
 			m.cycleSortColumn()
 			return m, nil
@@ -1122,9 +1184,7 @@ func (m *Model) runPaletteAction(action paletteAction) tea.Cmd {
 		return m.pushToast(ToastInfo, "Auto refresh toggled")
 	case paletteClearFilters:
 		m.rememberPaletteAction(action)
-		m.searchQuery = ""
-		m.searchInput.SetValue("")
-		m.applyFilter()
+		m.clearCurrentViewFilters()
 		return m.pushToast(ToastInfo, "Filters cleared")
 	case paletteRunWorkflow:
 		m.rememberPaletteAction(action)
@@ -1147,6 +1207,14 @@ func (m *Model) runPaletteAction(action paletteAction) tea.Cmd {
 	case paletteDeleteTrigger:
 		m.rememberPaletteAction(action)
 		return m.openDeleteTriggerModalCmd()
+	case paletteSetStatusScope:
+		m.rememberPaletteAction(action)
+		if !supportsStatusScope(m.view) {
+			return m.pushToast(ToastWarn, "Status scope is available in Workflows and Triggers")
+		}
+		next := statusScopeFromValue(action.Value)
+		m.setStatusScopeForView(m.view, next)
+		return m.pushToast(ToastInfo, "Status filter: "+strings.ToLower(statusScopeLabel(next)))
 	case paletteShowCLIHandoff:
 		m.rememberPaletteAction(action)
 		return m.openCLIHandoffModalCmd(action.Value)
@@ -1227,13 +1295,54 @@ func networkProfileLabel(profile NetworkProfile) string {
 }
 
 func (m Model) paletteState() paletteBuildState {
+	scope := m.currentStatusScope(m.view)
+	hasScope := supportsStatusScope(m.view) && scope != statusScopeAll
 	return paletteBuildState{
 		View:         m.view,
 		HasSelection: m.selectedRowID() != "",
-		HasFilter:    strings.TrimSpace(m.searchQuery) != "",
+		HasFilter:    strings.TrimSpace(m.searchQuery) != "" || hasScope,
+		HasScope:     supportsStatusScope(m.view),
+		Scope:        scope,
 		AutoRefresh:  m.autoRefresh,
 		Profile:      m.networkProfile,
 		HasRecent:    len(m.paletteRecent) > 0,
+	}
+}
+
+func supportsStatusScope(view ViewID) bool {
+	return view == ViewWorkflows || view == ViewTriggers
+}
+
+func (m Model) currentStatusScope(view ViewID) statusScope {
+	if !supportsStatusScope(view) {
+		return statusScopeAll
+	}
+	scope, ok := m.statusScopeByView[view]
+	if !ok {
+		return statusScopeAll
+	}
+	return scope
+}
+
+func statusScopeLabel(scope statusScope) string {
+	switch scope {
+	case statusScopeActive:
+		return "ACTIVE"
+	case statusScopeInactive:
+		return "INACTIVE"
+	default:
+		return "ALL"
+	}
+}
+
+func statusScopeFromValue(value string) statusScope {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "active":
+		return statusScopeActive
+	case "inactive":
+		return statusScopeInactive
+	default:
+		return statusScopeAll
 	}
 }
 
@@ -1382,18 +1491,39 @@ func paletteItemFromAction(action paletteAction, state paletteBuildState) palett
 			item.DisabledReason = "Select a trigger row in Triggers first"
 		}
 	case paletteDeleteWorkflow:
-		item.Label = "Action: Delete selected workflow"
+		item.Label = "Action: Archive selected workflow"
 		if !(state.View == ViewWorkflows && state.HasSelection) {
 			item.Enabled = false
 			item.Detail = "Unavailable: select workflow row"
 			item.DisabledReason = "Select a workflow row in Workflows first"
 		}
 	case paletteDeleteTrigger:
-		item.Label = "Action: Delete selected trigger"
+		item.Label = "Action: Archive selected trigger"
 		if !(state.View == ViewTriggers && state.HasSelection) {
 			item.Enabled = false
 			item.Detail = "Unavailable: select trigger row"
 			item.DisabledReason = "Select a trigger row in Triggers first"
+		}
+	case paletteSetStatusScope:
+		if !state.HasScope {
+			item.Enabled = false
+			item.Detail = "Unavailable in this view"
+			item.DisabledReason = "Status scope is available in Workflows and Triggers"
+		}
+		scope := statusScopeFromValue(action.Value)
+		suffix := ""
+		if state.Scope == scope {
+			suffix = " (active)"
+		}
+		switch scope {
+		case statusScopeActive:
+			item.Label = "Filter: Active only" + suffix
+		default:
+			if scope == statusScopeInactive {
+				item.Label = "Filter: Inactive only" + suffix
+			} else {
+				item.Label = "Filter: Show all" + suffix
+			}
 		}
 	case paletteShowCLIHandoff:
 		switch action.Value {
@@ -1457,6 +1587,41 @@ func (m *Model) nextView() {
 	}
 }
 
+func (m *Model) setStatusScopeForView(view ViewID, scope statusScope) {
+	if !supportsStatusScope(view) {
+		return
+	}
+	m.statusScopeByView[view] = scope
+	m.applyFilter()
+}
+
+func (m *Model) cycleStatusScopeForCurrentViewCmd() tea.Cmd {
+	if !supportsStatusScope(m.view) {
+		return m.pushToast(ToastWarn, "Status scope is available in Workflows and Triggers")
+	}
+	current := m.currentStatusScope(m.view)
+	next := statusScopeAll
+	switch current {
+	case statusScopeAll:
+		next = statusScopeActive
+	case statusScopeActive:
+		next = statusScopeInactive
+	default:
+		next = statusScopeAll
+	}
+	m.setStatusScopeForView(m.view, next)
+	return m.pushToast(ToastInfo, "Status filter: "+strings.ToLower(statusScopeLabel(next)))
+}
+
+func (m *Model) clearCurrentViewFilters() {
+	m.searchQuery = ""
+	m.searchInput.SetValue("")
+	if supportsStatusScope(m.view) {
+		m.statusScopeByView[m.view] = statusScopeAll
+	}
+	m.applyFilter()
+}
+
 func (m *Model) prevView() {
 	for i, view := range m.views {
 		if view == m.view {
@@ -1494,7 +1659,11 @@ func (m *Model) toggleWorkflowActiveCmd() tea.Cmd {
 		if err != nil {
 			return mutationResultMsg{err: err}
 		}
-		return mutationResultMsg{successMessage: "Workflow status updated", refresh: true}
+		message := "Workflow archived"
+		if next {
+			message = "Workflow restored"
+		}
+		return mutationResultMsg{successMessage: message, refresh: true}
 	}
 }
 
@@ -1553,7 +1722,11 @@ func (m *Model) toggleTriggerActiveCmd() tea.Cmd {
 		if err != nil {
 			return mutationResultMsg{err: err}
 		}
-		return mutationResultMsg{successMessage: "Trigger status updated", refresh: true}
+		message := "Trigger archived"
+		if next {
+			message = "Trigger restored"
+		}
+		return mutationResultMsg{successMessage: message, refresh: true}
 	}
 }
 
@@ -1575,7 +1748,7 @@ func (m *Model) deleteWorkflowCmd(workflowID string) tea.Cmd {
 		if err != nil {
 			return mutationResultMsg{err: err}
 		}
-		return mutationResultMsg{successMessage: "Workflow deleted", refresh: true}
+		return mutationResultMsg{successMessage: "Workflow archived", refresh: true}
 	}
 }
 
@@ -1598,7 +1771,7 @@ func (m *Model) deleteTriggerCmd(workflowID string, triggerID string) tea.Cmd {
 		if err != nil {
 			return mutationResultMsg{err: err}
 		}
-		return mutationResultMsg{successMessage: "Trigger deleted", refresh: true}
+		return mutationResultMsg{successMessage: "Trigger archived", refresh: true}
 	}
 }
 
@@ -1776,16 +1949,19 @@ func (m *Model) openDeleteWorkflowModalCmd() tea.Cmd {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
 	}
 	if m.view != ViewWorkflows {
-		return m.pushToast(ToastWarn, "Open Workflows to delete")
+		return m.pushToast(ToastWarn, "Open Workflows to archive")
 	}
 	selected := m.selectedRowID()
 	wf, ok := workflowByID(&m.store, selected)
 	if !ok {
 		return m.pushToast(ToastWarn, "Select a workflow first")
 	}
-	phrase := "DELETE " + wf.ID
-	description := "Delete workflow \"" + wf.Name + "\" (" + wf.ID + ")"
-	m.openDeleteConfirmModal("Delete Workflow", description, phrase, wf.ID, "")
+	if !wf.Active {
+		return m.pushToast(ToastInfo, "Workflow already archived; press e to restore")
+	}
+	phrase := "ARCHIVE " + wf.ID
+	description := "Archive workflow \"" + wf.Name + "\" (" + wf.ID + ") and set it inactive"
+	m.openDeleteConfirmModal("Archive Workflow", description, phrase, wf.ID, "")
 	return nil
 }
 
@@ -1794,16 +1970,19 @@ func (m *Model) openDeleteTriggerModalCmd() tea.Cmd {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
 	}
 	if m.view != ViewTriggers {
-		return m.pushToast(ToastWarn, "Open Triggers to delete")
+		return m.pushToast(ToastWarn, "Open Triggers to archive")
 	}
 	selected := m.selectedRowID()
 	trg, ok := triggerByID(&m.store, selected)
 	if !ok {
 		return m.pushToast(ToastWarn, "Select a trigger first")
 	}
-	phrase := "DELETE " + trg.ID
-	description := "Delete trigger \"" + trg.Name + "\" (" + trg.ID + ")"
-	m.openDeleteConfirmModal("Delete Trigger", description, phrase, trg.WorkflowID, trg.ID)
+	if !trg.Active {
+		return m.pushToast(ToastInfo, "Trigger already archived; press e to restore")
+	}
+	phrase := "ARCHIVE " + trg.ID
+	description := "Archive trigger \"" + trg.Name + "\" (" + trg.ID + ") and set it inactive"
+	m.openDeleteConfirmModal("Archive Trigger", description, phrase, trg.WorkflowID, trg.ID)
 	return nil
 }
 
@@ -2308,18 +2487,42 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		toggleTrigger.DisabledReason = "Select a trigger row in Triggers first"
 	}
 
-	deleteWorkflow := command("Action: Delete selected workflow", "Workflow", paletteAction{Kind: paletteDeleteWorkflow}, "delete", "workflow", "remove")
+	deleteWorkflow := command("Action: Archive selected workflow", "Workflow", paletteAction{Kind: paletteDeleteWorkflow}, "archive", "workflow", "soft-delete")
 	if !(state.View == ViewWorkflows && state.HasSelection) {
 		deleteWorkflow.Enabled = false
 		deleteWorkflow.Detail = "Unavailable: select workflow row"
 		deleteWorkflow.DisabledReason = "Select a workflow row in Workflows first"
 	}
 
-	deleteTrigger := command("Action: Delete selected trigger", "Trigger", paletteAction{Kind: paletteDeleteTrigger}, "delete", "trigger", "remove")
+	deleteTrigger := command("Action: Archive selected trigger", "Trigger", paletteAction{Kind: paletteDeleteTrigger}, "archive", "trigger", "soft-delete")
 	if !(state.View == ViewTriggers && state.HasSelection) {
 		deleteTrigger.Enabled = false
 		deleteTrigger.Detail = "Unavailable: select trigger row"
 		deleteTrigger.DisabledReason = "Select a trigger row in Triggers first"
+	}
+
+	showAllScope := command("Filter: Show all", "Status scope", paletteAction{Kind: paletteSetStatusScope, Value: "all"}, "filter", "status", "all")
+	showActiveScope := command("Filter: Active only", "Status scope", paletteAction{Kind: paletteSetStatusScope, Value: "active"}, "filter", "status", "active")
+	showInactiveScope := command("Filter: Inactive only", "Status scope", paletteAction{Kind: paletteSetStatusScope, Value: "inactive"}, "filter", "status", "inactive")
+	if !state.HasScope {
+		showAllScope.Enabled = false
+		showAllScope.Detail = "Unavailable in this view"
+		showAllScope.DisabledReason = "Status scope is available in Workflows and Triggers"
+		showActiveScope.Enabled = false
+		showActiveScope.Detail = "Unavailable in this view"
+		showActiveScope.DisabledReason = "Status scope is available in Workflows and Triggers"
+		showInactiveScope.Enabled = false
+		showInactiveScope.Detail = "Unavailable in this view"
+		showInactiveScope.DisabledReason = "Status scope is available in Workflows and Triggers"
+	}
+	if state.Scope == statusScopeAll {
+		showAllScope.Label += " (active)"
+	}
+	if state.Scope == statusScopeActive {
+		showActiveScope.Label += " (active)"
+	}
+	if state.Scope == statusScopeInactive {
+		showInactiveScope.Label += " (active)"
 	}
 
 	clearFilters := command("Action: Clear filters", "Table", paletteAction{Kind: paletteClearFilters}, "clear", "filter", "reset")
@@ -2361,6 +2564,9 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		toggleTrigger,
 		deleteWorkflow,
 		deleteTrigger,
+		showAllScope,
+		showActiveScope,
+		showInactiveScope,
 		clearFilters,
 		command("Toggle: Auto refresh", "System ("+autoStatus+")", paletteAction{Kind: paletteToggleRefresh}, "refresh", "polling", "live"),
 		section(":: CLI Handoff"),

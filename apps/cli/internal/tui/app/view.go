@@ -304,6 +304,10 @@ func renderTableMeta(m Model, width int) string {
 		sortLabel = strings.ToLower(strings.TrimSpace(m.columns[m.sortColumn].Title)) + " " + dir
 	}
 	text := "rows " + itoa(rows) + "  " + themedDivider(m) + "  filtered " + itoa(filtered) + "  " + themedDivider(m) + "  page " + itoa(page) + "/" + itoa(totalPages) + "  " + themedDivider(m) + "  sort " + sortLabel
+	if supportsStatusScope(m.view) {
+		scope := strings.ToLower(statusScopeLabel(m.currentStatusScope(m.view)))
+		text += "  " + themedDivider(m) + "  status " + scope
+	}
 	text = ansi.Truncate(text, width, "")
 	return m.styles.Dim.Width(width).Render(text)
 }
@@ -326,10 +330,10 @@ func renderFooterHints(m Model) string {
 	} else if m.focus == FocusMain {
 		hint = "focus: main  " + themedDivider(m) + "  ↑/↓ select  " + themedDivider(m) + "  s col  S dir  " + themedDivider(m) + "  g/G top/bottom  " + themedDivider(m) + "  tab next pane"
 		if m.view == ViewWorkflows {
-			hint += "  " + themedDivider(m) + "  r run  e toggle  n rename  c trigger  d delete"
+			hint += "  " + themedDivider(m) + "  r run  e toggle  n rename  c trigger  d archive  f filter"
 		}
 		if m.view == ViewTriggers {
-			hint += "  " + themedDivider(m) + "  e toggle  n rename  c create  d delete"
+			hint += "  " + themedDivider(m) + "  e toggle  n rename  c create  d archive  f filter"
 		}
 	} else {
 		hint = "focus: context  " + themedDivider(m) + "  j/k scroll  " + themedDivider(m) + "  [/] or 1-4 tabs  " + themedDivider(m) + "  ctrl+f search"

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/gentij/taskforge/apps/cli/internal/config"
 	"github.com/gentij/taskforge/apps/cli/internal/tui/data"
 )
@@ -55,18 +56,18 @@ func TestParseJSONObject_RequiresObject(t *testing.T) {
 
 func TestDeleteConfirmModal_RequiresExactPhrase(t *testing.T) {
 	m := NewModel(nil, "", false, config.Config{}, "")
-	m.openDeleteConfirmModal("Delete Workflow", "Delete test workflow", "DELETE wf_test", "wf_test", "")
+	m.openDeleteConfirmModal("Archive Workflow", "Archive test workflow", "ARCHIVE wf_test", "wf_test", "")
 
 	if got := m.actionModalValidationError(); got == "" {
 		t.Fatal("expected validation error when phrase is empty")
 	}
 
-	m.action.Confirm.SetValue("DELETE something-else")
+	m.action.Confirm.SetValue("ARCHIVE something-else")
 	if got := m.actionModalValidationError(); got == "" {
 		t.Fatal("expected validation error for mismatched phrase")
 	}
 
-	m.action.Confirm.SetValue("DELETE wf_test")
+	m.action.Confirm.SetValue("ARCHIVE wf_test")
 	if got := m.actionModalValidationError(); got != "" {
 		t.Fatalf("expected valid confirmation phrase, got error: %q", got)
 	}
@@ -74,12 +75,12 @@ func TestDeleteConfirmModal_RequiresExactPhrase(t *testing.T) {
 
 func TestSubmitDeleteConfirmDispatchesDeleteCmd(t *testing.T) {
 	m := NewModel(nil, "", false, config.Config{}, "")
-	m.openDeleteConfirmModal("Delete Trigger", "Delete test trigger", "DELETE trg_test", "wf_test", "trg_test")
-	m.action.Confirm.SetValue("DELETE trg_test")
+	m.openDeleteConfirmModal("Archive Trigger", "Archive test trigger", "ARCHIVE trg_test", "wf_test", "trg_test")
+	m.action.Confirm.SetValue("ARCHIVE trg_test")
 
 	cmd := m.submitActionModal()
 	if cmd == nil {
-		t.Fatal("expected delete command to be returned")
+		t.Fatal("expected archive command to be returned")
 	}
 
 	msg := cmd()
@@ -92,5 +93,28 @@ func TestSubmitDeleteConfirmDispatchesDeleteCmd(t *testing.T) {
 	}
 	if !strings.Contains(result.err.Error(), "api client unavailable") {
 		t.Fatalf("unexpected error: %v", result.err)
+	}
+}
+
+func TestScopeRowsForCurrentView_ActiveOnlyWorkflows(t *testing.T) {
+	now := time.Now()
+	m := NewModel(nil, "", false, config.Config{}, "")
+	m.view = ViewWorkflows
+	m.store = data.Store{
+		Workflows: []data.Workflow{
+			{ID: "wf_active", Name: "Active", Active: true, UpdatedAt: now},
+			{ID: "wf_inactive", Name: "Inactive", Active: false, UpdatedAt: now},
+		},
+	}
+	rows := []table.Row{{"Active"}, {"Inactive"}}
+	ids := []string{"wf_active", "wf_inactive"}
+
+	m.setStatusScopeForView(ViewWorkflows, statusScopeActive)
+	filteredRows, filteredIDs := m.scopeRowsForCurrentView(rows, ids)
+	if len(filteredRows) != 1 || len(filteredIDs) != 1 {
+		t.Fatalf("expected one active row, got rows=%d ids=%d", len(filteredRows), len(filteredIDs))
+	}
+	if filteredIDs[0] != "wf_active" {
+		t.Fatalf("unexpected row id: %q", filteredIDs[0])
 	}
 }
