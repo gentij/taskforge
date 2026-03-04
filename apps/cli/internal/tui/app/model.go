@@ -145,6 +145,7 @@ const (
 	actionModalRenameWorkflow
 	actionModalRenameTrigger
 	actionModalCreateTrigger
+	actionModalUpdateTrigger
 	actionModalCreateSecret
 	actionModalUpdateSecret
 	actionModalConfirmDelete
@@ -1503,7 +1504,7 @@ func paletteItemFromAction(action paletteAction, state paletteBuildState) palett
 			item.DisabledReason = "Select a row in Workflows or Triggers first"
 		}
 	case paletteRenameTrigger:
-		item.Label = "Action: Rename selected trigger"
+		item.Label = "Action: Update selected trigger"
 		if !(state.View == ViewTriggers && state.HasSelection) {
 			item.Enabled = false
 			item.Detail = "Unavailable: select trigger row"
@@ -1943,7 +1944,7 @@ func (m *Model) renameWorkflowCmd(workflowID string, name string) tea.Cmd {
 	}
 }
 
-func (m *Model) renameTriggerCmd(workflowID string, triggerID string, name string) tea.Cmd {
+func (m *Model) updateTriggerCmd(workflowID string, triggerID string, name string, active bool, configValue map[string]any) tea.Cmd {
 	if m.mutationPending {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
 	}
@@ -1954,21 +1955,52 @@ func (m *Model) renameTriggerCmd(workflowID string, triggerID string, name strin
 	if name == "" {
 		return m.pushToast(ToastWarn, "Trigger name cannot be empty")
 	}
+	trigger, ok := triggerByID(&m.store, triggerID)
+	if !ok {
+		return m.pushToast(ToastWarn, "Select a trigger first")
+	}
+	if trigger.WorkflowID != workflowID {
+		return m.pushToast(ToastWarn, "Trigger does not match selected workflow")
+	}
+	patch := map[string]any{}
+	if name != strings.TrimSpace(trigger.Name) {
+		patch["name"] = name
+	}
+	if active != trigger.Active {
+		patch["isActive"] = active
+	}
+	if configValue == nil {
+		configValue = map[string]any{}
+	}
+	existingConfig, err := parseJSONObject(trigger.ConfigJSON)
+	if err != nil {
+		existingConfig = map[string]any{}
+	}
+	if isCronTriggerType(trigger.Type) {
+		existingConfig = normalizeCronConfigMap(existingConfig)
+		configValue = normalizeCronConfigMap(configValue)
+	}
+	if !jsonMapsEqual(existingConfig, configValue) {
+		patch["config"] = configValue
+	}
+	if len(patch) == 0 {
+		return m.pushToast(ToastWarn, "No changes to update")
+	}
 	client := m.client
 	m.mutationPending = true
 	return func() tea.Msg {
 		if client == nil {
 			return mutationResultMsg{err: fmt.Errorf("api client unavailable")}
 		}
-		_, err := client.UpdateTrigger(workflowID, triggerID, map[string]any{"name": name})
+		_, err := client.UpdateTrigger(workflowID, triggerID, patch)
 		if err != nil {
 			return mutationResultMsg{err: err}
 		}
-		return mutationResultMsg{successMessage: "Trigger renamed", refresh: true}
+		return mutationResultMsg{successMessage: "Trigger updated", refresh: true}
 	}
 }
 
-func (m *Model) createTriggerCmd(workflowID string, triggerType string, name string, active bool, configRaw string) tea.Cmd {
+func (m *Model) createTriggerCmd(workflowID string, triggerType string, name string, active bool, configValue map[string]any) tea.Cmd {
 	if m.mutationPending {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
 	}
@@ -1980,12 +2012,8 @@ func (m *Model) createTriggerCmd(workflowID string, triggerType string, name str
 	if name == "" {
 		return m.pushToast(ToastWarn, "Trigger name cannot be empty")
 	}
-	if strings.TrimSpace(configRaw) == "" {
-		configRaw = "{}"
-	}
-	configValue, err := parseJSONObject(configRaw)
-	if err != nil {
-		return m.pushToast(ToastWarn, "Trigger config must be a valid JSON object")
+	if configValue == nil {
+		configValue = map[string]any{}
 	}
 	client := m.client
 	m.mutationPending = true
@@ -2039,23 +2067,42 @@ func (m *Model) openRenameTriggerModalCmd() tea.Cmd {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
 	}
 	if m.view != ViewTriggers {
-		return m.pushToast(ToastWarn, "Open Triggers to rename")
+		return m.pushToast(ToastWarn, "Open Triggers to update")
 	}
 	selected := m.selectedRowID()
 	trg, ok := triggerByID(&m.store, selected)
 	if !ok {
 		return m.pushToast(ToastWarn, "Select a trigger first")
 	}
-	input := newActionInput("name> ", "Trigger name", trg.Name, 120)
+	nameInput := newActionInput("name> ", "Trigger name", trg.Name, 120)
+	configInput := newActionInput("config> ", "JSON object", "{}", 2000)
+	timezoneInput := newActionInput("tz> ", "UTC", "", 120)
+	triggerType := strings.ToUpper(strings.TrimSpace(trg.Type))
+	if triggerType == "CRON" {
+		cronExpr, timezone := triggerCronFieldsFromJSON(trg.ConfigJSON)
+		configInput = newActionInput("cron> ", "*/5 * * * *", cronExpr, 256)
+		timezoneInput = newActionInput("tz> ", "UTC", timezone, 120)
+	} else {
+		configValue := strings.TrimSpace(trg.ConfigJSON)
+		if configValue == "" {
+			configValue = "{}"
+		}
+		configInput.SetValue(configValue)
+		configInput.CursorEnd()
+	}
 	m.action = actionModalState{
-		Active:      true,
-		Mode:        actionModalRenameTrigger,
-		Title:       "Rename Trigger",
-		Description: "Update selected trigger name",
-		Primary:     input,
-		Focus:       0,
-		WorkflowID:  trg.WorkflowID,
-		TriggerID:   trg.ID,
+		Active:        true,
+		Mode:          actionModalUpdateTrigger,
+		Title:         "Update Trigger",
+		Description:   "Edit trigger fields and config",
+		Primary:       nameInput,
+		Secondary:     configInput,
+		Tertiary:      timezoneInput,
+		Focus:         0,
+		WorkflowID:    trg.WorkflowID,
+		TriggerID:     trg.ID,
+		TriggerType:   triggerType,
+		TriggerActive: trg.Active,
 	}
 	m.syncActionModalFocus()
 	return nil
@@ -2071,6 +2118,7 @@ func (m *Model) openCreateTriggerModalCmd() tea.Cmd {
 	}
 	nameInput := newActionInput("name> ", "Trigger name", "", 120)
 	configInput := newActionInput("config> ", "JSON object", "{}", 2000)
+	timezoneInput := newActionInput("tz> ", "UTC", "UTC", 120)
 	m.action = actionModalState{
 		Active:        true,
 		Mode:          actionModalCreateTrigger,
@@ -2078,11 +2126,13 @@ func (m *Model) openCreateTriggerModalCmd() tea.Cmd {
 		Description:   "Create a trigger for selected workflow",
 		Primary:       nameInput,
 		Secondary:     configInput,
+		Tertiary:      timezoneInput,
 		Focus:         1,
 		WorkflowID:    workflowID,
 		TriggerType:   "MANUAL",
 		TriggerActive: true,
 	}
+	m.setActionTriggerType("MANUAL")
 	m.syncActionModalFocus()
 	return nil
 }
@@ -2266,6 +2316,113 @@ func parseJSONObject(raw string) (map[string]any, error) {
 	return obj, nil
 }
 
+func jsonMapsEqual(a map[string]any, b map[string]any) bool {
+	left, errLeft := json.Marshal(a)
+	right, errRight := json.Marshal(b)
+	if errLeft != nil || errRight != nil {
+		return false
+	}
+	return string(left) == string(right)
+}
+
+func triggerCronFieldsFromJSON(configJSON string) (string, string) {
+	config, err := parseJSONObject(configJSON)
+	if err != nil {
+		return "*/5 * * * *", "UTC"
+	}
+	cron := "*/5 * * * *"
+	if value, ok := config["cron"].(string); ok && strings.TrimSpace(value) != "" {
+		cron = strings.TrimSpace(value)
+	}
+	timezone := "UTC"
+	if value, ok := config["timezone"].(string); ok && strings.TrimSpace(value) != "" {
+		timezone = strings.TrimSpace(value)
+	}
+	return cron, timezone
+}
+
+func normalizeCronConfigMap(config map[string]any) map[string]any {
+	normalized := map[string]any{}
+	for key, value := range config {
+		normalized[key] = value
+	}
+	cron := strings.TrimSpace(stringFromAny(normalized["cron"]))
+	if cron != "" {
+		normalized["cron"] = cron
+	}
+	timezone := strings.TrimSpace(stringFromAny(normalized["timezone"]))
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	normalized["timezone"] = timezone
+	if _, ok := normalized["input"]; !ok {
+		normalized["input"] = map[string]any{}
+	}
+	return normalized
+}
+
+func stringFromAny(value any) string {
+	if value == nil {
+		return ""
+	}
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return fmt.Sprintf("%v", value)
+}
+
+func isCronTriggerType(value string) bool {
+	return strings.EqualFold(strings.TrimSpace(value), "CRON")
+}
+
+func (m *Model) setActionTriggerType(triggerType string) {
+	next := strings.ToUpper(strings.TrimSpace(triggerType))
+	if !isAllowedTriggerType(next) {
+		next = "MANUAL"
+	}
+	previous := strings.ToUpper(strings.TrimSpace(m.action.TriggerType))
+	m.action.TriggerType = next
+	if isCronTriggerType(next) {
+		m.action.Secondary.Prompt = "cron> "
+		m.action.Secondary.Placeholder = "*/5 * * * *"
+		if strings.TrimSpace(m.action.Secondary.Value()) == "" || strings.TrimSpace(m.action.Secondary.Value()) == "{}" || !isCronTriggerType(previous) {
+			m.action.Secondary.SetValue("*/5 * * * *")
+			m.action.Secondary.CursorEnd()
+		}
+		m.action.Tertiary.Prompt = "tz> "
+		m.action.Tertiary.Placeholder = "UTC"
+		if strings.TrimSpace(m.action.Tertiary.Value()) == "" {
+			m.action.Tertiary.SetValue("UTC")
+			m.action.Tertiary.CursorEnd()
+		}
+		return
+	}
+	m.action.Secondary.Prompt = "config> "
+	m.action.Secondary.Placeholder = "JSON object"
+	if isCronTriggerType(previous) {
+		m.action.Secondary.SetValue("{}")
+		m.action.Secondary.CursorEnd()
+	}
+	m.action.Tertiary.Prompt = "tz> "
+	m.action.Tertiary.Placeholder = "UTC"
+}
+
+func (m *Model) triggerConfigFromAction() (map[string]any, error) {
+	if isCronTriggerType(m.action.TriggerType) {
+		cronExpr := strings.TrimSpace(m.action.Secondary.Value())
+		timezone := strings.TrimSpace(m.action.Tertiary.Value())
+		if timezone == "" {
+			timezone = "UTC"
+		}
+		return map[string]any{
+			"cron":     cronExpr,
+			"timezone": timezone,
+			"input":    map[string]any{},
+		}, nil
+	}
+	return parseJSONObject(m.action.Secondary.Value())
+}
+
 func (m *Model) refreshActionValidation() {
 	if !m.action.ShowValidation {
 		return
@@ -2293,6 +2450,25 @@ func (m *Model) actionModalValidationError() string {
 		if strings.TrimSpace(m.action.Primary.Value()) == "" {
 			return "Trigger name cannot be empty"
 		}
+	case actionModalUpdateTrigger:
+		if strings.TrimSpace(m.action.WorkflowID) == "" || strings.TrimSpace(m.action.TriggerID) == "" {
+			return "Select a trigger first"
+		}
+		if strings.TrimSpace(m.action.Primary.Value()) == "" {
+			return "Trigger name cannot be empty"
+		}
+		if isCronTriggerType(m.action.TriggerType) {
+			if len(strings.Fields(strings.TrimSpace(m.action.Secondary.Value()))) != 5 {
+				return "Cron expression must have 5 fields"
+			}
+			if strings.TrimSpace(m.action.Tertiary.Value()) == "" {
+				return "Timezone cannot be empty"
+			}
+		} else {
+			if _, err := parseJSONObject(m.action.Secondary.Value()); err != nil {
+				return "Trigger config must be a valid JSON object"
+			}
+		}
 	case actionModalCreateTrigger:
 		if strings.TrimSpace(m.action.WorkflowID) == "" {
 			return "Select a workflow first"
@@ -2303,8 +2479,17 @@ func (m *Model) actionModalValidationError() string {
 		if !isAllowedTriggerType(m.action.TriggerType) {
 			return "Trigger type must be MANUAL, CRON, or WEBHOOK"
 		}
-		if _, err := parseJSONObject(m.action.Secondary.Value()); err != nil {
-			return "Trigger config must be a valid JSON object"
+		if isCronTriggerType(m.action.TriggerType) {
+			if len(strings.Fields(strings.TrimSpace(m.action.Secondary.Value()))) != 5 {
+				return "Cron expression must have 5 fields"
+			}
+			if strings.TrimSpace(m.action.Tertiary.Value()) == "" {
+				return "Timezone cannot be empty"
+			}
+		} else {
+			if _, err := parseJSONObject(m.action.Secondary.Value()); err != nil {
+				return "Trigger config must be a valid JSON object"
+			}
 		}
 	case actionModalCreateSecret:
 		if strings.TrimSpace(m.action.Primary.Value()) == "" {
@@ -2440,22 +2625,26 @@ func (m *Model) updateActionModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cycleActionModalFocus(-1)
 			return m, nil
 		}
-		if m.action.Mode == actionModalCreateTrigger {
+		if m.action.Mode == actionModalCreateTrigger || m.action.Mode == actionModalUpdateTrigger {
 			switch keyMsg.String() {
 			case "left", "h":
-				if m.action.Focus == 0 {
+				if m.action.Mode == actionModalCreateTrigger && m.action.Focus == 0 {
 					m.cycleActionTriggerType(-1)
 					m.refreshActionValidation()
 					return m, nil
 				}
 			case "right", "l":
-				if m.action.Focus == 0 {
+				if m.action.Mode == actionModalCreateTrigger && m.action.Focus == 0 {
 					m.cycleActionTriggerType(1)
 					m.refreshActionValidation()
 					return m, nil
 				}
 			case " ":
-				if m.action.Focus == 2 {
+				toggleFocus := 2
+				if m.action.Mode == actionModalUpdateTrigger {
+					toggleFocus = 1
+				}
+				if m.action.Focus == toggleFocus {
 					m.action.TriggerActive = !m.action.TriggerActive
 					m.refreshActionValidation()
 					return m, nil
@@ -2477,16 +2666,34 @@ func (m *Model) updateActionModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.action.Primary.CursorEnd()
 				m.refreshActionValidation()
 				return m, nil
-			case actionModalCreateTrigger:
-				if m.action.Focus == 1 {
+			case actionModalCreateTrigger, actionModalUpdateTrigger:
+				nameFocus := 1
+				configFocus := 3
+				timezoneFocus := 4
+				if m.action.Mode == actionModalUpdateTrigger {
+					nameFocus = 0
+					configFocus = 2
+					timezoneFocus = 3
+				}
+				if m.action.Focus == nameFocus {
 					m.action.Primary.SetValue("")
 					m.action.Primary.CursorEnd()
 					m.refreshActionValidation()
 					return m, nil
 				}
-				if m.action.Focus == 3 {
-					m.action.Secondary.SetValue("{}")
+				if m.action.Focus == configFocus {
+					if isCronTriggerType(m.action.TriggerType) {
+						m.action.Secondary.SetValue("*/5 * * * *")
+					} else {
+						m.action.Secondary.SetValue("{}")
+					}
 					m.action.Secondary.CursorEnd()
+					m.refreshActionValidation()
+					return m, nil
+				}
+				if isCronTriggerType(m.action.TriggerType) && m.action.Focus == timezoneFocus {
+					m.action.Tertiary.SetValue("UTC")
+					m.action.Tertiary.CursorEnd()
 					m.refreshActionValidation()
 					return m, nil
 				}
@@ -2519,14 +2726,27 @@ func (m *Model) updateActionModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.action.Primary, cmd = m.action.Primary.Update(msg)
 		m.refreshActionValidation()
 		return m, cmd
-	case actionModalCreateTrigger:
-		if m.action.Focus == 1 {
+	case actionModalCreateTrigger, actionModalUpdateTrigger:
+		nameFocus := 1
+		configFocus := 3
+		timezoneFocus := 4
+		if m.action.Mode == actionModalUpdateTrigger {
+			nameFocus = 0
+			configFocus = 2
+			timezoneFocus = 3
+		}
+		if m.action.Focus == nameFocus {
 			m.action.Primary, cmd = m.action.Primary.Update(msg)
 			m.refreshActionValidation()
 			return m, cmd
 		}
-		if m.action.Focus == 3 {
+		if m.action.Focus == configFocus {
 			m.action.Secondary, cmd = m.action.Secondary.Update(msg)
+			m.refreshActionValidation()
+			return m, cmd
+		}
+		if isCronTriggerType(m.action.TriggerType) && m.action.Focus == timezoneFocus {
+			m.action.Tertiary, cmd = m.action.Tertiary.Update(msg)
 			m.refreshActionValidation()
 			return m, cmd
 		}
@@ -2564,20 +2784,22 @@ func (m *Model) submitActionModal() tea.Cmd {
 		workflowID := m.action.WorkflowID
 		m.action = actionModalState{}
 		return m.renameWorkflowCmd(workflowID, name)
-	case actionModalRenameTrigger:
+	case actionModalRenameTrigger, actionModalUpdateTrigger:
 		name := strings.TrimSpace(m.action.Primary.Value())
-		if name == "" {
-			return m.pushToast(ToastWarn, "Trigger name cannot be empty")
-		}
 		workflowID := m.action.WorkflowID
 		triggerID := m.action.TriggerID
+		active := m.action.TriggerActive
+		configValue, err := m.triggerConfigFromAction()
+		if err != nil {
+			return m.pushToast(ToastWarn, "Trigger config must be a valid JSON object")
+		}
 		m.action = actionModalState{}
-		return m.renameTriggerCmd(workflowID, triggerID, name)
+		return m.updateTriggerCmd(workflowID, triggerID, name, active, configValue)
 	case actionModalCreateTrigger:
 		name := strings.TrimSpace(m.action.Primary.Value())
-		configValue := strings.TrimSpace(m.action.Secondary.Value())
-		if configValue == "" {
-			configValue = "{}"
+		configValue, err := m.triggerConfigFromAction()
+		if err != nil {
+			return m.pushToast(ToastWarn, "Trigger config must be a valid JSON object")
 		}
 		workflowID := m.action.WorkflowID
 		triggerType := m.action.TriggerType
@@ -2631,6 +2853,14 @@ func (m *Model) cycleActionModalFocus(delta int) {
 		total = 1
 	case actionModalCreateTrigger:
 		total = 4
+		if isCronTriggerType(m.action.TriggerType) {
+			total = 5
+		}
+	case actionModalUpdateTrigger:
+		total = 3
+		if isCronTriggerType(m.action.TriggerType) {
+			total = 4
+		}
 	case actionModalCreateSecret, actionModalUpdateSecret:
 		total = 3
 	case actionModalConfirmDelete:
@@ -2664,6 +2894,19 @@ func (m *Model) syncActionModalFocus() {
 		if m.action.Focus == 3 {
 			m.action.Secondary.Focus()
 		}
+		if isCronTriggerType(m.action.TriggerType) && m.action.Focus == 4 {
+			m.action.Tertiary.Focus()
+		}
+	case actionModalUpdateTrigger:
+		if m.action.Focus == 0 {
+			m.action.Primary.Focus()
+		}
+		if m.action.Focus == 2 {
+			m.action.Secondary.Focus()
+		}
+		if isCronTriggerType(m.action.TriggerType) && m.action.Focus == 3 {
+			m.action.Tertiary.Focus()
+		}
 	case actionModalCreateSecret, actionModalUpdateSecret:
 		if m.action.Focus == 0 {
 			m.action.Primary.Focus()
@@ -2692,7 +2935,7 @@ func (m *Model) cycleActionTriggerType(delta int) {
 	for next < 0 {
 		next += len(order)
 	}
-	m.action.TriggerType = order[next%len(order)]
+	m.setActionTriggerType(order[next%len(order)])
 }
 
 func (m *Model) focusNext() {
@@ -2804,7 +3047,7 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		createTrigger.DisabledReason = "Select a row in Workflows or Triggers first"
 	}
 
-	renameTrigger := command("Action: Rename selected trigger", "Trigger", paletteAction{Kind: paletteRenameTrigger}, "rename", "trigger", "name")
+	renameTrigger := command("Action: Update selected trigger", "Trigger", paletteAction{Kind: paletteRenameTrigger}, "update", "trigger", "name", "config")
 	if !(state.View == ViewTriggers && state.HasSelection) {
 		renameTrigger.Enabled = false
 		renameTrigger.Detail = "Unavailable: select trigger row"

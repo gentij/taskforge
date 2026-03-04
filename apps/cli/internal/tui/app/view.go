@@ -333,7 +333,7 @@ func renderFooterHints(m Model) string {
 			hint += "  " + themedDivider(m) + "  r run  e toggle  n rename  c trigger  d archive  f filter"
 		}
 		if m.view == ViewTriggers {
-			hint += "  " + themedDivider(m) + "  e toggle  n rename  c create  d archive  f filter"
+			hint += "  " + themedDivider(m) + "  e toggle  n update  c create  d archive  f filter"
 		}
 		if m.view == ViewSecrets {
 			hint += "  " + themedDivider(m) + "  c create  n update  d delete"
@@ -580,15 +580,57 @@ func renderActionModal(m Model) string {
 		if m.action.Focus == 2 {
 			activeLabel = m.styles.ChipActive.Render(" " + activeLabel + " ")
 		}
-		hint = "tab next  |  ←/→ type  |  space toggle active  |  enter submit  |  esc cancel"
-		body = strings.Join([]string{
-			"Workflow ID: " + m.action.WorkflowID,
-			"",
-			typeLine,
-			m.action.Primary.View(),
-			activeLabel,
-			m.action.Secondary.View(),
-		}, "\n")
+		if isCronTriggerType(m.action.TriggerType) {
+			hint = "tab next  |  ←/→ type  |  space toggle active  |  enter submit  |  esc cancel"
+			body = strings.Join([]string{
+				"Workflow ID: " + m.action.WorkflowID,
+				"",
+				typeLine,
+				m.action.Primary.View(),
+				activeLabel,
+				m.action.Secondary.View(),
+				m.action.Tertiary.View(),
+			}, "\n")
+		} else {
+			hint = "tab next  |  ←/→ type  |  space toggle active  |  enter submit  |  esc cancel"
+			body = strings.Join([]string{
+				"Workflow ID: " + m.action.WorkflowID,
+				"",
+				typeLine,
+				m.action.Primary.View(),
+				activeLabel,
+				m.action.Secondary.View(),
+			}, "\n")
+		}
+	case actionModalUpdateTrigger:
+		activeLabel := "Active: false"
+		if m.action.TriggerActive {
+			activeLabel = "Active: true"
+		}
+		if m.action.Focus == 1 {
+			activeLabel = m.styles.ChipActive.Render(" " + activeLabel + " ")
+		}
+		hint = "tab next  |  space toggle active  |  enter submit  |  esc cancel"
+		if isCronTriggerType(m.action.TriggerType) {
+			body = strings.Join([]string{
+				"Trigger ID: " + m.action.TriggerID,
+				"Type: " + m.action.TriggerType,
+				"",
+				m.action.Primary.View(),
+				activeLabel,
+				m.action.Secondary.View(),
+				m.action.Tertiary.View(),
+			}, "\n")
+		} else {
+			body = strings.Join([]string{
+				"Trigger ID: " + m.action.TriggerID,
+				"Type: " + m.action.TriggerType,
+				"",
+				m.action.Primary.View(),
+				activeLabel,
+				m.action.Secondary.View(),
+			}, "\n")
+		}
 	case actionModalCreateSecret:
 		hint = "tab next field  |  enter submit  |  esc cancel"
 		body = strings.Join([]string{

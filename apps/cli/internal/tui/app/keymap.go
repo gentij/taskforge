@@ -61,7 +61,7 @@ func DefaultKeyMap() KeyMap {
 		JumpBottom:    key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")),
 		RunWorkflow:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "run now")),
 		ToggleActive:  key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "toggle active")),
-		Rename:        key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "rename")),
+		Rename:        key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "rename/update")),
 		CreateTrigger: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "create")),
 		ViewVersions:  key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view versions")),
 		RevokeToken:   key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "archive/revoke")),

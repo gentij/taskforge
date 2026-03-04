@@ -118,6 +118,41 @@ func TestCreateSecretValidation_RequiresNameAndValue(t *testing.T) {
 	}
 }
 
+func TestTriggerConfigFromAction_CronTypedFields(t *testing.T) {
+	m := NewModel(nil, "", false, config.Config{}, "")
+	m.action = actionModalState{
+		Mode:        actionModalCreateTrigger,
+		TriggerType: "CRON",
+		Secondary:   newActionInput("cron> ", "", "*/5 * * * *", 256),
+		Tertiary:    newActionInput("tz> ", "", "UTC", 120),
+	}
+	config, err := m.triggerConfigFromAction()
+	if err != nil {
+		t.Fatalf("expected cron config to parse, got error: %v", err)
+	}
+	if got, ok := config["cron"].(string); !ok || got != "*/5 * * * *" {
+		t.Fatalf("unexpected cron field: %#v", config["cron"])
+	}
+	if got, ok := config["timezone"].(string); !ok || got != "UTC" {
+		t.Fatalf("unexpected timezone field: %#v", config["timezone"])
+	}
+}
+
+func TestTriggerValidation_CronRequiresFiveFields(t *testing.T) {
+	m := NewModel(nil, "", false, config.Config{}, "")
+	m.action = actionModalState{
+		Mode:        actionModalCreateTrigger,
+		WorkflowID:  "wf_1",
+		TriggerType: "CRON",
+		Primary:     newActionInput("name> ", "", "nightly", 120),
+		Secondary:   newActionInput("cron> ", "", "*/5 * * *", 256),
+		Tertiary:    newActionInput("tz> ", "", "UTC", 120),
+	}
+	if got := m.actionModalValidationError(); got == "" {
+		t.Fatal("expected cron validation error for invalid field count")
+	}
+}
+
 func TestScopeRowsForCurrentView_ActiveOnlyWorkflows(t *testing.T) {
 	now := time.Now()
 	m := NewModel(nil, "", false, config.Config{}, "")
