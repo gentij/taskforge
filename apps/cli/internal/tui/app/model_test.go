@@ -56,7 +56,7 @@ func TestParseJSONObject_RequiresObject(t *testing.T) {
 
 func TestDeleteConfirmModal_RequiresExactPhrase(t *testing.T) {
 	m := NewModel(nil, "", false, config.Config{}, "")
-	m.openDeleteConfirmModal("Archive Workflow", "Archive test workflow", "ARCHIVE wf_test", "wf_test", "")
+	m.openDeleteConfirmModal("Archive Workflow", "Archive test workflow", "ARCHIVE wf_test", "workflow", "wf_test", "", "")
 
 	if got := m.actionModalValidationError(); got == "" {
 		t.Fatal("expected validation error when phrase is empty")
@@ -75,7 +75,7 @@ func TestDeleteConfirmModal_RequiresExactPhrase(t *testing.T) {
 
 func TestSubmitDeleteConfirmDispatchesDeleteCmd(t *testing.T) {
 	m := NewModel(nil, "", false, config.Config{}, "")
-	m.openDeleteConfirmModal("Archive Trigger", "Archive test trigger", "ARCHIVE trg_test", "wf_test", "trg_test")
+	m.openDeleteConfirmModal("Archive Trigger", "Archive test trigger", "ARCHIVE trg_test", "trigger", "wf_test", "trg_test", "")
 	m.action.Confirm.SetValue("ARCHIVE trg_test")
 
 	cmd := m.submitActionModal()
@@ -93,6 +93,28 @@ func TestSubmitDeleteConfirmDispatchesDeleteCmd(t *testing.T) {
 	}
 	if !strings.Contains(result.err.Error(), "api client unavailable") {
 		t.Fatalf("unexpected error: %v", result.err)
+	}
+}
+
+func TestCreateSecretValidation_RequiresNameAndValue(t *testing.T) {
+	m := NewModel(nil, "", false, config.Config{}, "")
+	m.action = actionModalState{
+		Active:    true,
+		Mode:      actionModalCreateSecret,
+		Primary:   newActionInput("name> ", "", "", 120),
+		Secondary: newMaskedActionInput("value> ", 5000),
+		Tertiary:  newActionInput("desc> ", "", "", 500),
+	}
+	if got := m.actionModalValidationError(); got == "" {
+		t.Fatal("expected validation error for empty secret fields")
+	}
+	m.action.Primary.SetValue("API_KEY")
+	if got := m.actionModalValidationError(); got == "" {
+		t.Fatal("expected validation error for empty secret value")
+	}
+	m.action.Secondary.SetValue("super-secret")
+	if got := m.actionModalValidationError(); got != "" {
+		t.Fatalf("expected valid secret create payload, got error: %q", got)
 	}
 }
 

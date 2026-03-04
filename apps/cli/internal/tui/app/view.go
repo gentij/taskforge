@@ -335,6 +335,9 @@ func renderFooterHints(m Model) string {
 		if m.view == ViewTriggers {
 			hint += "  " + themedDivider(m) + "  e toggle  n rename  c create  d archive  f filter"
 		}
+		if m.view == ViewSecrets {
+			hint += "  " + themedDivider(m) + "  c create  n update  d delete"
+		}
 	} else {
 		hint = "focus: context  " + themedDivider(m) + "  j/k scroll  " + themedDivider(m) + "  [/] or 1-4 tabs  " + themedDivider(m) + "  ctrl+f search"
 	}
@@ -585,6 +588,25 @@ func renderActionModal(m Model) string {
 			m.action.Primary.View(),
 			activeLabel,
 			m.action.Secondary.View(),
+		}, "\n")
+	case actionModalCreateSecret:
+		hint = "tab next field  |  enter submit  |  esc cancel"
+		body = strings.Join([]string{
+			m.action.Description,
+			"",
+			m.action.Primary.View(),
+			m.action.Secondary.View(),
+			m.action.Tertiary.View(),
+		}, "\n")
+	case actionModalUpdateSecret:
+		hint = "tab next field  |  enter submit  |  esc cancel"
+		body = strings.Join([]string{
+			"Secret ID: " + m.action.SecretID,
+			m.action.Description,
+			"",
+			m.action.Primary.View(),
+			m.action.Secondary.View(),
+			m.action.Tertiary.View(),
 		}, "\n")
 	case actionModalCLIHandoff:
 		hint = "enter/esc close"

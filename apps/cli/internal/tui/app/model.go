@@ -61,6 +61,9 @@ const (
 	paletteToggleTrigger
 	paletteDeleteWorkflow
 	paletteDeleteTrigger
+	paletteCreateSecret
+	paletteUpdateSecret
+	paletteDeleteSecret
 	paletteSetStatusScope
 	paletteShowCLIHandoff
 	paletteClearRecent
@@ -142,6 +145,8 @@ const (
 	actionModalRenameWorkflow
 	actionModalRenameTrigger
 	actionModalCreateTrigger
+	actionModalCreateSecret
+	actionModalUpdateSecret
 	actionModalConfirmDelete
 	actionModalCLIHandoff
 )
@@ -155,10 +160,13 @@ type actionModalState struct {
 	ShowValidation bool
 	Primary        textinput.Model
 	Secondary      textinput.Model
+	Tertiary       textinput.Model
 	Confirm        textinput.Model
 	Focus          int
 	WorkflowID     string
 	TriggerID      string
+	SecretID       string
+	DeleteKind     string
 	TriggerType    string
 	TriggerActive  bool
 	ConfirmPhrase  string
@@ -852,8 +860,14 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if (m.view == ViewWorkflows || m.view == ViewTriggers) && key.Matches(msg, m.keys.CreateTrigger) {
 		return m, m.openCreateTriggerModalCmd()
 	}
+	if m.view == ViewSecrets && key.Matches(msg, m.keys.CreateTrigger) {
+		return m, m.openCreateSecretModalCmd()
+	}
 	if m.view == ViewTriggers && key.Matches(msg, m.keys.Rename) {
 		return m, m.openRenameTriggerModalCmd()
+	}
+	if m.view == ViewSecrets && key.Matches(msg, m.keys.Rename) {
+		return m, m.openUpdateSecretModalCmd()
 	}
 	if m.view == ViewTriggers && key.Matches(msg, m.keys.ToggleActive) {
 		return m, m.toggleTriggerActiveCmd()
@@ -863,6 +877,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.view == ViewTriggers && key.Matches(msg, m.keys.RevokeToken) {
 		return m, m.openDeleteTriggerModalCmd()
+	}
+	if m.view == ViewSecrets && key.Matches(msg, m.keys.RevokeToken) {
+		return m, m.openDeleteSecretModalCmd()
 	}
 	if m.view == ViewTokens && key.Matches(msg, m.keys.RevokeToken) {
 		return m, m.pushToast(ToastWarn, "API tokens are not available yet")
@@ -1207,6 +1224,15 @@ func (m *Model) runPaletteAction(action paletteAction) tea.Cmd {
 	case paletteDeleteTrigger:
 		m.rememberPaletteAction(action)
 		return m.openDeleteTriggerModalCmd()
+	case paletteCreateSecret:
+		m.rememberPaletteAction(action)
+		return m.openCreateSecretModalCmd()
+	case paletteUpdateSecret:
+		m.rememberPaletteAction(action)
+		return m.openUpdateSecretModalCmd()
+	case paletteDeleteSecret:
+		m.rememberPaletteAction(action)
+		return m.openDeleteSecretModalCmd()
 	case paletteSetStatusScope:
 		m.rememberPaletteAction(action)
 		if !supportsStatusScope(m.view) {
@@ -1504,6 +1530,27 @@ func paletteItemFromAction(action paletteAction, state paletteBuildState) palett
 			item.Detail = "Unavailable: select trigger row"
 			item.DisabledReason = "Select a trigger row in Triggers first"
 		}
+	case paletteCreateSecret:
+		item.Label = "Action: Create secret"
+		if state.View != ViewSecrets {
+			item.Enabled = false
+			item.Detail = "Unavailable in this view"
+			item.DisabledReason = "Open Secrets first"
+		}
+	case paletteUpdateSecret:
+		item.Label = "Action: Update selected secret"
+		if !(state.View == ViewSecrets && state.HasSelection) {
+			item.Enabled = false
+			item.Detail = "Unavailable: select secret row"
+			item.DisabledReason = "Select a secret row in Secrets first"
+		}
+	case paletteDeleteSecret:
+		item.Label = "Action: Delete selected secret"
+		if !(state.View == ViewSecrets && state.HasSelection) {
+			item.Enabled = false
+			item.Detail = "Unavailable: select secret row"
+			item.DisabledReason = "Select a secret row in Secrets first"
+		}
 	case paletteSetStatusScope:
 		if !state.HasScope {
 			item.Enabled = false
@@ -1775,6 +1822,102 @@ func (m *Model) deleteTriggerCmd(workflowID string, triggerID string) tea.Cmd {
 	}
 }
 
+func (m *Model) createSecretCmd(name string, value string, description string) tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return m.pushToast(ToastWarn, "Secret name cannot be empty")
+	}
+	if strings.TrimSpace(value) == "" {
+		return m.pushToast(ToastWarn, "Secret value cannot be empty")
+	}
+	payload := map[string]any{"name": name, "value": value}
+	description = strings.TrimSpace(description)
+	if description != "" {
+		payload["description"] = description
+	}
+	client := m.client
+	m.mutationPending = true
+	return func() tea.Msg {
+		if client == nil {
+			return mutationResultMsg{err: fmt.Errorf("api client unavailable")}
+		}
+		_, err := client.CreateSecret(payload)
+		if err != nil {
+			return mutationResultMsg{err: err}
+		}
+		return mutationResultMsg{successMessage: "Secret created", refresh: true}
+	}
+}
+
+func (m *Model) updateSecretCmd(secretID string, name string, value string, description string) tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	secretID = strings.TrimSpace(secretID)
+	if secretID == "" {
+		return m.pushToast(ToastWarn, "Select a secret first")
+	}
+	secret, ok := secretByID(&m.store, secretID)
+	if !ok {
+		return m.pushToast(ToastWarn, "Select a secret first")
+	}
+	name = strings.TrimSpace(name)
+	description = strings.TrimSpace(description)
+	if name == "" {
+		return m.pushToast(ToastWarn, "Secret name cannot be empty")
+	}
+	patch := map[string]any{}
+	if name != secret.Name {
+		patch["name"] = name
+	}
+	if description != "" && description != strings.TrimSpace(secret.Description) {
+		patch["description"] = description
+	}
+	if strings.TrimSpace(value) != "" {
+		patch["value"] = value
+	}
+	if len(patch) == 0 {
+		return m.pushToast(ToastWarn, "No changes to update")
+	}
+	client := m.client
+	m.mutationPending = true
+	return func() tea.Msg {
+		if client == nil {
+			return mutationResultMsg{err: fmt.Errorf("api client unavailable")}
+		}
+		_, err := client.UpdateSecret(secretID, patch)
+		if err != nil {
+			return mutationResultMsg{err: err}
+		}
+		return mutationResultMsg{successMessage: "Secret updated", refresh: true}
+	}
+}
+
+func (m *Model) deleteSecretCmd(secretID string) tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	secretID = strings.TrimSpace(secretID)
+	if secretID == "" {
+		return m.pushToast(ToastWarn, "Select a secret first")
+	}
+	client := m.client
+	m.mutationPending = true
+	return func() tea.Msg {
+		if client == nil {
+			return mutationResultMsg{err: fmt.Errorf("api client unavailable")}
+		}
+		_, err := client.DeleteSecret(secretID)
+		if err != nil {
+			return mutationResultMsg{err: err}
+		}
+		return mutationResultMsg{successMessage: "Secret deleted", refresh: true}
+	}
+}
+
 func (m *Model) renameWorkflowCmd(workflowID string, name string) tea.Cmd {
 	if m.mutationPending {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
@@ -1944,6 +2087,78 @@ func (m *Model) openCreateTriggerModalCmd() tea.Cmd {
 	return nil
 }
 
+func (m *Model) openCreateSecretModalCmd() tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	if m.view != ViewSecrets {
+		return m.pushToast(ToastWarn, "Open Secrets to create")
+	}
+	nameInput := newActionInput("name> ", "Secret name", "", 120)
+	valueInput := newMaskedActionInput("value> ", 5000)
+	descriptionInput := newActionInput("desc> ", "Optional description", "", 500)
+	m.action = actionModalState{
+		Active:      true,
+		Mode:        actionModalCreateSecret,
+		Title:       "Create Secret",
+		Description: "Secret value is masked and never shown in context.",
+		Primary:     nameInput,
+		Secondary:   valueInput,
+		Tertiary:    descriptionInput,
+		Focus:       0,
+	}
+	m.syncActionModalFocus()
+	return nil
+}
+
+func (m *Model) openUpdateSecretModalCmd() tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	if m.view != ViewSecrets {
+		return m.pushToast(ToastWarn, "Open Secrets to update")
+	}
+	selected := m.selectedRowID()
+	secret, ok := secretByID(&m.store, selected)
+	if !ok {
+		return m.pushToast(ToastWarn, "Select a secret first")
+	}
+	nameInput := newActionInput("name> ", "Secret name", secret.Name, 120)
+	valueInput := newMaskedActionInput("value> ", 5000)
+	descriptionInput := newActionInput("desc> ", "Optional description", secret.Description, 500)
+	m.action = actionModalState{
+		Active:      true,
+		Mode:        actionModalUpdateSecret,
+		Title:       "Update Secret",
+		Description: "Leave value empty to keep existing secret value.",
+		Primary:     nameInput,
+		Secondary:   valueInput,
+		Tertiary:    descriptionInput,
+		Focus:       0,
+		SecretID:    secret.ID,
+	}
+	m.syncActionModalFocus()
+	return nil
+}
+
+func (m *Model) openDeleteSecretModalCmd() tea.Cmd {
+	if m.mutationPending {
+		return m.pushToast(ToastWarn, "Another action is still in progress")
+	}
+	if m.view != ViewSecrets {
+		return m.pushToast(ToastWarn, "Open Secrets to delete")
+	}
+	selected := m.selectedRowID()
+	secret, ok := secretByID(&m.store, selected)
+	if !ok {
+		return m.pushToast(ToastWarn, "Select a secret first")
+	}
+	phrase := "DELETE " + secret.ID
+	description := "Permanently delete secret \"" + secret.Name + "\" (" + secret.ID + ")"
+	m.openDeleteConfirmModal("Delete Secret", description, phrase, "secret", "", "", secret.ID)
+	return nil
+}
+
 func (m *Model) openDeleteWorkflowModalCmd() tea.Cmd {
 	if m.mutationPending {
 		return m.pushToast(ToastWarn, "Another action is still in progress")
@@ -1961,7 +2176,7 @@ func (m *Model) openDeleteWorkflowModalCmd() tea.Cmd {
 	}
 	phrase := "ARCHIVE " + wf.ID
 	description := "Archive workflow \"" + wf.Name + "\" (" + wf.ID + ") and set it inactive"
-	m.openDeleteConfirmModal("Archive Workflow", description, phrase, wf.ID, "")
+	m.openDeleteConfirmModal("Archive Workflow", description, phrase, "workflow", wf.ID, "", "")
 	return nil
 }
 
@@ -1982,7 +2197,7 @@ func (m *Model) openDeleteTriggerModalCmd() tea.Cmd {
 	}
 	phrase := "ARCHIVE " + trg.ID
 	description := "Archive trigger \"" + trg.Name + "\" (" + trg.ID + ") and set it inactive"
-	m.openDeleteConfirmModal("Archive Trigger", description, phrase, trg.WorkflowID, trg.ID)
+	m.openDeleteConfirmModal("Archive Trigger", description, phrase, "trigger", trg.WorkflowID, trg.ID, "")
 	return nil
 }
 
@@ -2025,6 +2240,13 @@ func newActionInput(prompt string, placeholder string, value string, limit int) 
 	input.CharLimit = limit
 	input.SetValue(value)
 	input.CursorEnd()
+	return input
+}
+
+func newMaskedActionInput(prompt string, limit int) textinput.Model {
+	input := newActionInput(prompt, "", "", limit)
+	input.EchoMode = textinput.EchoPassword
+	input.EchoCharacter = '*'
 	return input
 }
 
@@ -2084,9 +2306,50 @@ func (m *Model) actionModalValidationError() string {
 		if _, err := parseJSONObject(m.action.Secondary.Value()); err != nil {
 			return "Trigger config must be a valid JSON object"
 		}
+	case actionModalCreateSecret:
+		if strings.TrimSpace(m.action.Primary.Value()) == "" {
+			return "Secret name cannot be empty"
+		}
+		if strings.TrimSpace(m.action.Secondary.Value()) == "" {
+			return "Secret value cannot be empty"
+		}
+	case actionModalUpdateSecret:
+		if strings.TrimSpace(m.action.SecretID) == "" {
+			return "Select a secret first"
+		}
+		secret, ok := secretByID(&m.store, m.action.SecretID)
+		if !ok {
+			return "Select a secret first"
+		}
+		if strings.TrimSpace(m.action.Primary.Value()) == "" {
+			return "Secret name cannot be empty"
+		}
+		nameChanged := strings.TrimSpace(m.action.Primary.Value()) != secret.Name
+		description := strings.TrimSpace(m.action.Tertiary.Value())
+		descriptionChanged := description != "" && description != strings.TrimSpace(secret.Description)
+		valueChanged := strings.TrimSpace(m.action.Secondary.Value()) != ""
+		if !nameChanged && !descriptionChanged && !valueChanged {
+			return "No changes to update"
+		}
 	case actionModalConfirmDelete:
-		if strings.TrimSpace(m.action.WorkflowID) == "" {
-			return "Missing delete target"
+		kind := strings.TrimSpace(strings.ToLower(m.action.DeleteKind))
+		switch kind {
+		case "workflow":
+			if strings.TrimSpace(m.action.WorkflowID) == "" {
+				return "Missing delete target"
+			}
+		case "trigger":
+			if strings.TrimSpace(m.action.WorkflowID) == "" || strings.TrimSpace(m.action.TriggerID) == "" {
+				return "Missing delete target"
+			}
+		case "secret":
+			if strings.TrimSpace(m.action.SecretID) == "" {
+				return "Missing delete target"
+			}
+		default:
+			if strings.TrimSpace(m.action.SecretID) == "" && strings.TrimSpace(m.action.WorkflowID) == "" {
+				return "Missing delete target"
+			}
 		}
 		if strings.TrimSpace(m.action.ConfirmPhrase) == "" {
 			return "Confirmation phrase is required"
@@ -2107,7 +2370,7 @@ func isAllowedTriggerType(value string) bool {
 	}
 }
 
-func (m *Model) openDeleteConfirmModal(title string, description string, phrase string, workflowID string, triggerID string) {
+func (m *Model) openDeleteConfirmModal(title string, description string, phrase string, deleteKind string, workflowID string, triggerID string, secretID string) {
 	confirmInput := newActionInput("confirm> ", "", "", 80)
 	m.action = actionModalState{
 		Active:        true,
@@ -2116,8 +2379,10 @@ func (m *Model) openDeleteConfirmModal(title string, description string, phrase 
 		Description:   description,
 		Confirm:       confirmInput,
 		Focus:         0,
+		DeleteKind:    deleteKind,
 		WorkflowID:    workflowID,
 		TriggerID:     triggerID,
+		SecretID:      secretID,
 		ConfirmPhrase: phrase,
 	}
 	m.syncActionModalFocus()
@@ -2225,6 +2490,25 @@ func (m *Model) updateActionModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.refreshActionValidation()
 					return m, nil
 				}
+			case actionModalCreateSecret, actionModalUpdateSecret:
+				if m.action.Focus == 0 {
+					m.action.Primary.SetValue("")
+					m.action.Primary.CursorEnd()
+					m.refreshActionValidation()
+					return m, nil
+				}
+				if m.action.Focus == 1 {
+					m.action.Secondary.SetValue("")
+					m.action.Secondary.CursorEnd()
+					m.refreshActionValidation()
+					return m, nil
+				}
+				if m.action.Focus == 2 {
+					m.action.Tertiary.SetValue("")
+					m.action.Tertiary.CursorEnd()
+					m.refreshActionValidation()
+					return m, nil
+				}
 			}
 		}
 	}
@@ -2243,6 +2527,22 @@ func (m *Model) updateActionModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.action.Focus == 3 {
 			m.action.Secondary, cmd = m.action.Secondary.Update(msg)
+			m.refreshActionValidation()
+			return m, cmd
+		}
+	case actionModalCreateSecret, actionModalUpdateSecret:
+		if m.action.Focus == 0 {
+			m.action.Primary, cmd = m.action.Primary.Update(msg)
+			m.refreshActionValidation()
+			return m, cmd
+		}
+		if m.action.Focus == 1 {
+			m.action.Secondary, cmd = m.action.Secondary.Update(msg)
+			m.refreshActionValidation()
+			return m, cmd
+		}
+		if m.action.Focus == 2 {
+			m.action.Tertiary, cmd = m.action.Tertiary.Update(msg)
 			m.refreshActionValidation()
 			return m, cmd
 		}
@@ -2284,15 +2584,33 @@ func (m *Model) submitActionModal() tea.Cmd {
 		active := m.action.TriggerActive
 		m.action = actionModalState{}
 		return m.createTriggerCmd(workflowID, triggerType, name, active, configValue)
+	case actionModalCreateSecret:
+		name := strings.TrimSpace(m.action.Primary.Value())
+		value := m.action.Secondary.Value()
+		description := strings.TrimSpace(m.action.Tertiary.Value())
+		m.action = actionModalState{}
+		return m.createSecretCmd(name, value, description)
+	case actionModalUpdateSecret:
+		secretID := strings.TrimSpace(m.action.SecretID)
+		name := strings.TrimSpace(m.action.Primary.Value())
+		value := m.action.Secondary.Value()
+		description := strings.TrimSpace(m.action.Tertiary.Value())
+		m.action = actionModalState{}
+		return m.updateSecretCmd(secretID, name, value, description)
 	case actionModalConfirmDelete:
 		if errMessage := m.actionModalValidationError(); errMessage != "" {
 			m.action.Validation = errMessage
 			m.action.ShowValidation = true
 			return nil
 		}
+		kind := strings.TrimSpace(strings.ToLower(m.action.DeleteKind))
 		workflowID := m.action.WorkflowID
 		triggerID := m.action.TriggerID
+		secretID := m.action.SecretID
 		m.action = actionModalState{}
+		if kind == "secret" {
+			return m.deleteSecretCmd(secretID)
+		}
 		if strings.TrimSpace(triggerID) != "" {
 			return m.deleteTriggerCmd(workflowID, triggerID)
 		}
@@ -2313,6 +2631,8 @@ func (m *Model) cycleActionModalFocus(delta int) {
 		total = 1
 	case actionModalCreateTrigger:
 		total = 4
+	case actionModalCreateSecret, actionModalUpdateSecret:
+		total = 3
 	case actionModalConfirmDelete:
 		total = 1
 	default:
@@ -2332,6 +2652,7 @@ func (m *Model) cycleActionModalFocus(delta int) {
 func (m *Model) syncActionModalFocus() {
 	m.action.Primary.Blur()
 	m.action.Secondary.Blur()
+	m.action.Tertiary.Blur()
 	m.action.Confirm.Blur()
 	switch m.action.Mode {
 	case actionModalRenameWorkflow, actionModalRenameTrigger:
@@ -2342,6 +2663,16 @@ func (m *Model) syncActionModalFocus() {
 		}
 		if m.action.Focus == 3 {
 			m.action.Secondary.Focus()
+		}
+	case actionModalCreateSecret, actionModalUpdateSecret:
+		if m.action.Focus == 0 {
+			m.action.Primary.Focus()
+		}
+		if m.action.Focus == 1 {
+			m.action.Secondary.Focus()
+		}
+		if m.action.Focus == 2 {
+			m.action.Tertiary.Focus()
 		}
 	case actionModalConfirmDelete:
 		m.action.Confirm.Focus()
@@ -2501,6 +2832,27 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		deleteTrigger.DisabledReason = "Select a trigger row in Triggers first"
 	}
 
+	createSecret := command("Action: Create secret", "Secret", paletteAction{Kind: paletteCreateSecret}, "create", "secret", "credential")
+	if state.View != ViewSecrets {
+		createSecret.Enabled = false
+		createSecret.Detail = "Unavailable in this view"
+		createSecret.DisabledReason = "Open Secrets first"
+	}
+
+	updateSecret := command("Action: Update selected secret", "Secret", paletteAction{Kind: paletteUpdateSecret}, "update", "secret", "edit")
+	if !(state.View == ViewSecrets && state.HasSelection) {
+		updateSecret.Enabled = false
+		updateSecret.Detail = "Unavailable: select secret row"
+		updateSecret.DisabledReason = "Select a secret row in Secrets first"
+	}
+
+	deleteSecret := command("Action: Delete selected secret", "Secret", paletteAction{Kind: paletteDeleteSecret}, "delete", "secret", "hard-delete")
+	if !(state.View == ViewSecrets && state.HasSelection) {
+		deleteSecret.Enabled = false
+		deleteSecret.Detail = "Unavailable: select secret row"
+		deleteSecret.DisabledReason = "Select a secret row in Secrets first"
+	}
+
 	showAllScope := command("Filter: Show all", "Status scope", paletteAction{Kind: paletteSetStatusScope, Value: "all"}, "filter", "status", "all")
 	showActiveScope := command("Filter: Active only", "Status scope", paletteAction{Kind: paletteSetStatusScope, Value: "active"}, "filter", "status", "active")
 	showInactiveScope := command("Filter: Inactive only", "Status scope", paletteAction{Kind: paletteSetStatusScope, Value: "inactive"}, "filter", "status", "inactive")
@@ -2564,6 +2916,9 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		toggleTrigger,
 		deleteWorkflow,
 		deleteTrigger,
+		createSecret,
+		updateSecret,
+		deleteSecret,
 		showAllScope,
 		showActiveScope,
 		showInactiveScope,
