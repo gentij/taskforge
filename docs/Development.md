@@ -1,302 +1,246 @@
 # Development Guide
 
-This guide covers everything you need to know to develop and run Taskforge.
+This guide covers local development for Taskforge (server, worker, CLI, and TUI).
 
 ## Prerequisites
 
-- **Node.js** 20 or later
-- **pnpm** 9 or later
-- **Docker** and **Docker Compose** (for PostgreSQL and Redis)
-- **Git**
+- Node.js 20+
+- pnpm 9+
+- Docker + Docker Compose
+- Go 1.25+ (for CLI/TUI development)
+- Git
 
-## Installation
+## Clone and Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/taskforge/taskforge.git
 cd taskforge
-
-# Install dependencies
 pnpm install
 ```
 
 ## Infrastructure Setup
 
-Start the required services (PostgreSQL and Redis) using Docker Compose:
+Start PostgreSQL and Redis:
 
 ```bash
-cd deploy/compose
-docker compose up -d
+docker compose -f deploy/compose/docker-compose.yml up -d
 ```
 
-Verify services are running:
+If your Docker installation does not support `docker compose`, use:
 
 ```bash
-# Check PostgreSQL
-docker compose ps | grep postgres
-
-# Check Redis  
-docker compose ps | grep redis
+docker-compose -f deploy/compose/docker-compose.yml up -d
 ```
 
-## Database Setup
-
-Navigate to the server app and set up the database:
+Verify services:
 
 ```bash
-cd apps/server
-
-# Generate Prisma client from schema
-pnpm prisma:generate
-
-# Run migrations (creates tables)
-pnpm prisma:migrate dev
-
-# Optionally seed with sample data
-pnpm prisma:seed
+docker compose -f deploy/compose/docker-compose.yml ps
 ```
 
-**Note:** The `DATABASE_URL` environment variable must be set. See [Environment Variables](#environment-variables).
+## Server Environment Setup
 
-## Building Packages
-
-Build all packages in the correct order:
+Create a local env file:
 
 ```bash
-# Build db-access (depends on generated Prisma types)
-cd packages/db-access
-pnpm build
-
-# Build queue-config
-cd ../queue-config
-pnpm build
-
-# Build contracts
-cd ../contracts
-pnpm build
+cp apps/server/.env.example apps/server/.env
 ```
 
-Or build everything at once from the root:
+Set required values in `apps/server/.env`:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `TASKFORGE_ADMIN_TOKEN` (minimum 32 characters)
+- `TASKFORGE_SECRET_KEY` (64-char hex or base64 for 32 bytes)
+
+Optional helper commands for secure values:
 
 ```bash
-# Build packages
-cd packages/db-access && pnpm build
-cd ../queue-config && pnpm build
-cd ../contracts && pnpm build
+# 64-char hex (good for TASKFORGE_SECRET_KEY)
+openssl rand -hex 32
 
-# Build apps
-cd ../apps/server && pnpm build
-cd ../worker && pnpm build
+# 64-char token (good for TASKFORGE_ADMIN_TOKEN)
+openssl rand -hex 32
 ```
 
-## Running the Application
-
-### Development Mode
-
-Start the server in watch mode:
+## Database and Build Setup
 
 ```bash
-cd apps/server
-pnpm run start:dev
+# Generate Prisma client
+pnpm -C apps/server prisma:generate
+
+# Apply migrations
+pnpm -C apps/server prisma:migrate deploy
+
+# Build shared packages
+pnpm -C packages/db-access build
+pnpm -C packages/queue build
+pnpm -C packages/contracts build
 ```
 
-The API will be available at `http://localhost:3000`.
+## Run the Applications
 
-### Production Mode
+Start server:
 
 ```bash
-# Build first
-pnpm build
+pnpm -C apps/server start:dev
+```
 
-# Start the server
-pnpm run start:prod
+Start worker (separate terminal):
+
+```bash
+pnpm -C apps/worker start:dev
+```
+
+API URLs:
+
+- Base API: `http://localhost:3000/v1/api`
+- Swagger: `http://localhost:3000/api`
+- Health: `http://localhost:3000/v1/api/health`
+
+If `3000` is busy, start server on another port:
+
+```bash
+PORT=3100 pnpm -C apps/server start:dev
+```
+
+Then use `--server http://localhost:3100/v1/api` in CLI commands.
+
+## API Quickstart
+
+Swagger UI is served at `/api` and uses bearer token auth.
+
+Use your `TASKFORGE_ADMIN_TOKEN` to call the API directly:
+
+```bash
+TOKEN="<TASKFORGE_ADMIN_TOKEN>"
+
+# Health (public)
+curl -sS "http://localhost:3000/v1/api/health"
+
+# Auth check (protected)
+curl -sS "http://localhost:3000/v1/api/auth/whoami" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## CLI and TUI Development
+
+Build CLI binary from source:
+
+```bash
+cd apps/cli
+go build -o ../../taskforge ./cmd/taskforge
+cd ../..
+```
+
+Common commands:
+
+```bash
+./taskforge auth login --token "<TASKFORGE_ADMIN_TOKEN>"
+./taskforge auth whoami
+./taskforge workflow list
+./taskforge tui
 ```
 
 ## Testing
 
-Run all tests:
+Run server tests:
 
 ```bash
-cd apps/server
-pnpm test
+pnpm -C apps/server test
+pnpm -C apps/server test:e2e
 ```
 
-Run tests in watch mode:
+Run worker tests:
 
 ```bash
-pnpm test:watch
+pnpm -C apps/worker test
 ```
 
-Run tests with coverage:
+Run CLI/TUI tests:
 
 ```bash
-pnpm test:cov
+cd apps/cli
+go test ./...
+cd ../..
 ```
 
 ## Linting and Formatting
 
-### Check Formatting
+Server:
 
 ```bash
-pnpm format:check
+pnpm -C apps/server lint
+pnpm -C apps/server lint:fix
+pnpm -C apps/server format:check
+pnpm -C apps/server format
 ```
 
-### Auto-format Code
+Worker:
 
 ```bash
-pnpm format
+pnpm -C apps/worker lint
+pnpm -C apps/worker lint:fix
+pnpm -C apps/worker format:check
+pnpm -C apps/worker format
 ```
 
-### Check Linting
+## Environment Variable Reference
 
-```bash
-pnpm lint
-```
+Taskforge server variables (from runtime validation):
 
-### Auto-fix Linting Issues
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string (`postgres://` or `postgresql://`) |
+| `REDIS_URL` | Yes | Redis connection string (`redis://`) |
+| `TASKFORGE_ADMIN_TOKEN` | Yes | Admin bearer token used by CLI/TUI and API clients |
+| `TASKFORGE_SECRET_KEY` | Yes | Encryption key for secrets (64-char hex or base64 for 32 bytes) |
+| `PORT` | No | API server port (default `3000`) |
+| `CACHE_TTL_SECONDS` | No | Cache TTL in seconds (default `60`) |
+| `CACHE_REDIS_PREFIX` | No | Cache key namespace prefix |
+| `VERSION` | No | API version prefix used in routes (default `1`) |
 
-```bash
-pnpm lint:fix
-```
+## Common Development Tasks
 
-## Database Commands
+### Add a New Workflow Step Type
 
-### Generate Prisma Client
-
-```bash
-cd apps/server
-pnpm prisma:generate
-```
-
-**Required** whenever the `prisma/schema.prisma` file changes.
-
-### Run Migrations
-
-```bash
-# Development (creates migration file + runs it)
-pnpm prisma:migrate dev
-
-# Production (runs existing migrations)
-pnpm prisma:migrate deploy
-
-# Reset database (WARNING: deletes all data)
-pnpm prisma:reset
-```
-
-### Create a New Migration
-
-```bash
-pnpm prisma:migrate dev --name migration_name
-```
-
-### Open Prisma Studio
-
-Interactive database UI:
-
-```bash
-pnpm prisma:studio
-```
-
-## Environment Variables
-
-Create a `.env` file in `apps/server/`:
-
-```env
-# Required
-DATABASE_URL=postgresql://user:password@localhost:5432/taskforge
-REDIS_URL=redis://localhost:6379
-
-# Optional
-PORT=3000
-VERSION=0.1.0
-LOG_LEVEL=info
-```
-
-### Variable Reference
-
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/taskforge` |
-| `REDIS_URL` | Yes | Redis connection string | `redis://localhost:6379` |
-| `PORT` | No | HTTP server port | `3000` |
-| `VERSION` | No | API version string | `0.1.0` |
-| `LOG_LEVEL` | No | Logging level | `debug`, `info`, `warn`, `error` |
-
-## Common Tasks
-
-### Adding a New Repository
-
-1. Create the repository file in `packages/db-access/src/<entity>/repository.ts`
-2. Export it from `packages/db-access/src/index.ts`
-3. Import and use in server/worker modules
-
-### Adding a New Workflow Step Type
-
-1. Add schema in `packages/contracts/src/workflow-definition.ts`
-2. Create executor in `apps/worker/src/executors/<step-type>/`
+1. Add schemas in `packages/contracts`
+2. Implement executor in `apps/worker/src/executors/<step-type>/`
 3. Register executor in `apps/worker/src/executors/executor-registry.ts`
+4. Add/adjust validation in server if needed
+5. Add tests (worker + server as applicable)
 
-### Adding a New API Endpoint
+### Add a New API Endpoint
 
-1. Create DTOs in `apps/server/src/<module>/dto/`
-2. Create controller in `apps/server/src/<module>/<module>.controller.ts`
-3. Register route in module
+1. Add DTOs in the feature module
+2. Add controller/service behavior
+3. Add unit + e2e tests
+4. Verify Swagger output
 
 ## Troubleshooting
 
-### Prisma Client Not Generated
+### API returns unauthorized
+
+- Verify `TASKFORGE_ADMIN_TOKEN` in `apps/server/.env`
+- Re-run `./taskforge auth login --token "<token>"`
+
+### Worker is not processing runs
+
+- Confirm worker is running (`pnpm -C apps/worker start:dev`)
+- Confirm Redis is healthy
+- Check worker logs for queue/executor errors
+
+### Prisma/client type errors after schema changes
 
 ```bash
-# Regenerate Prisma client
-cd apps/server
-pnpm prisma:generate
+pnpm -C apps/server prisma:generate
+pnpm -C packages/db-access build
+pnpm -C apps/server build
+pnpm -C apps/worker build
 ```
 
-### Redis Connection Failed
+## Related Docs
 
-- Verify Redis is running: `docker compose ps | grep redis`
-- Check `REDIS_URL` is correct in `.env`
-
-### Database Connection Failed
-
-- Verify PostgreSQL is running: `docker compose ps | grep postgres`
-- Check `DATABASE_URL` is correct in `.env`
-- Ensure database exists: `pnpm prisma: migrate dev`
-
-### Type Errors After Schema Change
-
-```bash
-# Full rebuild
-pnpm prisma:generate
-cd ../../packages/db-access && pnpm build
-cd ../apps/server && pnpm build
-```
-
-## Making Changes
-
-### Code Style
-
-- Use TypeScript strict mode
-- Follow existing patterns in the codebase
-- Run `pnpm format` before committing
-- Run `pnpm lint:fix` to auto-fix issues
-
-### Commit Messages
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat(core): add new workflow trigger type
-fix(db): resolve connection timeout issue
-docs(readme): update installation instructions
-chore: update dependencies
-```
-
-## Learning Resources
-
+- [Architecture Overview](./Architecture.md)
 - [Taskforge TUI Guide](./Taskforge%20-%20TUI.md)
 - [Workflow Engine Concepts](./Taskforge%20-%20Workflow%20Engine.md)
-- [Queues and Workers Plan](./Taskforge%20-%20Queues%20and%20Workers%20Plan.md)
-- [NestJS Documentation](https://docs.nestjs.com)
-- [Prisma Documentation](https://www.prisma.io/docs)
-- [BullMQ Documentation](https://docs.bullmq.io)

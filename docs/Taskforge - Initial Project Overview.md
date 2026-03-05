@@ -1,6 +1,16 @@
 
 # TaskForge — Self-Hosted Workflow & Automation Engine
 
+> Historical planning document.
+>
+> Some implementation details below are outdated.
+> For current behavior and setup, use:
+>
+> - `README.md`
+> - `docs/Development.md`
+> - `docs/Architecture.md`
+> - `apps/cli/README.md`
+
 ## 1. Project Overview
 
 **TaskForge** is a **self-hosted workflow and automation engine** designed for engineers, developers, and technical users who prefer **local-first, infrastructure-controlled tools**.
@@ -72,7 +82,7 @@ TaskForge consists of **two main components**:
   - logging and inspection
 
 ### 2) TaskForge CLI
-- Written in **Rust or Go**
+- Written in **Go**
 - Installed as a **single binary**
 - Acts as:
   - installer
@@ -85,7 +95,7 @@ The CLI owns:
 - configuration
 - starting/stopping the stack
 - issuing commands
-- future TUI integration
+- TUI integration
 
 ---
 
@@ -93,7 +103,7 @@ The CLI owns:
 
 ### Installation (example on Arch Linux)
 ```bash
-yay -S taskforge
+yay -S taskforge-bin
 ```
 
 This installs:
@@ -102,10 +112,10 @@ This installs:
 
 ### Initialization
 ```bash
-taskforge --init
+taskforge init
 ```
 
-`--init`:
+`taskforge init`:
 - creates `~/.taskforge/`
 - generates a config file
 - initializes secrets / admin token
@@ -131,7 +141,7 @@ taskforge/
   deploy/
   apps/
     server/    (NestJS + Fastify)
-    cli/       (Rust or Go)
+    cli/       (Go)
   packages/
   scripts/
 ```
@@ -155,7 +165,7 @@ Runtime code is **not shared**, only contracts.
 
 ### v1 authentication
 - Single **admin API token**
-- Generated on `taskforge --init`
+- Generated during `taskforge init`
 - Stored in `~/.taskforge/config`
 - All API calls require `Authorization: Bearer <token>`
 
@@ -264,11 +274,7 @@ Key mechanisms:
 
 ## 12. Current Status
 
-- Concept validated
-- Architecture chosen
-- Stack selected:
-  - NestJS + Fastify (server)
-  - Rust or Go (CLI)
-  - Postgres + Redis
-  - Docker Compose
-- Ready to begin **Phase 1: Foundations**
+- This section reflects an early planning snapshot and is not the live status.
+- For current status and release readiness, use:
+  - `README.md`
+  - `docs/MVP-Release-Readiness.md`

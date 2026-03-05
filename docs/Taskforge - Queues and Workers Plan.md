@@ -1,5 +1,10 @@
 # Taskforge - Queues and Workers Plan
 
+> Planning document.
+>
+> It explains the execution model rationale. For the current shipped behavior,
+> use `docs/Architecture.md` and runtime docs in `README.md`.
+
 This document outlines how Taskforge should execute workflows using NestJS
 BullMQ queues and a separate worker app. It is based on the NestJS queues
 documentation and is aligned with the current data model (Workflow, Trigger,

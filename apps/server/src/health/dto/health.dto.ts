@@ -7,7 +7,7 @@ export class HealthResDto {
   @ApiProperty({ example: 'ok', enum: ['ok', 'degraded'] })
   status: 'ok' | 'degraded';
 
-  @ApiProperty({ example: '0.1.0' })
+  @ApiProperty({ example: '1' })
   version: string;
 
   @ApiProperty({ example: 123.45 })

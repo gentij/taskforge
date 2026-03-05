@@ -18,6 +18,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -56,3 +61,11 @@ jobs:
 
       - name: Worker tests
         run: pnpm -C apps/worker test
+
+      - name: CLI tests
+        working-directory: apps/cli
+        run: go test ./...
+
+      - name: CLI build
+        working-directory: apps/cli
+        run: go build ./cmd/taskforge

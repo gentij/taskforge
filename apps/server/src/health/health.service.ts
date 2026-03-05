@@ -16,7 +16,7 @@ export class HealthService {
     return {
       status: 'ok',
       uptime: process.uptime(),
-      version: this.configService.get('VERSION', '0.1.0'),
+      version: this.configService.get('VERSION', '1'),
       db: dbOk,
     };
   }

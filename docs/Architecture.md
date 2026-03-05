@@ -1,108 +1,100 @@
 # Architecture Overview
 
-Taskforge is a self-hosted workflow automation engine built with a monorepo architecture.
+Taskforge is a self-hosted workflow automation system built as a monorepo.
 
-## System Architecture
+## System Components
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Taskforge System                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐ │
-│  │    CLI      │      │   Server    │      │   Worker    │ │
-│  │  (future)   │─────▶│  (NestJS)   │      │  (BullMQ)   │ │
-│  └─────────────┘      │  Fastify    │      │  Consumer   │ │
-│                       └──────┬──────┘      └──────┬──────┘ │
-│                              │                     │        │
-│                              ▼                     ▼        │
-│                       ┌─────────────┐       ┌─────────────┐ │
-│                       │  PostgreSQL │       │    Redis    │ │
-│                       └─────────────┘       └─────────────┘ │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+```text
+Taskforge
+|- CLI/TUI (Go)
+|  \- Calls Taskforge HTTP API
+|- Server (NestJS + Fastify)
+|  |- Auth, workflows, triggers, runs, steps, secrets
+|  \- Enqueues step-run jobs
+|- Worker (NestJS + BullMQ)
+|  \- Consumes jobs and executes workflow steps
+|- PostgreSQL
+|  \- Durable state for all entities and run history
+\- Redis
+   \- Queue backend for step-run execution
 ```
 
 ## Monorepo Structure
 
 ### Apps
 
-| App | Purpose | Commands |
-|-----|---------|----------|
-| `server` | REST API, trigger handlers, job enqueueing | `pnpm start:dev` |
-| `worker` | Consumes jobs from Redis, executes steps | `pnpm start` |
+- `apps/server`: API server
+- `apps/worker`: queue consumer and step execution engine
+- `apps/cli`: CLI + TUI interface
 
 ### Packages
 
-| Package | Purpose | Dependencies |
-|---------|---------|--------------|
-| `contracts` | Zod schemas for API, workflow definitions | zod |
-| `db-access` | PrismaService + all repositories | @prisma/client, @nestjs/common |
-| `queue-config` | BullMQ configuration (Redis connection) | @nestjs/bullmq, @nestjs/config |
+- `packages/contracts`: shared schemas/contracts
+- `packages/db-access`: Prisma service and repositories
+- `packages/queue`: queue configuration package (`@taskforge/queue-config`)
 
-## Build Order
+## API Shape
 
-```
-packages/db-access  ──┐
-packages/contracts  ──┼─▶ apps/server ──┐
-packages/queue-config ─┘                  │──▶ apps/worker
-                                          │
-(depends on generated @prisma/client types)
-```
+- Global API prefix: `/v{VERSION}/api`
+- Default local base URL: `http://localhost:3000/v1/api`
+- Swagger UI: `http://localhost:3000/api`
 
-**Important:** When the Prisma schema changes:
-1. Run `pnpm prisma:generate` in `apps/server`
-2. Rebuild `packages/db-access`
-3. Rebuild `apps/server` and `apps/worker`
+## Execution Flow
 
-## Data Flow
+### Workflow Creation
 
-### Creating a Workflow
+1. Create workflow
+2. Create workflow version (definition snapshot)
+3. Create trigger(s)
 
-1. **Define workflow** → POST `/api/workflows`
-2. **Create version** → POST `/api/workflows/:id/versions`
-3. **Add trigger** → POST `/api/workflows/:id/triggers`
+### Workflow Run
 
-### Running a Workflow
+1. Trigger is invoked (manual/webhook/cron)
+2. Event is stored
+3. Workflow run is created (`QUEUED`)
+4. Step runs are created (`QUEUED`)
+5. Step runs are enqueued to Redis (`step-runs` queue)
+6. Worker executes each step
+7. Step runs transition to terminal state
+8. Workflow run resolves to final status
 
-```
-1. Trigger received (webhook, cron, manual)
-         ↓
-2. Event created in PostgreSQL
-         ↓
-3. WorkflowRun created (QUEUED)
-         ↓
-4. StepRuns created (QUEUED) for each step
-         ↓
-5. Each StepRun enqueued to Redis 'step-runs' queue
-         ↓
-6. Worker picks up job, executes step
-         ↓
-7. StepRun updated (RUNNING → SUCCEEDED/FAILED)
-         ↓
-8. WorkflowRun updated when all steps complete
-```
+## Current MVP Execution Types
 
-## Key Technologies
+Worker executors currently include:
 
-- **NestJS** - Application framework
-- **Fastify** - HTTP server (faster than Express)
-- **Prisma** - ORM with PostgreSQL
-- **BullMQ** - Redis-based job queue
-- **Zod** - Runtime type validation
-- **pnpm** - Monorepo package manager
+- `http`
+- `transform`
+- `condition`
 
-## Environment Variables
+## Build and Dependency Order
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `REDIS_URL` | Yes | Redis connection string |
-| `PORT` | No | Server port (default: 3000) |
-| `VERSION` | No | API version (default: 0.1.0) |
-| `LOG_LEVEL` | No | Pino log level (default: info) |
+When contracts or Prisma types change, build in this order:
+
+1. `pnpm -C apps/server prisma:generate`
+2. `pnpm -C packages/db-access build`
+3. `pnpm -C packages/queue build`
+4. `pnpm -C packages/contracts build`
+5. `pnpm -C apps/server build`
+6. `pnpm -C apps/worker build`
+
+## Runtime Requirements
+
+Required server env vars:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `TASKFORGE_ADMIN_TOKEN`
+- `TASKFORGE_SECRET_KEY`
+
+Optional:
+
+- `PORT` (default `3000`)
+- `VERSION` (default `1`)
+- `CACHE_TTL_SECONDS`
+- `CACHE_REDIS_PREFIX`
 
 ## Related Documentation
 
+- Development setup: `docs/Development.md`
+- CLI commands: `apps/cli/README.md`
 - TUI usage and internals: `docs/Taskforge - TUI.md`
-- Development setup and workflows: `docs/Development.md`

@@ -2,11 +2,19 @@
 
 The Taskforge CLI lets you manage workflows, triggers, runs, steps, and secrets from the terminal.
 
+For local self-hosted setup, run `taskforge init` first to provision `~/.taskforge/` and local stack config.
+
 ## Quickstart
 
 ```bash
-taskforge auth login
+taskforge auth login --token "<TASKFORGE_ADMIN_TOKEN>"
 taskforge workflow list
+```
+
+If your API is not on the default port, pass `--server`:
+
+```bash
+taskforge --server http://localhost:3100/v1/api auth whoami
 ```
 
 Create a workflow from a definition file:
@@ -49,6 +57,8 @@ taskforge auth logout
 ```
 
 ## Stack
+
+`taskforge init` must be run once before using stack commands.
 
 ```bash
 taskforge init

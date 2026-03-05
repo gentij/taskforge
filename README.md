@@ -1,59 +1,154 @@
 # Taskforge
 
-A self-hosted workflow and automation engine designed for engineers, developers, and technical users.
+Taskforge is a self-hosted workflow automation engine for technical users who want local control, API-first automation, and inspectable execution history.
 
-## Quick Start
+## MVP Status
+
+Taskforge currently ships:
+
+- API server
+- Worker-based step execution
+- CLI for lifecycle management
+- TUI for operator workflows (with known limitations)
+
+Current MVP step types:
+
+- `http`
+- `transform`
+- `condition`
+
+## Requirements
+
+- Node.js 20+
+- pnpm 9+
+- Docker + Docker Compose
+- Go 1.25+ (required for CLI development from source)
+
+## Quick Start (From Source)
 
 ```bash
-# 1. Clone and install dependencies
+# 1) Clone and install dependencies
 git clone https://github.com/taskforge/taskforge.git
 cd taskforge
 pnpm install
 
-# 2. Start infrastructure (PostgreSQL, Redis)
-cd deploy/compose && docker compose up -d
+# 2) Start infrastructure
+docker compose -f deploy/compose/docker-compose.yml up -d
 
-# 3. Generate Prisma client and run migrations
-cd apps/server && pnpm prisma:generate && pnpm prisma:migrate dev
+# 3) Create server env file
+cp apps/server/.env.example apps/server/.env
 
-# 4. Build shared packages
-cd ../..
-cd packages/db-access && pnpm build
-cd ../queue-config && pnpm build
-cd ../contracts && pnpm build
+# 4) Set required secrets in apps/server/.env
+#    TASKFORGE_ADMIN_TOKEN must be at least 32 chars
+#    TASKFORGE_SECRET_KEY must be 64-char hex or base64(32 bytes)
 
-# 5. Start the server
-cd ../apps/server && pnpm run start:dev
+# 5) Generate Prisma client + run migrations
+pnpm -C apps/server prisma:generate
+pnpm -C apps/server prisma:migrate deploy
+
+# 6) Build shared packages
+pnpm -C packages/db-access build
+pnpm -C packages/queue build
+pnpm -C packages/contracts build
+
+# 7) Start API server and worker (in separate terminals)
+pnpm -C apps/server start:dev
+pnpm -C apps/worker start:dev
 ```
 
-The server will be available at `http://localhost:3000`.
+Default local endpoints:
+
+- API base URL: `http://localhost:3000/v1/api`
+- Swagger UI: `http://localhost:3000/api`
+
+If port `3000` is already used on your machine, run the server with a different port, for example:
+
+```bash
+PORT=3100 pnpm -C apps/server start:dev
+```
+
+And point CLI commands to that base URL:
+
+```bash
+./taskforge --server "http://localhost:3100/v1/api" auth whoami
+```
+
+## First CLI Run
+
+Build the CLI:
+
+```bash
+cd apps/cli
+go build -o ../../taskforge ./cmd/taskforge
+cd ../..
+```
+
+Authenticate and verify:
+
+```bash
+./taskforge auth login --token "<TASKFORGE_ADMIN_TOKEN>"
+./taskforge auth whoami
+```
+
+Create and execute a minimal workflow:
+
+```bash
+cat > /tmp/tf-definition.json <<'JSON'
+{
+  "input": {
+    "apiBase": "https://jsonplaceholder.typicode.com"
+  },
+  "steps": [
+    {
+      "key": "fetch_post",
+      "type": "http",
+      "request": {
+        "method": "GET",
+        "url": "{{input.apiBase}}/posts/1"
+      }
+    }
+  ]
+}
+JSON
+
+./taskforge workflow create --name "MVP Test" --definition /tmp/tf-definition.json
+./taskforge workflow list
+# run with the workflow id from list output
+./taskforge workflow run <workflow-id>
+```
+
+Run the terminal UI:
+
+```bash
+./taskforge tui
+```
+
+## Current Limitations
+
+- TUI API token revoke/manage actions are not fully wired yet.
+- Some TUI header indicators are static placeholders.
 
 ## Documentation
 
+- [Development Guide](./docs/Development.md)
 - [Architecture Overview](./docs/Architecture.md)
-- [Workflow Engine Concepts](./docs/Taskforge%20-%20Workflow%20Engine.md)
-- [Queues and Workers Plan](./docs/Taskforge%20-%20Queues%20and%20Workers%20Plan.md)
 - [CLI Guide](./apps/cli/README.md)
+- [TUI Guide](./docs/Taskforge%20-%20TUI.md)
+- [MVP Release Readiness](./docs/MVP-Release-Readiness.md)
 
 ## Project Structure
 
-```
+```text
 taskforge/
-├── apps/
-│   ├── server/           # API server (NestJS + Fastify)
-│   └── worker/           # BullMQ worker for executing steps
-├── packages/
-│   ├── contracts/        # Zod schemas (API contracts, workflow definitions)
-│   ├── db-access/        # Prisma service + repositories
-│   └── queue-config/     # BullMQ configuration (Redis connection)
-├── docs/                 # Design documents and planning notes
-├── deploy/               # Docker Compose configurations
-└── scripts/              # Utility scripts
+|- apps/
+|  |- server/      # NestJS + Fastify API
+|  |- worker/      # BullMQ worker
+|  \- cli/         # Go CLI + TUI
+|- packages/
+|  |- contracts/   # Zod schemas and contracts
+|  |- db-access/   # Prisma service + repositories
+|  \- queue/       # Queue configuration package
+|- deploy/         # Docker and compose files
+|- docs/           # Product, architecture, and development docs
+\- scripts/        # Utility scripts
 ```
-
-## Requirements
-
-- **Node.js** 20+
-- **pnpm** 9+
-- **PostgreSQL** 14+
-- **Redis** 7+
