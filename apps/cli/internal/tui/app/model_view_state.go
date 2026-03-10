@@ -18,11 +18,17 @@ func (m *Model) refreshView() {
 	cfg, ok := m.sortByView[m.view]
 	if !ok || cfg.Column < 0 || cfg.Column >= len(columns) {
 		cfg = defaultSortConfig(columns)
-		m.sortByView[m.view] = cfg
 	}
+	serverSortable := serverSortableColumnIndexesForView(m.view, columns)
+	if len(serverSortable) > 0 && !containsIndex(serverSortable, cfg.Column) {
+		cfg.Column = serverSortable[0]
+	}
+	m.sortByView[m.view] = cfg
 	m.sortColumn = cfg.Column
 	m.sortDesc = cfg.Desc
-	rows, rowIDs = screens.SortRowsForView(screens.ViewID(m.view), &m.store, columns, rows, rowIDs, cfg.Column, cfg.Desc)
+	if shouldUseClientSideSort(m.view, columns) {
+		rows, rowIDs = screens.SortRowsForView(screens.ViewID(m.view), &m.store, columns, rows, rowIDs, cfg.Column, cfg.Desc)
+	}
 	m.columns = columns
 	m.baseRows = rows
 	m.baseRowIDs = rowIDs

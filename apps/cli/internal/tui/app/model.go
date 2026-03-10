@@ -294,6 +294,8 @@ type Model struct {
 	statusScopeByView map[ViewID]statusScope
 
 	paginator paginator.Model
+
+	snapshotSort snapshotSortOptions
 }
 
 func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Config, configPath string) Model {
@@ -371,6 +373,7 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		sortColumn:         -1,
 		sortDesc:           true,
 		statusScopeByView:  map[ViewID]statusScope{},
+		snapshotSort:       defaultSnapshotSortOptions(),
 	}
 	model.setNetworkProfile(NetworkNormal)
 
@@ -388,7 +391,7 @@ func (m Model) Init() tea.Cmd {
 		width, height := initialSize()
 		return tea.WindowSizeMsg{Width: width, Height: height}
 	}
-	return tea.Batch(windowSizeCmd, pulseTick(), fetchSnapshotCmd(m.client, m.profileDelay(), m.profileShouldFail(false)))
+	return tea.Batch(windowSizeCmd, pulseTick(), fetchSnapshotCmd(m.client, m.snapshotSort, m.profileDelay(), m.profileShouldFail(false)))
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -408,7 +411,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := []tea.Cmd{pulseTick()}
 		if m.autoRefresh && !m.refreshPending && time.Since(m.lastRefresh) >= m.refreshEvery {
 			m.startMockRefresh(false)
-			cmds = append(cmds, fetchSnapshotCmd(m.client, m.profileDelay(), m.profileShouldFail(false)))
+			cmds = append(cmds, fetchSnapshotCmd(m.client, m.snapshotSort, m.profileDelay(), m.profileShouldFail(false)))
 		}
 		return m, tea.Batch(cmds...)
 	case snapshotLoadedMsg:
@@ -454,7 +457,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.refresh {
 			m.startMockRefresh(false)
-			cmds = append(cmds, fetchSnapshotCmd(m.client, m.profileDelay(), m.profileShouldFail(false)))
+			cmds = append(cmds, fetchSnapshotCmd(m.client, m.snapshotSort, m.profileDelay(), m.profileShouldFail(false)))
 		}
 		return m, tea.Batch(cmds...)
 	}

@@ -74,10 +74,26 @@ func (m *Model) cycleSortColumn() {
 	if len(m.columns) == 0 {
 		return
 	}
-	if m.sortColumn < 0 {
-		m.sortColumn = 0
+	indexes := serverSortableColumnIndexesForView(m.view, m.columns)
+	if len(indexes) == 0 {
+		indexes = make([]int, len(m.columns))
+		for i := range m.columns {
+			indexes[i] = i
+		}
+	}
+	if len(indexes) == 0 {
+		return
+	}
+
+	if m.sortColumn < 0 || !containsIndex(indexes, m.sortColumn) {
+		m.sortColumn = indexes[0]
 	} else {
-		m.sortColumn = (m.sortColumn + 1) % len(m.columns)
+		for i, idx := range indexes {
+			if idx == m.sortColumn {
+				m.sortColumn = indexes[(i+1)%len(indexes)]
+				break
+			}
+		}
 	}
 	cfg := m.sortByView[m.view]
 	cfg.Column = m.sortColumn
@@ -93,6 +109,105 @@ func (m *Model) toggleSortDirection() {
 	cfg.Desc = m.sortDesc
 	m.sortByView[m.view] = cfg
 	m.refreshView()
+}
+
+func sortOrderFromDesc(desc bool) string {
+	if desc {
+		return "desc"
+	}
+	return "asc"
+}
+
+func setAPISortSpec(target *apiListSort, by string, order string) bool {
+	by = strings.TrimSpace(by)
+	order = strings.ToLower(strings.TrimSpace(order))
+	if by == "" || (order != "asc" && order != "desc") {
+		return false
+	}
+	if target.By == by && target.Order == order {
+		return false
+	}
+	target.By = by
+	target.Order = order
+	return true
+}
+
+func (m *Model) syncServerSortForCurrentView() bool {
+	if m.sortColumn < 0 || m.sortColumn >= len(m.columns) {
+		return false
+	}
+
+	title := strings.TrimSpace(m.columns[m.sortColumn].Title)
+	field, ok := serverSortFieldForViewColumn(m.view, title)
+	if !ok {
+		return false
+	}
+	order := sortOrderFromDesc(m.sortDesc)
+
+	switch m.view {
+	case ViewWorkflows:
+		return setAPISortSpec(&m.snapshotSort.Workflows, field, order)
+	case ViewDashboard, ViewRuns:
+		return setAPISortSpec(&m.snapshotSort.Runs, field, order)
+	case ViewTriggers:
+		return setAPISortSpec(&m.snapshotSort.Triggers, field, order)
+	case ViewEvents:
+		return setAPISortSpec(&m.snapshotSort.Events, field, order)
+	case ViewSecrets:
+		return setAPISortSpec(&m.snapshotSort.Secrets, field, order)
+	}
+
+	return false
+}
+
+func serverSortFieldForViewColumn(view ViewID, title string) (string, bool) {
+	title = strings.TrimSpace(title)
+	switch view {
+	case ViewWorkflows:
+		if title == "Updated" {
+			return "updatedAt", true
+		}
+	case ViewDashboard, ViewRuns:
+		if title == "Started" {
+			return "createdAt", true
+		}
+	case ViewTriggers:
+		if title == "Created" {
+			return "createdAt", true
+		}
+	case ViewEvents:
+		if title == "Received" {
+			return "receivedAt", true
+		}
+	case ViewSecrets:
+		if title == "Created" {
+			return "createdAt", true
+		}
+	}
+	return "", false
+}
+
+func serverSortableColumnIndexesForView(view ViewID, columns []table.Column) []int {
+	indexes := make([]int, 0, len(columns))
+	for i, col := range columns {
+		if _, ok := serverSortFieldForViewColumn(view, col.Title); ok {
+			indexes = append(indexes, i)
+		}
+	}
+	return indexes
+}
+
+func shouldUseClientSideSort(view ViewID, columns []table.Column) bool {
+	return len(serverSortableColumnIndexesForView(view, columns)) == 0
+}
+
+func containsIndex(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func truncateRows(rows []table.Row, columns []table.Column) []table.Row {

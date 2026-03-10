@@ -41,7 +41,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Retry) && m.canRetry() {
 		m.startMockRefresh(true)
 		clearToastCmd := m.pushToast(ToastInfo, "Retrying refresh...")
-		return m, tea.Batch(fetchSnapshotCmd(m.client, m.profileDelay(), m.profileShouldFail(true)), clearToastCmd)
+		return m, tea.Batch(fetchSnapshotCmd(m.client, m.snapshotSort, m.profileDelay(), m.profileShouldFail(true)), clearToastCmd)
 	}
 	if key.Matches(msg, m.keys.Palette) {
 		m.palette = buildPalette(m.theme, m.paletteRecent, m.paletteState())
@@ -160,10 +160,18 @@ func (m *Model) updateMain(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if key.Matches(keyMsg, m.keys.SortColumn) {
 			m.cycleSortColumn()
+			if m.syncServerSortForCurrentView() {
+				m.startMockRefresh(false)
+				return m, fetchSnapshotCmd(m.client, m.snapshotSort, m.profileDelay(), m.profileShouldFail(false))
+			}
 			return m, nil
 		}
 		if key.Matches(keyMsg, m.keys.SortDirection) {
 			m.toggleSortDirection()
+			if m.syncServerSortForCurrentView() {
+				m.startMockRefresh(false)
+				return m, fetchSnapshotCmd(m.client, m.snapshotSort, m.profileDelay(), m.profileShouldFail(false))
+			}
 			return m, nil
 		}
 		if key.Matches(keyMsg, m.keys.JumpTop) {

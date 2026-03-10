@@ -3,7 +3,6 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +12,60 @@ import (
 )
 
 const apiPageSize = 100
+
+type apiListSort struct {
+	By    string
+	Order string
+}
+
+type snapshotSortOptions struct {
+	Workflows        apiListSort
+	WorkflowVersions apiListSort
+	Triggers         apiListSort
+	Runs             apiListSort
+	Events           apiListSort
+	StepRuns         apiListSort
+	Secrets          apiListSort
+}
+
+func defaultSnapshotSortOptions() snapshotSortOptions {
+	return snapshotSortOptions{
+		Workflows:        apiListSort{By: "updatedAt", Order: "desc"},
+		WorkflowVersions: apiListSort{By: "version", Order: "desc"},
+		Triggers:         apiListSort{By: "createdAt", Order: "desc"},
+		Runs:             apiListSort{By: "createdAt", Order: "desc"},
+		Events:           apiListSort{By: "receivedAt", Order: "desc"},
+		StepRuns:         apiListSort{By: "createdAt", Order: "asc"},
+		Secrets:          apiListSort{By: "createdAt", Order: "desc"},
+	}
+}
+
+func normalizedSnapshotSortOptions(input snapshotSortOptions) snapshotSortOptions {
+	defaults := defaultSnapshotSortOptions()
+	merge := func(current apiListSort, fallback apiListSort) apiListSort {
+		if strings.TrimSpace(current.By) == "" {
+			current.By = fallback.By
+		}
+		if strings.TrimSpace(current.Order) == "" {
+			current.Order = fallback.Order
+		}
+		current.Order = strings.ToLower(strings.TrimSpace(current.Order))
+		if current.Order != "asc" && current.Order != "desc" {
+			current.Order = fallback.Order
+		}
+		return current
+	}
+
+	return snapshotSortOptions{
+		Workflows:        merge(input.Workflows, defaults.Workflows),
+		WorkflowVersions: merge(input.WorkflowVersions, defaults.WorkflowVersions),
+		Triggers:         merge(input.Triggers, defaults.Triggers),
+		Runs:             merge(input.Runs, defaults.Runs),
+		Events:           merge(input.Events, defaults.Events),
+		StepRuns:         merge(input.StepRuns, defaults.StepRuns),
+		Secrets:          merge(input.Secrets, defaults.Secrets),
+	}
+}
 
 type snapshotLoadedMsg struct {
 	store     data.Store
@@ -26,7 +79,7 @@ type mutationResultMsg struct {
 	refresh        bool
 }
 
-func fetchSnapshotCmd(client *api.Client, delay time.Duration, fail bool) tea.Cmd {
+func fetchSnapshotCmd(client *api.Client, sortOptions snapshotSortOptions, delay time.Duration, fail bool) tea.Cmd {
 	return func() tea.Msg {
 		if delay > 0 {
 			time.Sleep(delay)
@@ -34,7 +87,7 @@ func fetchSnapshotCmd(client *api.Client, delay time.Duration, fail bool) tea.Cm
 		if fail {
 			return snapshotLoadedMsg{err: fmt.Errorf("simulated flaky network")}
 		}
-		store, err := loadStoreFromAPI(client)
+		store, err := loadStoreFromAPI(client, normalizedSnapshotSortOptions(sortOptions))
 		if err != nil {
 			return snapshotLoadedMsg{err: err, apiStatus: "OFFLINE"}
 		}
@@ -42,12 +95,12 @@ func fetchSnapshotCmd(client *api.Client, delay time.Duration, fail bool) tea.Cm
 	}
 }
 
-func loadStoreFromAPI(client *api.Client) (data.Store, error) {
+func loadStoreFromAPI(client *api.Client, sortOptions snapshotSortOptions) (data.Store, error) {
 	if client == nil {
 		return data.Store{}, fmt.Errorf("api client is not configured")
 	}
 
-	apiWorkflows, err := listAllWorkflows(client)
+	apiWorkflows, err := listAllWorkflows(client, sortOptions.Workflows)
 	if err != nil {
 		return data.Store{}, err
 	}
@@ -59,26 +112,26 @@ func loadStoreFromAPI(client *api.Client) (data.Store, error) {
 	stepsByRun := map[string][]api.StepRun{}
 
 	for _, wf := range apiWorkflows {
-		versions, err := listAllWorkflowVersions(client, wf.ID)
+		versions, err := listAllWorkflowVersions(client, wf.ID, sortOptions.WorkflowVersions)
 		if err != nil {
 			return data.Store{}, err
 		}
 		versionsByWorkflow[wf.ID] = versions
 
-		triggers, err := listAllTriggers(client, wf.ID)
+		triggers, err := listAllTriggers(client, wf.ID, sortOptions.Triggers)
 		if err != nil {
 			return data.Store{}, err
 		}
 		triggersByWorkflow[wf.ID] = triggers
 
-		runs, err := listAllWorkflowRuns(client, wf.ID)
+		runs, err := listAllWorkflowRuns(client, wf.ID, sortOptions.Runs)
 		if err != nil {
 			return data.Store{}, err
 		}
 		runsByWorkflow[wf.ID] = runs
 
 		for _, trigger := range triggers {
-			events, err := listAllEvents(client, wf.ID, trigger.ID)
+			events, err := listAllEvents(client, wf.ID, trigger.ID, sortOptions.Events)
 			if err != nil {
 				return data.Store{}, err
 			}
@@ -86,7 +139,7 @@ func loadStoreFromAPI(client *api.Client) (data.Store, error) {
 		}
 
 		for _, run := range runs {
-			steps, err := listAllStepRuns(client, wf.ID, run.ID)
+			steps, err := listAllStepRuns(client, wf.ID, run.ID, sortOptions.StepRuns)
 			if err != nil {
 				return data.Store{}, err
 			}
@@ -94,7 +147,7 @@ func loadStoreFromAPI(client *api.Client) (data.Store, error) {
 		}
 	}
 
-	secrets, err := listAllSecrets(client)
+	secrets, err := listAllSecrets(client, sortOptions.Secrets)
 	if err != nil {
 		return data.Store{}, err
 	}
@@ -241,24 +294,14 @@ func loadStoreFromAPI(client *api.Client) (data.Store, error) {
 		})
 	}
 
-	sort.SliceStable(store.Workflows, func(i int, j int) bool {
-		return store.Workflows[i].UpdatedAt.After(store.Workflows[j].UpdatedAt)
-	})
-	sort.SliceStable(store.Runs, func(i int, j int) bool {
-		return store.Runs[i].StartedAt.After(store.Runs[j].StartedAt)
-	})
-	sort.SliceStable(store.Events, func(i int, j int) bool {
-		return store.Events[i].ReceivedAt.After(store.Events[j].ReceivedAt)
-	})
-
 	return store, nil
 }
 
-func listAllWorkflows(client *api.Client) ([]api.Workflow, error) {
+func listAllWorkflows(client *api.Client, sortSpec apiListSort) ([]api.Workflow, error) {
 	items := make([]api.Workflow, 0)
 	page := 1
 	for {
-		result, err := client.ListWorkflows(page, apiPageSize, "updatedAt", "desc")
+		result, err := client.ListWorkflows(page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -271,11 +314,11 @@ func listAllWorkflows(client *api.Client) ([]api.Workflow, error) {
 	return items, nil
 }
 
-func listAllWorkflowVersions(client *api.Client, workflowID string) ([]api.WorkflowVersion, error) {
+func listAllWorkflowVersions(client *api.Client, workflowID string, sortSpec apiListSort) ([]api.WorkflowVersion, error) {
 	items := make([]api.WorkflowVersion, 0)
 	page := 1
 	for {
-		result, err := client.ListWorkflowVersions(workflowID, page, apiPageSize, "version", "desc")
+		result, err := client.ListWorkflowVersions(workflowID, page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -288,11 +331,11 @@ func listAllWorkflowVersions(client *api.Client, workflowID string) ([]api.Workf
 	return items, nil
 }
 
-func listAllTriggers(client *api.Client, workflowID string) ([]api.Trigger, error) {
+func listAllTriggers(client *api.Client, workflowID string, sortSpec apiListSort) ([]api.Trigger, error) {
 	items := make([]api.Trigger, 0)
 	page := 1
 	for {
-		result, err := client.ListTriggers(workflowID, page, apiPageSize, "createdAt", "desc")
+		result, err := client.ListTriggers(workflowID, page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -305,11 +348,11 @@ func listAllTriggers(client *api.Client, workflowID string) ([]api.Trigger, erro
 	return items, nil
 }
 
-func listAllWorkflowRuns(client *api.Client, workflowID string) ([]api.WorkflowRun, error) {
+func listAllWorkflowRuns(client *api.Client, workflowID string, sortSpec apiListSort) ([]api.WorkflowRun, error) {
 	items := make([]api.WorkflowRun, 0)
 	page := 1
 	for {
-		result, err := client.ListWorkflowRuns(workflowID, page, apiPageSize, "createdAt", "desc")
+		result, err := client.ListWorkflowRuns(workflowID, page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -322,11 +365,11 @@ func listAllWorkflowRuns(client *api.Client, workflowID string) ([]api.WorkflowR
 	return items, nil
 }
 
-func listAllEvents(client *api.Client, workflowID string, triggerID string) ([]api.Event, error) {
+func listAllEvents(client *api.Client, workflowID string, triggerID string, sortSpec apiListSort) ([]api.Event, error) {
 	items := make([]api.Event, 0)
 	page := 1
 	for {
-		result, err := client.ListEvents(workflowID, triggerID, page, apiPageSize, "receivedAt", "desc")
+		result, err := client.ListEvents(workflowID, triggerID, page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -339,11 +382,11 @@ func listAllEvents(client *api.Client, workflowID string, triggerID string) ([]a
 	return items, nil
 }
 
-func listAllStepRuns(client *api.Client, workflowID string, runID string) ([]api.StepRun, error) {
+func listAllStepRuns(client *api.Client, workflowID string, runID string, sortSpec apiListSort) ([]api.StepRun, error) {
 	items := make([]api.StepRun, 0)
 	page := 1
 	for {
-		result, err := client.ListStepRuns(workflowID, runID, page, apiPageSize, "createdAt", "asc")
+		result, err := client.ListStepRuns(workflowID, runID, page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
@@ -356,11 +399,11 @@ func listAllStepRuns(client *api.Client, workflowID string, runID string) ([]api
 	return items, nil
 }
 
-func listAllSecrets(client *api.Client) ([]api.Secret, error) {
+func listAllSecrets(client *api.Client, sortSpec apiListSort) ([]api.Secret, error) {
 	items := make([]api.Secret, 0)
 	page := 1
 	for {
-		result, err := client.ListSecrets(page, apiPageSize, "createdAt", "desc")
+		result, err := client.ListSecrets(page, apiPageSize, sortSpec.By, sortSpec.Order)
 		if err != nil {
 			return nil, err
 		}
