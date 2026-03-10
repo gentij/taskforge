@@ -1,12 +1,14 @@
 package api
 
 type Pagination struct {
-	Page       int  `json:"page"`
-	PageSize   int  `json:"pageSize"`
-	Total      int  `json:"total"`
-	TotalPages int  `json:"totalPages"`
-	HasNext    bool `json:"hasNext"`
-	HasPrev    bool `json:"hasPrev"`
+	Page       int    `json:"page"`
+	PageSize   int    `json:"pageSize"`
+	Total      int    `json:"total"`
+	TotalPages int    `json:"totalPages"`
+	HasNext    bool   `json:"hasNext"`
+	HasPrev    bool   `json:"hasPrev"`
+	SortBy     string `json:"sortBy,omitempty"`
+	SortOrder  string `json:"sortOrder,omitempty"`
 }
 
 type Paginated[T any] struct {

@@ -18,6 +18,8 @@ var triggerCmd = &cobra.Command{
 
 var triggerListPage int
 var triggerListPageSize int
+var triggerListSortBy string
+var triggerListSortOrder string
 var triggerCreateType string
 var triggerCreateName string
 var triggerCreateIsActive bool
@@ -35,6 +37,8 @@ func init() {
 	}
 	listCmd.Flags().IntVar(&triggerListPage, "page", 1, "Page number")
 	listCmd.Flags().IntVar(&triggerListPageSize, "page-size", 25, "Page size")
+	listCmd.Flags().StringVar(&triggerListSortBy, "sort-by", "createdAt", "Sort field (createdAt|updatedAt)")
+	listCmd.Flags().StringVar(&triggerListSortOrder, "sort-order", "desc", "Sort order (asc|desc)")
 
 	getCmd := &cobra.Command{
 		Use:   "get <workflow-id> <trigger-id>",
@@ -86,7 +90,7 @@ func triggerList(cmd *cobra.Command, args []string) error {
 	}
 
 	workflowID := args[0]
-	result, err := ctx.Client.ListTriggers(workflowID, triggerListPage, triggerListPageSize)
+	result, err := ctx.Client.ListTriggers(workflowID, triggerListPage, triggerListPageSize, triggerListSortBy, triggerListSortOrder)
 	if err != nil {
 		return err
 	}

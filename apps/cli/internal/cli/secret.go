@@ -16,6 +16,8 @@ var secretCmd = &cobra.Command{
 
 var secretListPage int
 var secretListPageSize int
+var secretListSortBy string
+var secretListSortOrder string
 var secretCreateName string
 var secretCreateValue string
 var secretCreateDescription string
@@ -31,6 +33,8 @@ func init() {
 	}
 	listCmd.Flags().IntVar(&secretListPage, "page", 1, "Page number")
 	listCmd.Flags().IntVar(&secretListPageSize, "page-size", 25, "Page size")
+	listCmd.Flags().StringVar(&secretListSortBy, "sort-by", "createdAt", "Sort field (createdAt|updatedAt)")
+	listCmd.Flags().StringVar(&secretListSortOrder, "sort-order", "desc", "Sort order (asc|desc)")
 
 	getCmd := &cobra.Command{
 		Use:   "get <secret-id>",
@@ -80,7 +84,7 @@ func secretList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("missing context")
 	}
 
-	result, err := ctx.Client.ListSecrets(secretListPage, secretListPageSize)
+	result, err := ctx.Client.ListSecrets(secretListPage, secretListPageSize, secretListSortBy, secretListSortOrder)
 	if err != nil {
 		return err
 	}

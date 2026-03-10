@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -84,9 +85,9 @@ type validateResponse struct {
 	ReferencedSecrets    []string            `json:"referencedSecrets"`
 }
 
-func (c *Client) ListWorkflows(page int, pageSize int) (Paginated[Workflow], error) {
+func (c *Client) ListWorkflows(page int, pageSize int, sortBy string, sortOrder string) (Paginated[Workflow], error) {
 	var result Paginated[Workflow]
-	path := fmt.Sprintf("/workflows?page=%d&pageSize=%d", page, pageSize)
+	path := paginatedPath("/workflows", page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
 }
 
@@ -130,9 +131,9 @@ func (c *Client) ValidateWorkflow(id string, definition any) (validateResponse, 
 	return result, c.PostJSON("/workflows/"+id+"/versions/validate", payload, &result)
 }
 
-func (c *Client) ListWorkflowVersions(workflowID string, page int, pageSize int) (Paginated[WorkflowVersion], error) {
+func (c *Client) ListWorkflowVersions(workflowID string, page int, pageSize int, sortBy string, sortOrder string) (Paginated[WorkflowVersion], error) {
 	var result Paginated[WorkflowVersion]
-	path := fmt.Sprintf("/workflows/%s/versions?page=%d&pageSize=%d", workflowID, page, pageSize)
+	path := paginatedPath(fmt.Sprintf("/workflows/%s/versions", workflowID), page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
 }
 
@@ -147,9 +148,9 @@ func (c *Client) CreateWorkflowVersion(workflowID string, definition any) (Workf
 	return result, c.PostJSON("/workflows/"+workflowID+"/versions", payload, &result)
 }
 
-func (c *Client) ListTriggers(workflowID string, page int, pageSize int) (Paginated[Trigger], error) {
+func (c *Client) ListTriggers(workflowID string, page int, pageSize int, sortBy string, sortOrder string) (Paginated[Trigger], error) {
 	var result Paginated[Trigger]
-	path := fmt.Sprintf("/workflows/%s/triggers?page=%d&pageSize=%d", workflowID, page, pageSize)
+	path := paginatedPath(fmt.Sprintf("/workflows/%s/triggers", workflowID), page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
 }
 
@@ -173,9 +174,9 @@ func (c *Client) DeleteTrigger(workflowID string, triggerID string) (Trigger, er
 	return result, c.DeleteJSON("/workflows/"+workflowID+"/triggers/"+triggerID, &result)
 }
 
-func (c *Client) ListWorkflowRuns(workflowID string, page int, pageSize int) (Paginated[WorkflowRun], error) {
+func (c *Client) ListWorkflowRuns(workflowID string, page int, pageSize int, sortBy string, sortOrder string) (Paginated[WorkflowRun], error) {
 	var result Paginated[WorkflowRun]
-	path := fmt.Sprintf("/workflows/%s/runs?page=%d&pageSize=%d", workflowID, page, pageSize)
+	path := paginatedPath(fmt.Sprintf("/workflows/%s/runs", workflowID), page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
 }
 
@@ -184,9 +185,9 @@ func (c *Client) GetWorkflowRun(workflowID string, runID string) (WorkflowRun, e
 	return result, c.GetJSON("/workflows/"+workflowID+"/runs/"+runID, &result)
 }
 
-func (c *Client) ListStepRuns(workflowID string, runID string, page int, pageSize int) (Paginated[StepRun], error) {
+func (c *Client) ListStepRuns(workflowID string, runID string, page int, pageSize int, sortBy string, sortOrder string) (Paginated[StepRun], error) {
 	var result Paginated[StepRun]
-	path := fmt.Sprintf("/workflows/%s/runs/%s/steps?page=%d&pageSize=%d", workflowID, runID, page, pageSize)
+	path := paginatedPath(fmt.Sprintf("/workflows/%s/runs/%s/steps", workflowID, runID), page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
 }
 
@@ -195,9 +196,9 @@ func (c *Client) GetStepRun(workflowID string, runID string, stepID string) (Ste
 	return result, c.GetJSON("/workflows/"+workflowID+"/runs/"+runID+"/steps/"+stepID, &result)
 }
 
-func (c *Client) ListEvents(workflowID string, triggerID string, page int, pageSize int) (Paginated[Event], error) {
+func (c *Client) ListEvents(workflowID string, triggerID string, page int, pageSize int, sortBy string, sortOrder string) (Paginated[Event], error) {
 	var result Paginated[Event]
-	path := fmt.Sprintf("/workflows/%s/triggers/%s/events?page=%d&pageSize=%d", workflowID, triggerID, page, pageSize)
+	path := paginatedPath(fmt.Sprintf("/workflows/%s/triggers/%s/events", workflowID, triggerID), page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
 }
 
@@ -207,10 +208,23 @@ func (c *Client) GetEvent(workflowID string, triggerID string, eventID string) (
 	return result, c.GetJSON(path, &result)
 }
 
-func (c *Client) ListSecrets(page int, pageSize int) (Paginated[Secret], error) {
+func (c *Client) ListSecrets(page int, pageSize int, sortBy string, sortOrder string) (Paginated[Secret], error) {
 	var result Paginated[Secret]
-	path := fmt.Sprintf("/secrets?page=%d&pageSize=%d", page, pageSize)
+	path := paginatedPath("/secrets", page, pageSize, sortBy, sortOrder)
 	return result, c.GetJSON(path, &result)
+}
+
+func paginatedPath(base string, page int, pageSize int, sortBy string, sortOrder string) string {
+	q := url.Values{}
+	q.Set("page", strconv.Itoa(page))
+	q.Set("pageSize", strconv.Itoa(pageSize))
+	if strings.TrimSpace(sortBy) != "" {
+		q.Set("sortBy", strings.TrimSpace(sortBy))
+	}
+	if strings.TrimSpace(sortOrder) != "" {
+		q.Set("sortOrder", strings.ToLower(strings.TrimSpace(sortOrder)))
+	}
+	return base + "?" + q.Encode()
 }
 
 func (c *Client) GetSecret(id string) (Secret, error) {

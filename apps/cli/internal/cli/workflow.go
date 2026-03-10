@@ -16,6 +16,8 @@ var workflowCmd = &cobra.Command{
 
 var workflowListPage int
 var workflowListPageSize int
+var workflowListSortBy string
+var workflowListSortOrder string
 var workflowCreateName string
 var workflowCreateDefinition string
 var workflowUpdateName string
@@ -32,6 +34,8 @@ func init() {
 	}
 	listCmd.Flags().IntVar(&workflowListPage, "page", 1, "Page number")
 	listCmd.Flags().IntVar(&workflowListPageSize, "page-size", 25, "Page size")
+	listCmd.Flags().StringVar(&workflowListSortBy, "sort-by", "createdAt", "Sort field (createdAt|updatedAt)")
+	listCmd.Flags().StringVar(&workflowListSortOrder, "sort-order", "desc", "Sort order (asc|desc)")
 
 	getCmd := &cobra.Command{
 		Use:   "get <workflow-id>",
@@ -100,7 +104,7 @@ func workflowList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("missing context")
 	}
 
-	result, err := ctx.Client.ListWorkflows(workflowListPage, workflowListPageSize)
+	result, err := ctx.Client.ListWorkflows(workflowListPage, workflowListPageSize, workflowListSortBy, workflowListSortOrder)
 	if err != nil {
 		return err
 	}

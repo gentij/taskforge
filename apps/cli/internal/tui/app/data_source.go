@@ -258,7 +258,7 @@ func listAllWorkflows(client *api.Client) ([]api.Workflow, error) {
 	items := make([]api.Workflow, 0)
 	page := 1
 	for {
-		result, err := client.ListWorkflows(page, apiPageSize)
+		result, err := client.ListWorkflows(page, apiPageSize, "updatedAt", "desc")
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +275,7 @@ func listAllWorkflowVersions(client *api.Client, workflowID string) ([]api.Workf
 	items := make([]api.WorkflowVersion, 0)
 	page := 1
 	for {
-		result, err := client.ListWorkflowVersions(workflowID, page, apiPageSize)
+		result, err := client.ListWorkflowVersions(workflowID, page, apiPageSize, "version", "desc")
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +292,7 @@ func listAllTriggers(client *api.Client, workflowID string) ([]api.Trigger, erro
 	items := make([]api.Trigger, 0)
 	page := 1
 	for {
-		result, err := client.ListTriggers(workflowID, page, apiPageSize)
+		result, err := client.ListTriggers(workflowID, page, apiPageSize, "createdAt", "desc")
 		if err != nil {
 			return nil, err
 		}
@@ -309,7 +309,7 @@ func listAllWorkflowRuns(client *api.Client, workflowID string) ([]api.WorkflowR
 	items := make([]api.WorkflowRun, 0)
 	page := 1
 	for {
-		result, err := client.ListWorkflowRuns(workflowID, page, apiPageSize)
+		result, err := client.ListWorkflowRuns(workflowID, page, apiPageSize, "createdAt", "desc")
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func listAllEvents(client *api.Client, workflowID string, triggerID string) ([]a
 	items := make([]api.Event, 0)
 	page := 1
 	for {
-		result, err := client.ListEvents(workflowID, triggerID, page, apiPageSize)
+		result, err := client.ListEvents(workflowID, triggerID, page, apiPageSize, "receivedAt", "desc")
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +343,7 @@ func listAllStepRuns(client *api.Client, workflowID string, runID string) ([]api
 	items := make([]api.StepRun, 0)
 	page := 1
 	for {
-		result, err := client.ListStepRuns(workflowID, runID, page, apiPageSize)
+		result, err := client.ListStepRuns(workflowID, runID, page, apiPageSize, "createdAt", "asc")
 		if err != nil {
 			return nil, err
 		}
@@ -360,7 +360,7 @@ func listAllSecrets(client *api.Client) ([]api.Secret, error) {
 	items := make([]api.Secret, 0)
 	page := 1
 	for {
-		result, err := client.ListSecrets(page, apiPageSize)
+		result, err := client.ListSecrets(page, apiPageSize, "createdAt", "desc")
 		if err != nil {
 			return nil, err
 		}

@@ -15,6 +15,8 @@ var stepCmd = &cobra.Command{
 
 var stepListPage int
 var stepListPageSize int
+var stepListSortBy string
+var stepListSortOrder string
 
 func init() {
 	listCmd := &cobra.Command{
@@ -25,6 +27,8 @@ func init() {
 	}
 	listCmd.Flags().IntVar(&stepListPage, "page", 1, "Page number")
 	listCmd.Flags().IntVar(&stepListPageSize, "page-size", 25, "Page size")
+	listCmd.Flags().StringVar(&stepListSortBy, "sort-by", "createdAt", "Sort field (createdAt|updatedAt)")
+	listCmd.Flags().StringVar(&stepListSortOrder, "sort-order", "asc", "Sort order (asc|desc)")
 
 	getCmd := &cobra.Command{
 		Use:   "get <workflow-id> <run-id> <step-run-id>",
@@ -45,7 +49,7 @@ func stepList(cmd *cobra.Command, args []string) error {
 
 	workflowID := args[0]
 	runID := args[1]
-	result, err := ctx.Client.ListStepRuns(workflowID, runID, stepListPage, stepListPageSize)
+	result, err := ctx.Client.ListStepRuns(workflowID, runID, stepListPage, stepListPageSize, stepListSortBy, stepListSortOrder)
 	if err != nil {
 		return err
 	}

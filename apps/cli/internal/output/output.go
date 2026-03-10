@@ -44,13 +44,19 @@ func PrintPagination(meta api.Pagination) error {
 		return nil
 	}
 
+	sortLabel := ""
+	if strings.TrimSpace(meta.SortBy) != "" && strings.TrimSpace(meta.SortOrder) != "" {
+		sortLabel = fmt.Sprintf(" · Sort %s %s", meta.SortBy, strings.ToLower(meta.SortOrder))
+	}
+
 	_, err := fmt.Fprintf(
 		os.Stdout,
-		"Page %d/%d · Total %d · PageSize %d\n",
+		"Page %d/%d · Total %d · PageSize %d%s\n",
 		meta.Page,
 		meta.TotalPages,
 		meta.Total,
 		meta.PageSize,
+		sortLabel,
 	)
 	return err
 }

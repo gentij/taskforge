@@ -16,6 +16,8 @@ var workflowVersionCmd = &cobra.Command{
 
 var workflowVersionListPage int
 var workflowVersionListPageSize int
+var workflowVersionListSortBy string
+var workflowVersionListSortOrder string
 var workflowVersionCreateDefinition string
 
 func init() {
@@ -27,6 +29,8 @@ func init() {
 	}
 	listCmd.Flags().IntVar(&workflowVersionListPage, "page", 1, "Page number")
 	listCmd.Flags().IntVar(&workflowVersionListPageSize, "page-size", 25, "Page size")
+	listCmd.Flags().StringVar(&workflowVersionListSortBy, "sort-by", "version", "Sort field (version|createdAt)")
+	listCmd.Flags().StringVar(&workflowVersionListSortOrder, "sort-order", "desc", "Sort order (asc|desc)")
 
 	getCmd := &cobra.Command{
 		Use:   "get <workflow-id> <version>",
@@ -56,7 +60,7 @@ func workflowVersionList(cmd *cobra.Command, args []string) error {
 	}
 
 	workflowID := args[0]
-	result, err := ctx.Client.ListWorkflowVersions(workflowID, workflowVersionListPage, workflowVersionListPageSize)
+	result, err := ctx.Client.ListWorkflowVersions(workflowID, workflowVersionListPage, workflowVersionListPageSize, workflowVersionListSortBy, workflowVersionListSortOrder)
 	if err != nil {
 		return err
 	}

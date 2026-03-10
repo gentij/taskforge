@@ -15,6 +15,8 @@ var runCmd = &cobra.Command{
 
 var runListPage int
 var runListPageSize int
+var runListSortBy string
+var runListSortOrder string
 
 func init() {
 	listCmd := &cobra.Command{
@@ -25,6 +27,8 @@ func init() {
 	}
 	listCmd.Flags().IntVar(&runListPage, "page", 1, "Page number")
 	listCmd.Flags().IntVar(&runListPageSize, "page-size", 25, "Page size")
+	listCmd.Flags().StringVar(&runListSortBy, "sort-by", "createdAt", "Sort field (createdAt|updatedAt)")
+	listCmd.Flags().StringVar(&runListSortOrder, "sort-order", "desc", "Sort order (asc|desc)")
 
 	getCmd := &cobra.Command{
 		Use:   "get <workflow-id> <run-id>",
@@ -44,7 +48,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	workflowID := args[0]
-	result, err := ctx.Client.ListWorkflowRuns(workflowID, runListPage, runListPageSize)
+	result, err := ctx.Client.ListWorkflowRuns(workflowID, runListPage, runListPageSize, runListSortBy, runListSortOrder)
 	if err != nil {
 		return err
 	}
