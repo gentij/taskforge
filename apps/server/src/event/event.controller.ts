@@ -5,8 +5,7 @@ import {
   ApiPaginatedEnvelope,
 } from 'src/common/swagger/envelope/api-envelope.decorator';
 import { EventService } from './event.service';
-import { EventResDto } from './dto/event.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
+import { EventListQueryDto, EventResDto } from './dto/event.dto';
 
 @ApiTags('Events')
 @ApiBearerAuth('bearer')
@@ -22,7 +21,7 @@ export class EventController {
   list(
     @Param('workflowId') workflowId: string,
     @Param('triggerId') triggerId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: EventListQueryDto,
   ) {
     return this.service.list({ workflowId, triggerId, ...query });
   }

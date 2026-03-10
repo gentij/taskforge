@@ -173,7 +173,12 @@ export class WorkflowService {
     return result;
   }
 
-  async list(params: { page: number; pageSize: number }): Promise<{
+  async list(params: {
+    page: number;
+    pageSize: number;
+    sortBy: 'createdAt' | 'updatedAt';
+    sortOrder: 'asc' | 'desc';
+  }): Promise<{
     items: Workflow[];
     pagination: ReturnType<typeof buildPaginationMeta>;
   }> {
@@ -184,6 +189,8 @@ export class WorkflowService {
         page: params.page,
         pageSize: params.pageSize,
         total,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       }),
     };
   }

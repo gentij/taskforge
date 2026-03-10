@@ -1,6 +1,10 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { WorkflowDefinitionSchema } from '@taskforge/contracts';
+import {
+  PaginationQuerySchema,
+  SortOrderSchema,
+} from 'src/common/dto/pagination.dto';
 
 export const WorkflowResSchema = z.object({
   id: z.string(),
@@ -12,6 +16,15 @@ export const WorkflowResSchema = z.object({
 });
 
 export class WorkflowResDto extends createZodDto(WorkflowResSchema) {}
+
+export const WorkflowListSortBySchema = z.enum(['createdAt', 'updatedAt']);
+export const WorkflowListQuerySchema = PaginationQuerySchema.extend({
+  sortBy: WorkflowListSortBySchema.default('createdAt'),
+  sortOrder: SortOrderSchema.default('desc'),
+});
+export class WorkflowListQueryDto extends createZodDto(
+  WorkflowListQuerySchema,
+) {}
 
 export const CreateWorkflowReqSchema = z.object({
   name: z.string().min(1).max(120),

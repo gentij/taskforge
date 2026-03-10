@@ -17,13 +17,13 @@ import type { Prisma } from '@prisma/client';
 import { TriggerService } from './trigger.service';
 import {
   CreateTriggerReqDto,
+  TriggerListQueryDto,
   TriggerResDto,
   UpdateTriggerReqDto,
 } from './dto/trigger.dto';
 import { OrchestrationService } from 'src/core/orchestration.service';
 import { WorkflowService } from 'src/workflow/workflow.service';
 import { RunWorkflowReqDto } from 'src/workflow/dto/workflow.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Triggers')
 @ApiBearerAuth('bearer')
@@ -60,7 +60,7 @@ export class TriggerController {
   @Get()
   list(
     @Param('workflowId') workflowId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: TriggerListQueryDto,
   ) {
     return this.service.list({ workflowId, ...query });
   }

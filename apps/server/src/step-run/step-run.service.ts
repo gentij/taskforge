@@ -54,6 +54,8 @@ export class StepRunService {
     workflowRunId: string;
     page: number;
     pageSize: number;
+    sortBy: 'createdAt' | 'updatedAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{
     items: StepRun[];
     pagination: ReturnType<typeof buildPaginationMeta>;
@@ -66,6 +68,8 @@ export class StepRunService {
         page: params.page,
         pageSize: params.pageSize,
         total,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       }),
     };
   }

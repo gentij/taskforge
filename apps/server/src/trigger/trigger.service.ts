@@ -66,6 +66,8 @@ export class TriggerService {
     workflowId: string;
     page: number;
     pageSize: number;
+    sortBy: 'createdAt' | 'updatedAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{
     items: Trigger[];
     pagination: ReturnType<typeof buildPaginationMeta>;
@@ -78,6 +80,8 @@ export class TriggerService {
         page: params.page,
         pageSize: params.pageSize,
         total,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       }),
     };
   }

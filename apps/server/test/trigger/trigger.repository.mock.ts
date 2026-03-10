@@ -5,7 +5,15 @@ export type TriggerRepositoryMock = {
   findManyByWorkflow: jest.Mock<Promise<Trigger[]>, [string]>;
   findPageByWorkflow: jest.Mock<
     Promise<{ items: Trigger[]; total: number }>,
-    [{ workflowId: string; page: number; pageSize: number }]
+    [
+      {
+        workflowId: string;
+        page: number;
+        pageSize: number;
+        sortBy: 'createdAt' | 'updatedAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >;
   findById: jest.Mock<Promise<Trigger | null>, [string]>;
   update: jest.Mock<Promise<Trigger>, [string, any]>;
@@ -17,7 +25,15 @@ export const createTriggerRepositoryMock = (): TriggerRepositoryMock => ({
   findManyByWorkflow: jest.fn<Promise<Trigger[]>, [string]>(),
   findPageByWorkflow: jest.fn<
     Promise<{ items: Trigger[]; total: number }>,
-    [{ workflowId: string; page: number; pageSize: number }]
+    [
+      {
+        workflowId: string;
+        page: number;
+        pageSize: number;
+        sortBy: 'createdAt' | 'updatedAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >(),
   findById: jest.fn<Promise<Trigger | null>, [string]>(),
   update: jest.fn<Promise<Trigger>, [string, any]>(),

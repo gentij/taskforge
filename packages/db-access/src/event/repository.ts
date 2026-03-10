@@ -21,12 +21,18 @@ export class EventRepository {
     triggerId: string;
     page: number;
     pageSize: number;
+    sortBy: 'receivedAt' | 'createdAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{ items: Event[]; total: number }> {
     const skip = (params.page - 1) * params.pageSize;
+    const orderBy =
+      params.sortBy === 'createdAt'
+        ? [{ createdAt: params.sortOrder }, { id: params.sortOrder }]
+        : [{ receivedAt: params.sortOrder }, { id: params.sortOrder }];
     const [items, total] = await Promise.all([
       this.prisma.event.findMany({
         where: { triggerId: params.triggerId },
-        orderBy: { receivedAt: 'desc' },
+        orderBy,
         skip,
         take: params.pageSize,
       }),

@@ -24,7 +24,13 @@ export class WorkflowVersionService {
     return wf;
   }
 
-  async list(params: { workflowId: string; page: number; pageSize: number }) {
+  async list(params: {
+    workflowId: string;
+    page: number;
+    pageSize: number;
+    sortBy: 'version' | 'createdAt';
+    sortOrder: 'asc' | 'desc';
+  }) {
     await this.assertWorkflowExists(params.workflowId);
     const { items, total } = await this.repo.findPageByWorkflow(params);
     return {
@@ -33,6 +39,8 @@ export class WorkflowVersionService {
         page: params.page,
         pageSize: params.pageSize,
         total,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       }),
     };
   }

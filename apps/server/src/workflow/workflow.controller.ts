@@ -20,8 +20,8 @@ import {
   WorkflowResDto,
   RunWorkflowReqDto,
   RunWorkflowResDto,
+  WorkflowListQueryDto,
 } from './dto/workflow.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 import {
   CreateWorkflowVersionReqDto,
   WorkflowVersionResDto,
@@ -58,7 +58,7 @@ export class WorkflowController {
     errors: [401, 500],
   })
   @Get()
-  list(@Query() query: PaginationQueryDto) {
+  list(@Query() query: WorkflowListQueryDto) {
     return this.service.list(query);
   }
 

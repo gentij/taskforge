@@ -21,12 +21,18 @@ export class TriggerRepository {
     workflowId: string;
     page: number;
     pageSize: number;
+    sortBy: 'createdAt' | 'updatedAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{ items: Trigger[]; total: number }> {
     const skip = (params.page - 1) * params.pageSize;
+    const orderBy =
+      params.sortBy === 'updatedAt'
+        ? [{ updatedAt: params.sortOrder }, { id: params.sortOrder }]
+        : [{ createdAt: params.sortOrder }, { id: params.sortOrder }];
     const [items, total] = await Promise.all([
       this.prisma.trigger.findMany({
         where: { workflowId: params.workflowId },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: params.pageSize,
       }),

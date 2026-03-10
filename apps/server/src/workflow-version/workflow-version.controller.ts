@@ -5,8 +5,10 @@ import {
   ApiPaginatedEnvelope,
 } from 'src/common/swagger/envelope/api-envelope.decorator';
 import { WorkflowVersionService } from './workflow-version.service';
-import { WorkflowVersionResDto } from './dto/workflow-version.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
+import {
+  WorkflowVersionListQueryDto,
+  WorkflowVersionResDto,
+} from './dto/workflow-version.dto';
 
 @ApiTags('Workflow Versions')
 @ApiBearerAuth('bearer')
@@ -21,7 +23,7 @@ export class WorkflowVersionController {
   @Get()
   list(
     @Param('workflowId') workflowId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: WorkflowVersionListQueryDto,
   ) {
     return this.service.list({ workflowId, ...query });
   }

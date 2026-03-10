@@ -5,7 +5,15 @@ export type EventRepositoryMock = {
   findManyByTrigger: jest.Mock<Promise<Event[]>, [string]>;
   findPageByTrigger: jest.Mock<
     Promise<{ items: Event[]; total: number }>,
-    [{ triggerId: string; page: number; pageSize: number }]
+    [
+      {
+        triggerId: string;
+        page: number;
+        pageSize: number;
+        sortBy: 'receivedAt' | 'createdAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >;
   findById: jest.Mock<Promise<Event | null>, [string]>;
 };
@@ -15,7 +23,15 @@ export const createEventRepositoryMock = (): EventRepositoryMock => ({
   findManyByTrigger: jest.fn<Promise<Event[]>, [string]>(),
   findPageByTrigger: jest.fn<
     Promise<{ items: Event[]; total: number }>,
-    [{ triggerId: string; page: number; pageSize: number }]
+    [
+      {
+        triggerId: string;
+        page: number;
+        pageSize: number;
+        sortBy: 'receivedAt' | 'createdAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >(),
   findById: jest.fn<Promise<Event | null>, [string]>(),
 });

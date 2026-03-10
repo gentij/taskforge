@@ -49,6 +49,8 @@ export class EventService {
     triggerId: string;
     page: number;
     pageSize: number;
+    sortBy: 'receivedAt' | 'createdAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{
     items: Event[];
     pagination: ReturnType<typeof buildPaginationMeta>;
@@ -58,6 +60,8 @@ export class EventService {
       triggerId: params.triggerId,
       page: params.page,
       pageSize: params.pageSize,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
     });
     return {
       items,
@@ -65,6 +69,8 @@ export class EventService {
         page: params.page,
         pageSize: params.pageSize,
         total,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       }),
     };
   }

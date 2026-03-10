@@ -1,5 +1,16 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import {
+  PaginationQuerySchema,
+  SortOrderSchema,
+} from 'src/common/dto/pagination.dto';
+
+export const SecretListSortBySchema = z.enum(['createdAt', 'updatedAt']);
+export const SecretListQuerySchema = PaginationQuerySchema.extend({
+  sortBy: SecretListSortBySchema.default('createdAt'),
+  sortOrder: SortOrderSchema.default('desc'),
+});
+export class SecretListQueryDto extends createZodDto(SecretListQuerySchema) {}
 
 export const SecretResSchema = z.object({
   id: z.string(),

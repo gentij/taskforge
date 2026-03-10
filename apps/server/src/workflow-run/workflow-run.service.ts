@@ -53,6 +53,8 @@ export class WorkflowRunService {
     workflowId: string;
     page: number;
     pageSize: number;
+    sortBy: 'createdAt' | 'updatedAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{
     items: WorkflowRun[];
     pagination: ReturnType<typeof buildPaginationMeta>;
@@ -65,6 +67,8 @@ export class WorkflowRunService {
         page: params.page,
         pageSize: params.pageSize,
         total,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       }),
     };
   }

@@ -16,10 +16,10 @@ import {
 import { SecretService } from './secret.service';
 import {
   CreateSecretReqDto,
+  SecretListQueryDto,
   SecretResDto,
   UpdateSecretReqDto,
 } from './dto/secret.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Secrets')
 @ApiBearerAuth('bearer')
@@ -45,7 +45,7 @@ export class SecretController {
     errors: [401, 500],
   })
   @Get()
-  list(@Query() query: PaginationQueryDto) {
+  list(@Query() query: SecretListQueryDto) {
     return this.service.list(query);
   }
 

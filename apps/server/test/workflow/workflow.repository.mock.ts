@@ -5,7 +5,14 @@ export type WorkflowRepositoryMock = {
   findMany: jest.Mock<Promise<Workflow[]>, []>;
   findPage: jest.Mock<
     Promise<{ items: Workflow[]; total: number }>,
-    [{ page: number; pageSize: number }]
+    [
+      {
+        page: number;
+        pageSize: number;
+        sortBy: 'createdAt' | 'updatedAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >;
   findById: jest.Mock<Promise<Workflow | null>, [string]>;
   update: jest.Mock<
@@ -20,7 +27,14 @@ export const createWorkflowRepositoryMock = (): WorkflowRepositoryMock => ({
   findMany: jest.fn<Promise<Workflow[]>, []>(),
   findPage: jest.fn<
     Promise<{ items: Workflow[]; total: number }>,
-    [{ page: number; pageSize: number }]
+    [
+      {
+        page: number;
+        pageSize: number;
+        sortBy: 'createdAt' | 'updatedAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >(),
   findById: jest.fn<Promise<Workflow | null>, [string]>(),
   update: jest.fn<

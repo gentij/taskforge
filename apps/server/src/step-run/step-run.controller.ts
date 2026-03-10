@@ -5,8 +5,7 @@ import {
   ApiPaginatedEnvelope,
 } from 'src/common/swagger/envelope/api-envelope.decorator';
 import { StepRunService } from './step-run.service';
-import { StepRunResDto } from './dto/step-run.dto';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
+import { StepRunListQueryDto, StepRunResDto } from './dto/step-run.dto';
 
 @ApiTags('Step Runs')
 @ApiBearerAuth('bearer')
@@ -22,7 +21,7 @@ export class StepRunController {
   list(
     @Param('workflowId') workflowId: string,
     @Param('runId') runId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: StepRunListQueryDto,
   ) {
     return this.service.list({ workflowRunId: runId, ...query });
   }

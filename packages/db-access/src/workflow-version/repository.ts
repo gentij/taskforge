@@ -21,12 +21,18 @@ export class WorkflowVersionRepository {
     workflowId: string;
     page: number;
     pageSize: number;
+    sortBy: 'version' | 'createdAt';
+    sortOrder: 'asc' | 'desc';
   }): Promise<{ items: WorkflowVersion[]; total: number }> {
     const skip = (params.page - 1) * params.pageSize;
+    const orderBy =
+      params.sortBy === 'createdAt'
+        ? [{ createdAt: params.sortOrder }, { id: params.sortOrder }]
+        : [{ version: params.sortOrder }, { id: params.sortOrder }];
     const [items, total] = await Promise.all([
       this.prisma.workflowVersion.findMany({
         where: { workflowId: params.workflowId },
-        orderBy: { version: 'desc' },
+        orderBy,
         skip,
         take: params.pageSize,
       }),

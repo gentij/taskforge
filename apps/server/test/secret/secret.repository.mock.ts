@@ -6,7 +6,14 @@ export type SecretRepositoryMock = {
   findManyByNames: jest.Mock<Promise<Array<{ name: string }>>, [string[]]>;
   findPage: jest.Mock<
     Promise<{ items: Secret[]; total: number }>,
-    [{ page: number; pageSize: number }]
+    [
+      {
+        page: number;
+        pageSize: number;
+        sortBy: 'createdAt' | 'updatedAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >;
   findById: jest.Mock<Promise<Secret | null>, [string]>;
   update: jest.Mock<Promise<Secret>, [string, any]>;
@@ -19,7 +26,14 @@ export const createSecretRepositoryMock = (): SecretRepositoryMock => ({
   findManyByNames: jest.fn<Promise<Array<{ name: string }>>, [string[]]>(),
   findPage: jest.fn<
     Promise<{ items: Secret[]; total: number }>,
-    [{ page: number; pageSize: number }]
+    [
+      {
+        page: number;
+        pageSize: number;
+        sortBy: 'createdAt' | 'updatedAt';
+        sortOrder: 'asc' | 'desc';
+      },
+    ]
   >(),
   findById: jest.fn<Promise<Secret | null>, [string]>(),
   update: jest.fn<Promise<Secret>, [string, any]>(),

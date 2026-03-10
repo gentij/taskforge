@@ -7,6 +7,9 @@ export const PaginationQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
+export const SortOrderSchema = z.enum(['asc', 'desc']);
+export type SortOrder = z.infer<typeof SortOrderSchema>;
+
 export class PaginationQueryDto extends createZodDto(PaginationQuerySchema) {}
 
 export class PaginationMetaDto {
@@ -27,4 +30,10 @@ export class PaginationMetaDto {
 
   @ApiProperty({ example: false })
   hasPrev: boolean;
+
+  @ApiProperty({ required: false, example: 'createdAt' })
+  sortBy?: string;
+
+  @ApiProperty({ required: false, enum: ['asc', 'desc'], example: 'desc' })
+  sortOrder?: SortOrder;
 }

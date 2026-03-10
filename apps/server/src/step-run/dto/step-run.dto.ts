@@ -1,5 +1,16 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import {
+  PaginationQuerySchema,
+  SortOrderSchema,
+} from 'src/common/dto/pagination.dto';
+
+export const StepRunListSortBySchema = z.enum(['createdAt', 'updatedAt']);
+export const StepRunListQuerySchema = PaginationQuerySchema.extend({
+  sortBy: StepRunListSortBySchema.default('createdAt'),
+  sortOrder: SortOrderSchema.default('asc'),
+});
+export class StepRunListQueryDto extends createZodDto(StepRunListQuerySchema) {}
 
 export const StepRunStatusSchema = z.enum([
   'QUEUED',

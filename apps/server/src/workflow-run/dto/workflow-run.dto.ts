@@ -1,5 +1,18 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import {
+  PaginationQuerySchema,
+  SortOrderSchema,
+} from 'src/common/dto/pagination.dto';
+
+export const WorkflowRunListSortBySchema = z.enum(['createdAt', 'updatedAt']);
+export const WorkflowRunListQuerySchema = PaginationQuerySchema.extend({
+  sortBy: WorkflowRunListSortBySchema.default('createdAt'),
+  sortOrder: SortOrderSchema.default('desc'),
+});
+export class WorkflowRunListQueryDto extends createZodDto(
+  WorkflowRunListQuerySchema,
+) {}
 
 export const WorkflowRunStatusSchema = z.enum([
   'QUEUED',

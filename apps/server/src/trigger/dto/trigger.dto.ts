@@ -1,7 +1,16 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import {
+  PaginationQuerySchema,
+  SortOrderSchema,
+} from 'src/common/dto/pagination.dto';
 
 export const TriggerTypeSchema = z.enum(['MANUAL', 'WEBHOOK', 'CRON']);
+export const TriggerListSortBySchema = z.enum(['createdAt', 'updatedAt']);
+export const TriggerListQuerySchema = PaginationQuerySchema.extend({
+  sortBy: TriggerListSortBySchema.default('createdAt'),
+  sortOrder: SortOrderSchema.default('desc'),
+});
 
 export const TriggerResSchema = z.object({
   id: z.string(),
@@ -15,6 +24,7 @@ export const TriggerResSchema = z.object({
 });
 
 export class TriggerResDto extends createZodDto(TriggerResSchema) {}
+export class TriggerListQueryDto extends createZodDto(TriggerListQuerySchema) {}
 
 export const CreateTriggerReqSchema = z.object({
   type: TriggerTypeSchema,
