@@ -18,6 +18,7 @@ import { TriggerService } from './trigger.service';
 import {
   CreateTriggerReqDto,
   TriggerListQueryDto,
+  RotateWebhookKeyResDto,
   TriggerResDto,
   UpdateTriggerReqDto,
 } from './dto/trigger.dto';
@@ -101,6 +102,18 @@ export class TriggerController {
   @Delete(':id')
   delete(@Param('workflowId') workflowId: string, @Param('id') id: string) {
     return this.service.delete(workflowId, id);
+  }
+
+  @ApiEnvelope(RotateWebhookKeyResDto, {
+    description: 'Rotate webhook key',
+    errors: [400, 401, 404, 500],
+  })
+  @Post(':id/webhook-key/rotate')
+  async rotateWebhookKey(
+    @Param('workflowId') workflowId: string,
+    @Param('id') triggerId: string,
+  ) {
+    return this.service.rotateWebhookKey(workflowId, triggerId);
   }
 
   @ApiTags('Triggers')

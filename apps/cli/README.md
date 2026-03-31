@@ -197,6 +197,8 @@ taskforge workflow version create <workflow-id> --definition definition.json
 taskforge trigger list <workflow-id>
 taskforge trigger get <workflow-id> <trigger-id>
 taskforge trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
+taskforge trigger create <workflow-id> --type WEBHOOK --name "Inbound"
+taskforge trigger webhook rotate-key <workflow-id> <trigger-id>
 taskforge trigger update <workflow-id> <trigger-id> --is-active=false
 taskforge trigger delete <workflow-id> <trigger-id>
 ```

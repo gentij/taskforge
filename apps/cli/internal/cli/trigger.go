@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -27,6 +28,7 @@ var triggerCreateConfig string
 var triggerUpdateName string
 var triggerUpdateIsActive bool
 var triggerUpdateConfig string
+var triggerWebhookPublicBase string
 
 func init() {
 	listCmd := &cobra.Command{
@@ -76,11 +78,26 @@ func init() {
 		RunE:  triggerDelete,
 	}
 
+	webhookCmd := &cobra.Command{
+		Use:   "webhook",
+		Short: "Webhook utilities",
+	}
+
+	rotateKeyCmd := &cobra.Command{
+		Use:   "rotate-key <workflow-id> <trigger-id>",
+		Short: "Rotate webhook key and print webhook URL",
+		Args:  cobra.ExactArgs(2),
+		RunE:  triggerWebhookRotateKey,
+	}
+	rotateKeyCmd.Flags().StringVar(&triggerWebhookPublicBase, "public-base", "", "Public API base URL override")
+	webhookCmd.AddCommand(rotateKeyCmd)
+
 	triggerCmd.AddCommand(listCmd)
 	triggerCmd.AddCommand(getCmd)
 	triggerCmd.AddCommand(createCmd)
 	triggerCmd.AddCommand(updateCmd)
 	triggerCmd.AddCommand(deleteCmd)
+	triggerCmd.AddCommand(webhookCmd)
 }
 
 func triggerList(cmd *cobra.Command, args []string) error {
@@ -210,6 +227,53 @@ func triggerDelete(cmd *cobra.Command, args []string) error {
 	return printTrigger(ctx, result)
 }
 
+func triggerWebhookRotateKey(cmd *cobra.Command, args []string) error {
+	ctx := GetContext(cmd.Context())
+	if ctx == nil {
+		return fmt.Errorf("missing context")
+	}
+
+	workflowID := args[0]
+	triggerID := args[1]
+
+	result, err := ctx.Client.RotateTriggerWebhookKey(workflowID, triggerID)
+	if err != nil {
+		return err
+	}
+
+	webhookURL, err := buildWebhookURL(
+		ctx.Client.BaseURL,
+		workflowID,
+		triggerID,
+		result.WebhookKey,
+		triggerWebhookPublicBase,
+	)
+	if err != nil {
+		return err
+	}
+
+	if IsJSON(ctx) {
+		return output.PrintJSON(map[string]string{
+			"workflowId": workflowID,
+			"triggerId":  triggerID,
+			"webhookKey": result.WebhookKey,
+			"webhookUrl": webhookURL,
+		})
+	}
+
+	if ctx.Quiet {
+		fmt.Fprintln(os.Stdout, webhookURL)
+		return nil
+	}
+
+	return output.PrintKVTable([][2]string{
+		{"workflowId", workflowID},
+		{"triggerId", triggerID},
+		{"webhookKey", result.WebhookKey},
+		{"webhookUrl", webhookURL},
+	})
+}
+
 func printTrigger(ctx *Context, result api.Trigger) error {
 	if IsJSON(ctx) {
 		return output.PrintJSON(result)
@@ -242,4 +306,46 @@ func triggerNameValue(name *string) string {
 		return ""
 	}
 	return *name
+}
+
+func buildWebhookURL(apiBase string, workflowID string, triggerID string, webhookKey string, publicBase string) (string, error) {
+	apiBase = strings.TrimSpace(apiBase)
+	apiParsed, err := url.Parse(apiBase)
+	if err != nil {
+		return "", err
+	}
+	if apiParsed.Scheme == "" || apiParsed.Host == "" {
+		return "", fmt.Errorf("invalid API base URL: %s", apiBase)
+	}
+
+	base := strings.TrimSpace(publicBase)
+	if base == "" {
+		base = apiBase
+	}
+
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid base URL: %s", base)
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	if strings.TrimSpace(publicBase) != "" && (basePath == "" || basePath == "/") {
+		basePath = strings.TrimRight(apiParsed.Path, "/")
+	}
+
+	parsed.Path = fmt.Sprintf(
+		"%s/hooks/%s/%s/%s",
+		basePath,
+		url.PathEscape(workflowID),
+		url.PathEscape(triggerID),
+		url.PathEscape(webhookKey),
+	)
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+
+	return parsed.String(), nil
 }

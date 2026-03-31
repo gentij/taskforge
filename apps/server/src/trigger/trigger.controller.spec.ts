@@ -21,6 +21,7 @@ describe('TriggerController', () => {
             get: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
+            rotateWebhookKey: jest.fn(),
           },
         },
         {
@@ -129,5 +130,16 @@ describe('TriggerController', () => {
 
     await expect(controller.delete('wf_1', 'tr_1')).resolves.toBe(trigger);
     expect(deleteSpy).toHaveBeenCalledWith('wf_1', 'tr_1');
+  });
+
+  it('rotateWebhookKey() calls TriggerService.rotateWebhookKey()', async () => {
+    const rotateSpy = jest
+      .spyOn(service, 'rotateWebhookKey')
+      .mockResolvedValue({ webhookKey: 'tf_key' });
+
+    await expect(controller.rotateWebhookKey('wf_1', 'tr_1')).resolves.toEqual({
+      webhookKey: 'tf_key',
+    });
+    expect(rotateSpy).toHaveBeenCalledWith('wf_1', 'tr_1');
   });
 });

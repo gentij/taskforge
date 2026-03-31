@@ -6,6 +6,7 @@ import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { buildPaginationMeta } from 'src/common/pagination/pagination';
 import { CronTriggerConfigSchema } from './cron/cron-trigger.types';
 import { parseExpression } from 'cron-parser';
+import { CryptoService } from 'src/crypto/crypto.service';
 
 const CRON_FIVE_FIELD = /^\s*([^\s]+\s+){4}[^\s]+\s*$/;
 
@@ -14,6 +15,7 @@ export class TriggerService {
   constructor(
     private readonly repo: TriggerRepository,
     private readonly workflowRepo: WorkflowRepository,
+    private readonly crypto: CryptoService,
   ) {}
 
   private async assertWorkflowExists(workflowId: string) {
@@ -142,4 +144,83 @@ export class TriggerService {
 
     return this.repo.update(id, patch);
   }
+
+  async rotateWebhookKey(
+    workflowId: string,
+    id: string,
+  ): Promise<{ webhookKey: string }> {
+    const trigger = await this.get(workflowId, id);
+    this.assertWebhookTriggerType(trigger);
+
+    const webhookKey = this.crypto.generateApiToken();
+    const keyHash = this.crypto.hashApiToken(webhookKey);
+
+    const config = toJsonObject(trigger.config);
+    config.webhookAuth = {
+      mode: 'path-key',
+      keyHash,
+      rotatedAt: new Date().toISOString(),
+    };
+
+    await this.repo.update(id, { config: config as Prisma.InputJsonValue });
+
+    return { webhookKey };
+  }
+
+  hasWebhookKey(trigger: Trigger): boolean {
+    const webhookAuth = this.getWebhookAuthObject(trigger);
+    return (
+      webhookAuth?.mode === 'path-key' &&
+      typeof webhookAuth.keyHash === 'string'
+    );
+  }
+
+  hasValidWebhookKey(trigger: Trigger, webhookKey: string): boolean {
+    const webhookAuth = this.getWebhookAuthObject(trigger);
+    if (!webhookAuth || webhookAuth.mode !== 'path-key') return false;
+
+    const storedHash = webhookAuth.keyHash;
+    if (typeof storedHash !== 'string' || storedHash.length === 0) return false;
+
+    const providedHash = this.crypto.hashApiToken(webhookKey.trim());
+    return this.crypto.secureCompare(providedHash, storedHash);
+  }
+
+  assertWebhookTriggerType(trigger: Trigger): void {
+    if (trigger.type !== 'WEBHOOK') {
+      throw AppError.badRequest(ErrorDefinitions.TRIGGER.INVALID_TYPE, [
+        {
+          field: 'type',
+          message: 'Webhook operations are only supported for WEBHOOK triggers',
+        },
+      ]);
+    }
+  }
+
+  private getWebhookAuthObject(
+    trigger: Trigger,
+  ): { mode?: unknown; keyHash?: unknown } | null {
+    const config = toJsonObject(trigger.config);
+    const webhookAuth = config.webhookAuth;
+
+    if (
+      !webhookAuth ||
+      typeof webhookAuth !== 'object' ||
+      Array.isArray(webhookAuth)
+    ) {
+      return null;
+    }
+
+    return webhookAuth as { mode?: unknown; keyHash?: unknown };
+  }
+}
+
+function toJsonObject(
+  value: Prisma.JsonValue | null | undefined,
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return { ...(value as Record<string, unknown>) };
 }

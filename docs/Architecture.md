@@ -65,6 +65,12 @@ Taskforge
 7. Step runs transition to terminal state
 8. Workflow run resolves to final status
 
+Webhook ingress supports a public path-key route for `WEBHOOK` triggers:
+
+- `POST /v1/api/hooks/:workflowId/:triggerId/:webhookKey`
+
+Webhook keys are trigger-scoped and rotated by operators via CLI/API.
+
 ## Current MVP Execution Types
 
 Worker executors currently include:

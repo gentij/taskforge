@@ -1,0 +1,13 @@
+taskforge.example.com {
+  encode gzip
+
+  @webhooks path /v1/api/hooks/*
+  handle @webhooks {
+    reverse_proxy 127.0.0.1:3000
+  }
+
+  # Keep admin API private by default.
+  handle /v1/api/* {
+    respond "forbidden" 403
+  }
+}

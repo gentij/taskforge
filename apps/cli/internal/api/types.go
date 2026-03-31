@@ -44,6 +44,10 @@ type Trigger struct {
 	UpdatedAt  string  `json:"updatedAt"`
 }
 
+type RotateWebhookKeyResponse struct {
+	WebhookKey string `json:"webhookKey"`
+}
+
 type Event struct {
 	ID         string  `json:"id"`
 	TriggerID  string  `json:"triggerId"`

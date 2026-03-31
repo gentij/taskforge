@@ -153,6 +153,24 @@ taskforge run list <workflow-id>
 taskforge step list <workflow-id> <run-id>
 ```
 
+## Optional: Configure Public Webhook Ingress
+
+Create a webhook trigger and rotate a path key:
+
+```bash
+taskforge trigger create <workflow-id> --type WEBHOOK --name "Inbound"
+taskforge trigger webhook rotate-key <workflow-id> <trigger-id>
+```
+
+This prints a URL in the format:
+
+- `http://<host>:3000/v1/api/hooks/:workflowId/:triggerId/:webhookKey`
+
+Use that URL in your webhook provider. For reverse proxy starters, see:
+
+- `deploy/ingress/nginx.taskforge.conf.example`
+- `deploy/ingress/Caddyfile.example`
+
 ## Optional: Open the TUI
 
 ```bash

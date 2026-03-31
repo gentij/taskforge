@@ -174,6 +174,12 @@ func (c *Client) DeleteTrigger(workflowID string, triggerID string) (Trigger, er
 	return result, c.DeleteJSON("/workflows/"+workflowID+"/triggers/"+triggerID, &result)
 }
 
+func (c *Client) RotateTriggerWebhookKey(workflowID string, triggerID string) (RotateWebhookKeyResponse, error) {
+	var result RotateWebhookKeyResponse
+	path := "/workflows/" + workflowID + "/triggers/" + triggerID + "/webhook-key/rotate"
+	return result, c.PostJSON(path, map[string]any{}, &result)
+}
+
 func (c *Client) ListWorkflowRuns(workflowID string, page int, pageSize int, sortBy string, sortOrder string) (Paginated[WorkflowRun], error) {
 	var result Paginated[WorkflowRun]
 	path := paginatedPath(fmt.Sprintf("/workflows/%s/runs", workflowID), page, pageSize, sortBy, sortOrder)

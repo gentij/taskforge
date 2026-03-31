@@ -42,3 +42,17 @@ export const UpdateTriggerReqSchema = z.object({
 });
 
 export class UpdateTriggerReqDto extends createZodDto(UpdateTriggerReqSchema) {}
+
+export const RotateWebhookKeyResSchema = z.object({
+  webhookKey: z.string(),
+});
+export class RotateWebhookKeyResDto extends createZodDto(
+  RotateWebhookKeyResSchema,
+) {}
+
+export const TriggerWebhookIngressResSchema = z.object({
+  status: z.enum(['accepted', 'trigger_inactive']),
+});
+export class TriggerWebhookIngressResDto extends createZodDto(
+  TriggerWebhookIngressResSchema,
+) {}

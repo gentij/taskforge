@@ -42,7 +42,12 @@ export class CryptoService {
   ): boolean {
     const computed = createHmac('sha256', secret).update(payload).digest('hex');
 
-    return timingSafeEqualHex(computed, signature);
+    return this.secureCompare(computed, signature);
+  }
+
+  secureCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
   }
 
   public generateId(): string {
@@ -86,11 +91,6 @@ export class CryptoService {
     ]);
     return plaintext.toString('utf8');
   }
-}
-
-function timingSafeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
 function decodeKey(raw: string): Buffer {

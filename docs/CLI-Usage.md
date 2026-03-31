@@ -106,11 +106,19 @@ Use `taskforge workflow create` or `taskforge workflow version create` with a de
 
 ```bash
 taskforge trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
+taskforge trigger create <workflow-id> --type WEBHOOK --name "Inbound"
+taskforge trigger webhook rotate-key <workflow-id> <trigger-id>
 taskforge trigger list <workflow-id>
 taskforge trigger get <workflow-id> <trigger-id>
 taskforge trigger update <workflow-id> <trigger-id> --is-active=false
 taskforge trigger delete <workflow-id> <trigger-id>
 ```
+
+Public webhook ingress path format:
+
+- `POST /v1/api/hooks/:workflowId/:triggerId/:webhookKey`
+
+After rotating a webhook key, call the generated URL directly from your webhook provider.
 
 ## Runs and Steps
 

@@ -66,6 +66,14 @@ export const ErrorDefinitions = {
       code: 'TRIGGER_NOT_FOUND',
       message: 'Trigger not found',
     },
+    INVALID_TYPE: {
+      code: 'TRIGGER_INVALID_TYPE',
+      message: 'Trigger type is invalid for this operation',
+    },
+    WEBHOOK_KEY_NOT_CONFIGURED: {
+      code: 'TRIGGER_WEBHOOK_KEY_NOT_CONFIGURED',
+      message: 'Webhook key is not configured for this trigger',
+    },
   },
 
   EVENT: {
