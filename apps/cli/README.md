@@ -2,7 +2,7 @@
 
 The Taskforge CLI lets you manage workflows, triggers, runs, steps, and secrets from the terminal.
 
-For local self-hosted setup, run `taskforge init` first to provision `~/.taskforge/` and local stack config.
+For self-hosted setup, run `taskforge init` first to provision `~/.taskforge/` and stack config.
 
 ## Quickstart
 
@@ -88,8 +88,21 @@ taskforge auth logout
 
 `taskforge init` must be run once before using stack commands.
 
+By default, init expects external Postgres and Redis URLs:
+
 ```bash
-taskforge init
+taskforge init \
+  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+  --redis-url "redis://redis.example.com:6379"
+```
+
+To run bundled local Postgres/Redis containers instead:
+
+```bash
+taskforge init --with-local-datastores
+```
+
+```bash
 taskforge start
 taskforge start server worker
 taskforge start --foreground

@@ -16,8 +16,10 @@ If you want to contribute to Taskforge itself, use `docs/Development.md`.
 If `taskforge` is already installed, this is the fastest path from zero to first run.
 
 ```bash
-# 1) Initialize and start local stack
-taskforge init
+# 1) Initialize and start stack (external datastores)
+taskforge init \
+  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+  --redis-url "redis://redis.example.com:6379"
 taskforge status
 
 # 2) Verify auth works
@@ -83,13 +85,21 @@ Download the matching release artifact from:
 
 Extract `taskforge` and put it on your `PATH`.
 
-## Initialize Local Stack
+## Initialize Stack
 
 ```bash
-taskforge init
+taskforge init \
+  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+  --redis-url "redis://redis.example.com:6379"
 ```
 
-This creates local config and starts the Taskforge stack (server, worker, Postgres, Redis).
+This creates local config and starts the Taskforge stack (server, worker).
+
+If you want Taskforge to run bundled local Postgres and Redis instead, use:
+
+```bash
+taskforge init --with-local-datastores
+```
 
 Check status:
 

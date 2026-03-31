@@ -49,10 +49,18 @@ taskforge workflow version list <workflow-id> --sort-by version --sort-order des
 
 ## Stack Commands
 
-Run once:
+Run once (external datastores):
 
 ```bash
-taskforge init
+taskforge init \
+  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+  --redis-url "redis://redis.example.com:6379"
+```
+
+Local bundled Postgres/Redis (optional):
+
+```bash
+taskforge init --with-local-datastores
 ```
 
 Day-to-day:

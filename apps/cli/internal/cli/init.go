@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,17 +19,26 @@ const (
 	defaultInitDirName = ".taskforge"
 	composeFileName    = "docker-compose.yml"
 	envFileName        = ".env"
+	localDatabaseURL   = "postgresql://taskforge:taskforge@postgres:5432/taskforge"
+	localRedisURL      = "redis://redis:6379"
 )
 
 var (
-	initForce      bool
-	initForeground bool
+	initForce               bool
+	initForeground          bool
+	initDatabaseURL         string
+	initRedisURL            string
+	initWithLocalDatastores bool
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize a local Taskforge stack",
+	Short: "Initialize a Taskforge stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateDatastoreFlags(); err != nil {
+			return err
+		}
+
 		baseDir, err := resolveInitDir()
 		if err != nil {
 			return err
@@ -56,18 +66,23 @@ var initCmd = &cobra.Command{
 			extras = nil
 		}
 
-		required := requiredEnvValues(values)
+		required, err := requiredEnvValues(values)
+		if err != nil {
+			return err
+		}
 		for key, val := range required {
-			if values[key] == "" {
-				values[key] = val
-			}
+			values[key] = val
 		}
 
-		if err := writeEnvFile(envPath, values, extras); err != nil {
+		if err := writeComposeFile(composePath, initForce, initWithLocalDatastores); err != nil {
 			return err
 		}
 
-		if err := writeComposeFile(composePath, initForce); err != nil {
+		if err := validateComposeDatastoreMode(composePath); err != nil {
+			return err
+		}
+
+		if err := writeEnvFile(envPath, values, extras); err != nil {
 			return err
 		}
 
@@ -79,12 +94,14 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-		if err := runDockerCompose(baseDir, composePath, "up", "-d", "postgres", "redis"); err != nil {
-			return err
-		}
+		if initWithLocalDatastores {
+			if err := runDockerCompose(baseDir, composePath, "up", "-d", "postgres", "redis"); err != nil {
+				return err
+			}
 
-		if err := waitForPostgres(baseDir, composePath); err != nil {
-			return err
+			if err := waitForPostgres(baseDir, composePath); err != nil {
+				return err
+			}
 		}
 
 		if err := runDockerCompose(
@@ -120,6 +137,14 @@ var initCmd = &cobra.Command{
 func init() {
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Overwrite existing init files")
 	initCmd.Flags().BoolVar(&initForeground, "foreground", false, "Run services in foreground")
+	initCmd.Flags().StringVar(&initDatabaseURL, "database-url", "", "PostgreSQL connection string")
+	initCmd.Flags().StringVar(&initRedisURL, "redis-url", "", "Redis connection string")
+	initCmd.Flags().BoolVar(
+		&initWithLocalDatastores,
+		"with-local-datastores",
+		false,
+		"Run bundled Postgres and Redis containers",
+	)
 }
 
 func resolveInitDir() (string, error) {
@@ -130,7 +155,7 @@ func resolveInitDir() (string, error) {
 	return filepath.Join(home, defaultInitDirName), nil
 }
 
-func requiredEnvValues(existing map[string]string) map[string]string {
+func requiredEnvValues(existing map[string]string) (map[string]string, error) {
 	adminToken := existing["TASKFORGE_ADMIN_TOKEN"]
 	if adminToken == "" {
 		adminToken = randomHex(32)
@@ -141,13 +166,44 @@ func requiredEnvValues(existing map[string]string) map[string]string {
 		secretKey = randomHex(32)
 	}
 
+	port := existing["PORT"]
+	if strings.TrimSpace(port) == "" {
+		port = "3000"
+	}
+
+	databaseURL := strings.TrimSpace(initDatabaseURL)
+	redisURL := strings.TrimSpace(initRedisURL)
+
+	if initWithLocalDatastores {
+		databaseURL = localDatabaseURL
+		redisURL = localRedisURL
+	} else {
+		if databaseURL == "" {
+			databaseURL = strings.TrimSpace(existing["DATABASE_URL"])
+		}
+		if redisURL == "" {
+			redisURL = strings.TrimSpace(existing["REDIS_URL"])
+		}
+
+		if databaseURL == "" || redisURL == "" {
+			return nil, fmt.Errorf("database and redis URLs are required; pass --database-url and --redis-url, or use --with-local-datastores")
+		}
+	}
+
+	if err := validateDatabaseURL(databaseURL); err != nil {
+		return nil, err
+	}
+	if err := validateRedisURL(redisURL); err != nil {
+		return nil, err
+	}
+
 	return map[string]string{
-		"DATABASE_URL":          "postgresql://taskforge:taskforge@postgres:5432/taskforge",
-		"REDIS_URL":             "redis://redis:6379",
+		"DATABASE_URL":          databaseURL,
+		"REDIS_URL":             redisURL,
 		"TASKFORGE_ADMIN_TOKEN": adminToken,
 		"TASKFORGE_SECRET_KEY":  secretKey,
-		"PORT":                  "3000",
-	}
+		"PORT":                  port,
+	}, nil
 }
 
 func randomHex(bytes int) string {
@@ -238,19 +294,18 @@ func writeEnvFile(path string, values map[string]string, extras []string) error 
 	return os.WriteFile(path, []byte(content), 0o600)
 }
 
-func writeComposeFile(path string, force bool) error {
+func writeComposeFile(path string, force bool, withLocalDatastores bool) error {
 	if !force {
-		data, err := os.ReadFile(path)
-		if err == nil {
-			if !strings.Contains(string(data), "container_name: taskforge-") {
-				return nil
-			}
+		if _, err := os.Stat(path); err == nil {
+			return nil
 		} else if !os.IsNotExist(err) {
 			return err
 		}
 	}
 
-	content := strings.TrimLeft(`name: taskforge
+	var content string
+	if withLocalDatastores {
+		content = strings.TrimLeft(`name: taskforge
 
 services:
   postgres:
@@ -306,8 +361,83 @@ volumes:
   taskforge_pgdata:
   taskforge_redisdata:
 `, "\n")
+	} else {
+		content = strings.TrimLeft(`name: taskforge
+
+services:
+  server:
+    image: gentij/taskforge-server:latest
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  worker:
+    image: gentij/taskforge-worker:latest
+    env_file:
+      - .env
+    restart: unless-stopped
+`, "\n")
+	}
 
 	return os.WriteFile(path, []byte(content), 0o644)
+}
+
+func validateDatastoreFlags() error {
+	if initWithLocalDatastores {
+		if strings.TrimSpace(initDatabaseURL) != "" || strings.TrimSpace(initRedisURL) != "" {
+			return fmt.Errorf("--with-local-datastores cannot be used with --database-url or --redis-url")
+		}
+	}
+	return nil
+}
+
+func validateDatabaseURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("--database-url must be a valid Postgres connection string")
+	}
+
+	if parsed.Scheme != "postgres" && parsed.Scheme != "postgresql" {
+		return fmt.Errorf("--database-url must use postgres:// or postgresql://")
+	}
+
+	return nil
+}
+
+func validateRedisURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("--redis-url must be a valid Redis connection string")
+	}
+
+	if parsed.Scheme != "redis" {
+		return fmt.Errorf("--redis-url must use redis://")
+	}
+
+	return nil
+}
+
+func validateComposeDatastoreMode(composePath string) error {
+	data, err := os.ReadFile(composePath)
+	if err != nil {
+		return err
+	}
+
+	compose := string(data)
+	hasPostgres := strings.Contains(compose, "\n  postgres:")
+	hasRedis := strings.Contains(compose, "\n  redis:")
+
+	if initWithLocalDatastores && (!hasPostgres || !hasRedis) {
+		return fmt.Errorf("existing compose file does not define local datastores; rerun 'taskforge init --with-local-datastores --force'")
+	}
+
+	if !initWithLocalDatastores && hasPostgres && hasRedis && strings.TrimSpace(initDatabaseURL) != "" && strings.TrimSpace(initRedisURL) != "" {
+		return fmt.Errorf("existing compose file still includes local datastores; rerun 'taskforge init --force --database-url <postgres-url> --redis-url <redis-url>' to switch modes")
+	}
+
+	return nil
 }
 
 func maybeUpdateConfig(values map[string]string) error {

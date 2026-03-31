@@ -86,6 +86,11 @@ When contracts or Prisma types change, build in this order:
 
 ## Runtime Requirements
 
+Taskforge server/worker can run with either:
+
+- external managed Postgres + Redis services, or
+- bundled local Postgres + Redis containers (CLI opt-in).
+
 Required server env vars:
 
 - `DATABASE_URL`
