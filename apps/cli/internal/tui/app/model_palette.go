@@ -473,6 +473,7 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		command("Theme: Retro Amber", "Theme", paletteAction{Kind: paletteSetTheme, View: ViewID("retro-amber")}, "theme", "amber", "crt"),
 	}
 	if len(recentActions) > 0 {
+		items = dedupePaletteBaseItems(items, recentActions)
 		recent := make([]list.Item, 0, len(recentActions)+1)
 		recent = append(recent, section(":: Recent"))
 		for _, action := range recentActions {
@@ -480,6 +481,7 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		}
 		items = append(recent, items...)
 	}
+	items = compactPaletteSections(items)
 
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = false
@@ -515,4 +517,63 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 	model.SetShowTitle(false)
 	model.DisableQuitKeybindings()
 	return model
+}
+
+func dedupePaletteBaseItems(baseItems []list.Item, recentActions []paletteAction) []list.Item {
+	if len(baseItems) == 0 || len(recentActions) == 0 {
+		return baseItems
+	}
+
+	recentKeys := make(map[string]struct{}, len(recentActions))
+	for _, action := range recentActions {
+		if action.Kind == paletteNoop {
+			continue
+		}
+		recentKeys[paletteActionKey(action)] = struct{}{}
+	}
+	if len(recentKeys) == 0 {
+		return baseItems
+	}
+
+	deduped := make([]list.Item, 0, len(baseItems))
+	for _, item := range baseItems {
+		paletteItemValue, ok := item.(paletteItem)
+		if !ok || paletteItemValue.Section || paletteItemValue.Action.Kind == paletteNoop {
+			deduped = append(deduped, item)
+			continue
+		}
+		if _, exists := recentKeys[paletteActionKey(paletteItemValue.Action)]; exists {
+			continue
+		}
+		deduped = append(deduped, item)
+	}
+
+	return deduped
+}
+
+func compactPaletteSections(items []list.Item) []list.Item {
+	if len(items) == 0 {
+		return items
+	}
+
+	compacted := make([]list.Item, 0, len(items))
+	var pendingSection list.Item
+	hasPendingSection := false
+
+	for _, item := range items {
+		paletteItemValue, ok := item.(paletteItem)
+		if ok && paletteItemValue.Section {
+			pendingSection = item
+			hasPendingSection = true
+			continue
+		}
+
+		if hasPendingSection {
+			compacted = append(compacted, pendingSection)
+			hasPendingSection = false
+		}
+		compacted = append(compacted, item)
+	}
+
+	return compacted
 }
