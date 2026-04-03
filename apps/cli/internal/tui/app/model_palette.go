@@ -216,6 +216,10 @@ func paletteItemFromAction(action paletteAction, state paletteBuildState) palett
 	case paletteSetTheme:
 		item.Label = "Theme"
 		switch action.View {
+		case ViewID("simple-dark"):
+			item.Label = "Theme: Simple Dark"
+		case ViewID("simple-light"):
+			item.Label = "Theme: Simple Light"
 		case ViewID("dracula"):
 			item.Label = "Theme: Dracula"
 		case ViewID("one-dark-pro"):
@@ -460,6 +464,8 @@ func buildPalette(theme styles.Theme, recentActions []paletteAction, state palet
 		profileItem("Network: Slow", NetworkSlow, state.Profile == NetworkSlow),
 		profileItem("Network: Flaky", NetworkFlaky, state.Profile == NetworkFlaky),
 		section(":: Themes"),
+		command("Theme: Simple Dark", "Theme", paletteAction{Kind: paletteSetTheme, View: ViewID("simple-dark")}, "theme", "simple", "dark"),
+		command("Theme: Simple Light", "Theme", paletteAction{Kind: paletteSetTheme, View: ViewID("simple-light")}, "theme", "simple", "light"),
 		command("Theme: Dracula", "Theme", paletteAction{Kind: paletteSetTheme, View: ViewID("dracula")}, "theme", "purple", "contrast"),
 		command("Theme: One Dark Pro", "Theme", paletteAction{Kind: paletteSetTheme, View: ViewID("one-dark-pro")}, "theme", "onedark", "modern"),
 		command("Theme: Rose Pine Moon", "Theme", paletteAction{Kind: paletteSetTheme, View: ViewID("rose-pine-moon")}, "theme", "rose", "soft"),

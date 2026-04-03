@@ -26,8 +26,7 @@ func Render(m Model) string {
 		output = renderPaletteScreen(m)
 	}
 	if m.showHelp {
-		modal := components.RenderModal("Help", m.help.View(m.keys), m.width, m.height, m.styles)
-		output = renderOverlay(base, modal, m)
+		output = renderHelpScreen(m)
 	}
 	if m.action.Active {
 		modal := renderActionModal(m)
@@ -270,5 +269,35 @@ func renderPaletteScreen(m Model) string {
 	filled := applyBackgroundLayer(body, innerWidth, innerHeight, m.styles.PanelFill)
 	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
 	panel := m.styles.PanelBorderFocus.Width(innerWidth).Height(innerHeight).Render(content)
+	return clampToViewport(panel, m.width, m.height)
+}
+
+func renderHelpScreen(m Model) string {
+	innerWidth := max(m.width-2, 1)
+	innerHeight := max(m.height-2, 1)
+	helpModel := m.help
+	helpModel.Width = innerWidth
+	if innerWidth < 96 {
+		helpModel.ShowAll = false
+	}
+
+	headerTitle := m.styles.PanelTitle.Render("Keyboard Help")
+	headerHintText := "esc or ? close"
+	if innerWidth < 96 {
+		headerHintText = "esc or ? close  |  widen terminal for full help"
+	}
+	headerHint := m.styles.Dim.Render(headerHintText)
+	divider := m.styles.Divider.Render(strings.Repeat("─", innerWidth))
+
+	helpHeight := max(innerHeight-3, 1)
+	helpView := strings.TrimRight(helpModel.View(m.keys), "\n")
+	helpView = sanitizeRenderable(helpView)
+	helpView = lipgloss.Place(innerWidth, helpHeight, lipgloss.Left, lipgloss.Top, helpView)
+
+	body := strings.Join([]string{headerTitle, headerHint, divider, helpView}, "\n")
+	filled := applyBackgroundLayer(body, innerWidth, innerHeight, m.styles.PanelFill)
+	content := lipgloss.Place(innerWidth, innerHeight, lipgloss.Left, lipgloss.Top, filled)
+	panel := m.styles.PanelBorderFocus.Width(innerWidth).Height(innerHeight).Render(content)
+
 	return clampToViewport(panel, m.width, m.height)
 }

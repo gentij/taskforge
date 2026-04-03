@@ -253,6 +253,10 @@ func themedDivider(m Model) string {
 
 func recommendedFont(themeName string) string {
 	switch themeName {
+	case "simple-dark":
+		return "Cascadia Mono"
+	case "simple-light":
+		return "Cascadia Mono"
 	case "dracula":
 		return "Fira Code"
 	case "one-dark-pro":

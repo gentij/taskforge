@@ -520,6 +520,7 @@ func (m *Model) resize(width int, height int) {
 	}
 
 	m.inspector.Resize(width, height)
+	m.help.Width = max(m.width-2, 1)
 	m.resizePalette()
 	m.updateMainPanel()
 }
