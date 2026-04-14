@@ -21,6 +21,7 @@ import {
   RunWorkflowReqDto,
   RunWorkflowResDto,
   WorkflowListQueryDto,
+  parseRunWorkflowReq,
 } from './dto/workflow.dto';
 import {
   CreateWorkflowVersionReqDto,
@@ -135,8 +136,7 @@ export class WorkflowController {
     @Param('id') workflowId: string,
     @Body() body: RunWorkflowReqDto,
   ) {
-    const input = body.input ?? {};
-    const overrides = body.overrides ?? {};
+    const { input, overrides } = parseRunWorkflowReq(body);
 
     const workflow = await this.service.get(workflowId);
 

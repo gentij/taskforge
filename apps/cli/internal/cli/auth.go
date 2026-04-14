@@ -23,7 +23,7 @@ func init() {
 		Use:   "login",
 		Short: "Login with an API token",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, path, err := loadConfig()
+			cfg, path, err := loadConfig(cmd.Flags().Changed("server"))
 			if err != nil {
 				return err
 			}
@@ -53,7 +53,11 @@ func init() {
 			}
 
 			cfg.Token = token
-			cfg.ServerURL = serverURL
+			cfg.ServerURL = resolveServerURL(
+				cfg.ServerURL,
+				serverURL,
+				cmd.Flags().Changed("server"),
+			)
 
 			if err := saveConfig(path, cfg); err != nil {
 				return err
@@ -69,7 +73,7 @@ func init() {
 		Use:   "logout",
 		Short: "Clear saved credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, path, err := loadConfig()
+			cfg, path, err := loadConfig(cmd.Flags().Changed("server"))
 			if err != nil {
 				return err
 			}
@@ -89,18 +93,13 @@ func init() {
 		Use:   "status",
 		Short: "Show auth status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, path, err := loadConfig()
+			cfg, path, err := loadConfig(cmd.Flags().Changed("server"))
 			if err != nil {
 				return err
 			}
 
-			server := cfg.ServerURL
-			if server == "" {
-				server = serverURL
-			}
-
 			fmt.Printf("Config: %s\n", path)
-			fmt.Printf("Server: %s\n", server)
+			fmt.Printf("Server: %s\n", cfg.ServerURL)
 			fmt.Printf("Token:  %s\n", tokenStatus(cfg.Token))
 			return nil
 		},

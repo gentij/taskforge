@@ -61,4 +61,8 @@ export const RunWorkflowReqSchema = z.object({
   input: z.record(z.string(), z.unknown()).default({}),
   overrides: z.record(z.string(), RunWorkflowOverrideSchema).default({}),
 });
+
+export const parseRunWorkflowReq = (body: unknown) =>
+  RunWorkflowReqSchema.parse(body);
+
 export class RunWorkflowReqDto extends createZodDto(RunWorkflowReqSchema) {}

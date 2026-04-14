@@ -24,7 +24,10 @@ import {
 } from './dto/trigger.dto';
 import { OrchestrationService } from 'src/core/orchestration.service';
 import { WorkflowService } from 'src/workflow/workflow.service';
-import { RunWorkflowReqDto } from 'src/workflow/dto/workflow.dto';
+import {
+  RunWorkflowReqDto,
+  parseRunWorkflowReq,
+} from 'src/workflow/dto/workflow.dto';
 
 @ApiTags('Triggers')
 @ApiBearerAuth('bearer')
@@ -123,8 +126,7 @@ export class TriggerController {
     @Param('id') triggerId: string,
     @Body() body: RunWorkflowReqDto,
   ) {
-    const input = body.input ?? {};
-    const overrides = body.overrides ?? {};
+    const { input, overrides } = parseRunWorkflowReq(body);
 
     const trigger = await this.service.get(workflowId, triggerId);
 

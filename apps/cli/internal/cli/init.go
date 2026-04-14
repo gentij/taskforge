@@ -441,7 +441,7 @@ func validateComposeDatastoreMode(composePath string) error {
 }
 
 func maybeUpdateConfig(values map[string]string) error {
-	cfg, path, err := loadConfig()
+	cfg, path, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
