@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gentij/taskforge/apps/cli/internal/tui/data"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/utils"
+	"github.com/gentij/lune/apps/cli/internal/tui/data"
+	"github.com/gentij/lune/apps/cli/internal/tui/utils"
 )
 
 func BuildContextContent(view ViewID, store *data.Store, selectedID string) string {

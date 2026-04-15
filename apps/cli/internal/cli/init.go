@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	defaultInitDirName = ".taskforge"
+	defaultInitDirName = ".lune"
 	composeFileName    = "docker-compose.yml"
 	envFileName        = ".env"
-	localDatabaseURL   = "postgresql://taskforge:taskforge@postgres:5432/taskforge"
+	localDatabaseURL   = "postgresql://lune:lune@postgres:5432/lune"
 	localRedisURL      = "redis://redis:6379"
 )
 
@@ -33,7 +33,7 @@ var (
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize a Taskforge stack",
+	Short: "Initialize a Lune stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := validateDatastoreFlags(); err != nil {
 			return err
@@ -127,7 +127,7 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Taskforge initialized in %s\n", baseDir)
+		fmt.Printf("Lune initialized in %s\n", baseDir)
 		fmt.Printf("Compose file: %s\n", composePath)
 		fmt.Printf("Env file: %s\n", envPath)
 		return nil
@@ -156,12 +156,12 @@ func resolveInitDir() (string, error) {
 }
 
 func requiredEnvValues(existing map[string]string) (map[string]string, error) {
-	adminToken := existing["TASKFORGE_ADMIN_TOKEN"]
+	adminToken := existing["LUNE_ADMIN_TOKEN"]
 	if adminToken == "" {
 		adminToken = randomHex(32)
 	}
 
-	secretKey := existing["TASKFORGE_SECRET_KEY"]
+	secretKey := existing["LUNE_SECRET_KEY"]
 	if secretKey == "" {
 		secretKey = randomHex(32)
 	}
@@ -198,11 +198,11 @@ func requiredEnvValues(existing map[string]string) (map[string]string, error) {
 	}
 
 	return map[string]string{
-		"DATABASE_URL":          databaseURL,
-		"REDIS_URL":             redisURL,
-		"TASKFORGE_ADMIN_TOKEN": adminToken,
-		"TASKFORGE_SECRET_KEY":  secretKey,
-		"PORT":                  port,
+		"DATABASE_URL":     databaseURL,
+		"REDIS_URL":        redisURL,
+		"LUNE_ADMIN_TOKEN": adminToken,
+		"LUNE_SECRET_KEY":  secretKey,
+		"PORT":             port,
 	}, nil
 }
 
@@ -251,13 +251,13 @@ func writeEnvFile(path string, values map[string]string, extras []string) error 
 	order := []string{
 		"DATABASE_URL",
 		"REDIS_URL",
-		"TASKFORGE_ADMIN_TOKEN",
-		"TASKFORGE_SECRET_KEY",
+		"LUNE_ADMIN_TOKEN",
+		"LUNE_SECRET_KEY",
 		"PORT",
 	}
 
 	var lines []string
-	lines = append(lines, "# Taskforge local environment")
+	lines = append(lines, "# Lune local environment")
 	for _, key := range order {
 		if val, ok := values[key]; ok && val != "" {
 			lines = append(lines, fmt.Sprintf("%s=%s", key, val))
@@ -305,21 +305,21 @@ func writeComposeFile(path string, force bool, withLocalDatastores bool) error {
 
 	var content string
 	if withLocalDatastores {
-		content = strings.TrimLeft(`name: taskforge
+		content = strings.TrimLeft(`name: lune
 
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: taskforge
-      POSTGRES_PASSWORD: taskforge
-      POSTGRES_DB: taskforge
+      POSTGRES_USER: lune
+      POSTGRES_PASSWORD: lune
+      POSTGRES_DB: lune
     ports:
       - "5432:5432"
     volumes:
-      - taskforge_pgdata:/var/lib/postgresql/data
+      - lune_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskforge -d taskforge"]
+      test: ["CMD-SHELL", "pg_isready -U lune -d lune"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -329,7 +329,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - taskforge_redisdata:/data
+      - lune_redisdata:/data
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -338,7 +338,7 @@ services:
       retries: 10
 
   server:
-    image: gentij/taskforge-server:latest
+    image: gentij/lune-server:latest
     env_file:
       - .env
     ports:
@@ -349,7 +349,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: gentij/taskforge-worker:latest
+    image: gentij/lune-worker:latest
     env_file:
       - .env
     depends_on:
@@ -358,15 +358,15 @@ services:
     restart: unless-stopped
 
 volumes:
-  taskforge_pgdata:
-  taskforge_redisdata:
+  lune_pgdata:
+  lune_redisdata:
 `, "\n")
 	} else {
-		content = strings.TrimLeft(`name: taskforge
+		content = strings.TrimLeft(`name: lune
 
 services:
   server:
-    image: gentij/taskforge-server:latest
+    image: gentij/lune-server:latest
     env_file:
       - .env
     ports:
@@ -374,7 +374,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: gentij/taskforge-worker:latest
+    image: gentij/lune-worker:latest
     env_file:
       - .env
     restart: unless-stopped
@@ -430,11 +430,11 @@ func validateComposeDatastoreMode(composePath string) error {
 	hasRedis := strings.Contains(compose, "\n  redis:")
 
 	if initWithLocalDatastores && (!hasPostgres || !hasRedis) {
-		return fmt.Errorf("existing compose file does not define local datastores; rerun 'taskforge init --with-local-datastores --force'")
+		return fmt.Errorf("existing compose file does not define local datastores; rerun 'lune init --with-local-datastores --force'")
 	}
 
 	if !initWithLocalDatastores && hasPostgres && hasRedis && strings.TrimSpace(initDatabaseURL) != "" && strings.TrimSpace(initRedisURL) != "" {
-		return fmt.Errorf("existing compose file still includes local datastores; rerun 'taskforge init --force --database-url <postgres-url> --redis-url <redis-url>' to switch modes")
+		return fmt.Errorf("existing compose file still includes local datastores; rerun 'lune init --force --database-url <postgres-url> --redis-url <redis-url>' to switch modes")
 	}
 
 	return nil
@@ -451,7 +451,7 @@ func maybeUpdateConfig(values map[string]string) error {
 	}
 
 	if strings.TrimSpace(cfg.Token) == "" {
-		if token := strings.TrimSpace(values["TASKFORGE_ADMIN_TOKEN"]); token != "" {
+		if token := strings.TrimSpace(values["LUNE_ADMIN_TOKEN"]); token != "" {
 			cfg.Token = token
 			return saveConfig(path, cfg)
 		}
@@ -488,9 +488,9 @@ func waitForPostgres(baseDir string, composePath string) error {
 			"postgres",
 			"pg_isready",
 			"-U",
-			"taskforge",
+			"lune",
 			"-d",
-			"taskforge",
+			"lune",
 		)
 		if err == nil {
 			return nil

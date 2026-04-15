@@ -6,19 +6,19 @@ export class CryptoService {
   private readonly secretKey: Buffer;
 
   constructor() {
-    const raw = process.env.TASKFORGE_SECRET_KEY;
+    const raw = process.env.LUNE_SECRET_KEY;
     if (!raw) {
-      throw new Error('TASKFORGE_SECRET_KEY is required (32-byte base64 or 64-char hex)');
+      throw new Error('LUNE_SECRET_KEY is required (32-byte base64 or 64-char hex)');
     }
 
     this.secretKey = decodeKey(raw);
     if (this.secretKey.length !== 32) {
-      throw new Error('TASKFORGE_SECRET_KEY must decode to 32 bytes');
+      throw new Error('LUNE_SECRET_KEY must decode to 32 bytes');
     }
   }
 
   decryptSecret(value: string): string {
-    if (!value.startsWith('tfsec:v1:')) {
+    if (!value.startsWith('lunesec:v1:')) {
       return value;
     }
 

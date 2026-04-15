@@ -1,4 +1,4 @@
-import type { WorkflowDefinition } from '@taskforge/contracts';
+import type { WorkflowDefinition } from '@lune/contracts';
 import {
   getReferencedSecrets,
   validateWorkflowDefinitionStrict,

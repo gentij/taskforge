@@ -1,5 +1,5 @@
-import type { SecretRepository } from '@taskforge/db-access';
-import type { WorkflowNotification } from '@taskforge/contracts';
+import type { SecretRepository } from '@lune/db-access';
+import type { WorkflowNotification } from '@lune/contracts';
 import type { WorkflowRun } from '@prisma/client';
 import { CryptoService } from '../crypto/crypto.service';
 import { WorkerCacheService } from '../cache/worker-cache.service';
@@ -29,7 +29,7 @@ describe('RunNotifierService', () => {
   });
 
   beforeEach(() => {
-    process.env.TASKFORGE_SECRET_KEY = '0'.repeat(64);
+    process.env.LUNE_SECRET_KEY = '0'.repeat(64);
     secretRepo = {
       findManyByNames: jest.fn(),
     };
@@ -94,7 +94,7 @@ describe('RunNotifierService', () => {
         fields?: Array<{ name?: string; value?: string }>;
       }>;
     };
-    expect(payload.content).toContain('Taskforge run FAILED');
+    expect(payload.content).toContain('Lune run FAILED');
     expect(Array.isArray(payload.embeds)).toBe(true);
     expect(payload.embeds?.[0]?.title).toContain('Workflow Run FAILED');
     const fields = payload.embeds?.[0]?.fields ?? [];

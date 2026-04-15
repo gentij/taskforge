@@ -68,7 +68,7 @@ jobs:
 
       - name: CLI build
         working-directory: apps/cli
-        run: go build ./cmd/taskforge
+        run: go build ./cmd/lune
 
       - name: Docs build
         run: pnpm -C apps/docs build

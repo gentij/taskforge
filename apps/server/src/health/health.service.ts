@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { HealthResDto } from './dto/health.dto';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '@taskforge/db-access';
+import { PrismaService } from '@lune/db-access';
 
 @Injectable()
 export class HealthService {

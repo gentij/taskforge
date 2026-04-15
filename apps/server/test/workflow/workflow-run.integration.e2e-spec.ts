@@ -18,9 +18,9 @@ import { OrchestrationService } from 'src/core/orchestration.service';
 import { AllExceptionsFilter } from 'src/common/http/filters/all-exceptions.filter';
 import { ResponseInterceptor } from 'src/common/http/interceptors/response.interceptor';
 import { AllowAuthGuard } from 'test/utils/allow-auth.guard';
-import { WorkflowRepository } from '@taskforge/db-access';
-import { PrismaService } from '@taskforge/db-access';
-import { SecretRepository } from '@taskforge/db-access';
+import { WorkflowRepository } from '@lune/db-access';
+import { PrismaService } from '@lune/db-access';
+import { SecretRepository } from '@lune/db-access';
 import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,

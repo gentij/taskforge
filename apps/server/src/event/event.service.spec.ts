@@ -4,7 +4,7 @@ import {
   EventRepository,
   WorkflowRepository,
   TriggerRepository,
-} from '@taskforge/db-access';
+} from '@lune/db-access';
 import {
   createEventRepositoryMock,
   type EventRepositoryMock,

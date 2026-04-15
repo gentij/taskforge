@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HealthService } from './health.service';
 import { ConfigService } from '@nestjs/config';
 import { HealthResDto } from './dto/health.dto';
-import { PrismaService } from '@taskforge/db-access';
+import { PrismaService } from '@lune/db-access';
 
 describe('HealthService', () => {
   let service: HealthService;

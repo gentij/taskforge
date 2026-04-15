@@ -1,13 +1,13 @@
 ---
 id: cli-usage
 title: CLI Usage
-description: Common Taskforge CLI commands for day-to-day operations.
+description: Common Lune CLI commands for day-to-day operations.
 slug: /cli
 ---
 
 # CLI Usage
 
-This page is a practical command reference for running Taskforge.
+This page is a practical command reference for running Lune.
 
 For full command coverage, see `apps/cli/README.md`.
 
@@ -42,9 +42,9 @@ Supported `--sort-by` values:
 Examples:
 
 ```bash
-taskforge workflow list --sort-by updatedAt --sort-order desc
-taskforge run list <workflow-id> --sort-by createdAt --sort-order asc
-taskforge workflow version list <workflow-id> --sort-by version --sort-order desc
+lune workflow list --sort-by updatedAt --sort-order desc
+lune run list <workflow-id> --sort-by createdAt --sort-order asc
+lune workflow version list <workflow-id> --sort-by version --sort-order desc
 ```
 
 ## Stack Commands
@@ -52,44 +52,44 @@ taskforge workflow version list <workflow-id> --sort-by version --sort-order des
 Run once (external datastores):
 
 ```bash
-taskforge init \
-  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+lune init \
+  --database-url "postgresql://user:pass@db.example.com:5432/lune" \
   --redis-url "redis://redis.example.com:6379"
 ```
 
 Local bundled Postgres/Redis (optional):
 
 ```bash
-taskforge init --with-local-datastores
+lune init --with-local-datastores
 ```
 
 Day-to-day:
 
 ```bash
-taskforge start
-taskforge status
-taskforge logs --follow
-taskforge stop
+lune start
+lune status
+lune logs --follow
+lune stop
 ```
 
 ## Auth Commands
 
 ```bash
-taskforge auth login --token "<TASKFORGE_ADMIN_TOKEN>"
-taskforge auth whoami
-taskforge auth status
-taskforge auth logout
+lune auth login --token "<LUNE_ADMIN_TOKEN>"
+lune auth whoami
+lune auth status
+lune auth logout
 ```
 
 ## Workflow Lifecycle
 
 ```bash
-taskforge workflow create --name "My Workflow" --definition definition.json
-taskforge workflow list
-taskforge workflow get <workflow-id>
-taskforge workflow update <workflow-id> --name "New Name"
-taskforge workflow run <workflow-id> --input input.json
-taskforge workflow delete <workflow-id>
+lune workflow create --name "My Workflow" --definition definition.json
+lune workflow list
+lune workflow get <workflow-id>
+lune workflow update <workflow-id> --name "New Name"
+lune workflow run <workflow-id> --input input.json
+lune workflow delete <workflow-id>
 ```
 
 Notes:
@@ -105,18 +105,18 @@ Workflow definitions support optional `notifications` entries for run completion
 - Events: `SUCCEEDED`, `FAILED`
 - `webhook` can be absolute `http(s)` or `{{secret.NAME}}`
 
-Use `taskforge workflow create` or `taskforge workflow version create` with a definition that includes `notifications`.
+Use `lune workflow create` or `lune workflow version create` with a definition that includes `notifications`.
 
 ## Triggers
 
 ```bash
-taskforge trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
-taskforge trigger create <workflow-id> --type WEBHOOK --name "Inbound"
-taskforge trigger webhook rotate-key <workflow-id> <trigger-id>
-taskforge trigger list <workflow-id>
-taskforge trigger get <workflow-id> <trigger-id>
-taskforge trigger update <workflow-id> <trigger-id> --is-active=false
-taskforge trigger delete <workflow-id> <trigger-id>
+lune trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
+lune trigger create <workflow-id> --type WEBHOOK --name "Inbound"
+lune trigger webhook rotate-key <workflow-id> <trigger-id>
+lune trigger list <workflow-id>
+lune trigger get <workflow-id> <trigger-id>
+lune trigger update <workflow-id> <trigger-id> --is-active=false
+lune trigger delete <workflow-id> <trigger-id>
 ```
 
 Public webhook ingress path format:
@@ -128,24 +128,24 @@ After rotating a webhook key, call the generated URL directly from your webhook 
 ## Runs and Steps
 
 ```bash
-taskforge run list <workflow-id>
-taskforge run get <workflow-id> <run-id>
-taskforge step list <workflow-id> <run-id>
-taskforge step get <workflow-id> <run-id> <step-run-id>
+lune run list <workflow-id>
+lune run get <workflow-id> <run-id>
+lune step list <workflow-id> <run-id>
+lune step get <workflow-id> <run-id> <step-run-id>
 ```
 
 ## Secrets
 
 ```bash
-taskforge secret create --name API_KEY --value "secret"
-taskforge secret list
-taskforge secret get <secret-id>
-taskforge secret update <secret-id> --description "Rotated"
-taskforge secret delete <secret-id>
+lune secret create --name API_KEY --value "secret"
+lune secret list
+lune secret get <secret-id>
+lune secret update <secret-id> --description "Rotated"
+lune secret delete <secret-id>
 ```
 
 ## TUI
 
 ```bash
-taskforge tui
+lune tui
 ```

@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import {
-  STEP_RUN_QUEUE_NAME,
-  QueueConfigModule,
-} from '@taskforge/queue-config';
+import { STEP_RUN_QUEUE_NAME, QueueConfigModule } from '@lune/queue-config';
 import { StepRunQueueService } from './step-run-queue.service';
 
 @Module({

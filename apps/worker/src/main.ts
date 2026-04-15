@@ -10,7 +10,7 @@ async function bootstrap() {
   });
 
   const logger = new Logger('WorkerBootstrap');
-  logger.log('Taskforge Worker started');
+  logger.log('Lune Worker started');
 
   app.enableShutdownHooks();
 }

@@ -1,28 +1,28 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: taskforge-postgres
+    container_name: lune-postgres
     environment:
-      POSTGRES_USER: taskforge
-      POSTGRES_PASSWORD: taskforge
-      POSTGRES_DB: taskforge
+      POSTGRES_USER: lune
+      POSTGRES_PASSWORD: lune
+      POSTGRES_DB: lune
     ports:
       - "5432:5432"
     volumes:
-      - taskforge_pgdata:/var/lib/postgresql/data
+      - lune_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskforge -d taskforge"]
+      test: ["CMD-SHELL", "pg_isready -U lune -d lune"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: taskforge-redis
+    container_name: lune-redis
     ports:
       - "6379:6379"
     volumes:
-      - taskforge_redisdata:/data
+      - lune_redisdata:/data
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -31,5 +31,5 @@ services:
       retries: 10
 
 volumes:
-  taskforge_pgdata:
-  taskforge_redisdata:
+  lune_pgdata:
+  lune_redisdata:

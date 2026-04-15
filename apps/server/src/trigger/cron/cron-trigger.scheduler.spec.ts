@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { CronTriggerScheduler } from './cron-trigger.scheduler';
-import { PrismaService } from '@taskforge/db-access';
+import { PrismaService } from '@lune/db-access';
 import { OrchestrationService } from 'src/core/orchestration.service';
 
 describe('CronTriggerScheduler', () => {

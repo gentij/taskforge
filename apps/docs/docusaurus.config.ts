@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'Taskforge Docs',
+  title: 'Lune Docs',
   tagline: 'Self-hosted workflow automation documentation',
   favicon: 'img/favicon.ico',
 
@@ -21,7 +21,7 @@ const config: Config = {
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'gentij',
-  projectName: 'taskforge',
+  projectName: 'lune',
 
   onBrokenLinks: 'throw',
 
@@ -55,7 +55,7 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Taskforge',
+      title: 'Lune',
       items: [
         {
           type: 'docSidebar',
@@ -64,7 +64,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/gentij/taskforge',
+          href: 'https://github.com/gentij/lune',
           label: 'GitHub',
           position: 'right',
         },
@@ -91,7 +91,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/gentij/taskforge',
+              href: 'https://github.com/gentij/lune',
             },
             {
               label: 'CLI Usage',
@@ -100,7 +100,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Taskforge.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Lune.`,
     },
     prism: {
       theme: prismThemes.github,

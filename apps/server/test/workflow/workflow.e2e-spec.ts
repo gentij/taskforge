@@ -33,7 +33,7 @@ import {
   PrismaService,
   SecretRepository,
   WorkflowRepository,
-} from '@taskforge/db-access';
+} from '@lune/db-access';
 import { createSecretRepositoryMock } from 'test/secret/secret.repository.mock';
 import { createCacheManagerMock } from 'test/utils/cache-manager.mock';
 

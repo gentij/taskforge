@@ -1,40 +1,40 @@
-# Taskforge CLI
+# Lune CLI
 
-The Taskforge CLI lets you manage workflows, triggers, runs, steps, and secrets from the terminal.
+The Lune CLI lets you manage workflows, triggers, runs, steps, and secrets from the terminal.
 
-For self-hosted setup, run `taskforge init` first to provision `~/.taskforge/` and stack config.
+For self-hosted setup, run `lune init` first to provision `~/.lune/` and stack config.
 
 ## Quickstart
 
 ```bash
-taskforge auth login --token "<TASKFORGE_ADMIN_TOKEN>"
-taskforge workflow list
+lune auth login --token "<LUNE_ADMIN_TOKEN>"
+lune workflow list
 ```
 
 If your API is not on the default port, pass `--server`:
 
 ```bash
-taskforge --server http://localhost:3100/v1/api auth whoami
+lune --server http://localhost:3100/v1/api auth whoami
 ```
 
 Create a workflow from a definition file:
 
 ```bash
-taskforge workflow create --name "My Workflow" --definition definition.json
+lune workflow create --name "My Workflow" --definition definition.json
 ```
 
 Create a CRON trigger:
 
 ```bash
-taskforge trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
+lune trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
 ```
 
 Run a workflow and check runs/steps:
 
 ```bash
-taskforge workflow run <workflow-id> --input input.json
-taskforge run list <workflow-id>
-taskforge step list <workflow-id> <run-id>
+lune workflow run <workflow-id> --input input.json
+lune run list <workflow-id>
+lune step list <workflow-id> <run-id>
 ```
 
 ## Global Flags
@@ -70,58 +70,58 @@ Supported `--sort-by` values:
 Examples:
 
 ```bash
-taskforge workflow list --page 1 --page-size 25 --sort-by updatedAt --sort-order desc
-taskforge run list <workflow-id> --sort-by createdAt --sort-order asc
-taskforge workflow version list <workflow-id> --sort-by version --sort-order desc
+lune workflow list --page 1 --page-size 25 --sort-by updatedAt --sort-order desc
+lune run list <workflow-id> --sort-by createdAt --sort-order asc
+lune workflow version list <workflow-id> --sort-by version --sort-order desc
 ```
 
 ## Auth
 
 ```bash
-taskforge auth login
-taskforge auth status
-taskforge auth whoami
-taskforge auth logout
+lune auth login
+lune auth status
+lune auth whoami
+lune auth logout
 ```
 
 ## Stack
 
-`taskforge init` must be run once before using stack commands.
+`lune init` must be run once before using stack commands.
 
 By default, init expects external Postgres and Redis URLs:
 
 ```bash
-taskforge init \
-  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+lune init \
+  --database-url "postgresql://user:pass@db.example.com:5432/lune" \
   --redis-url "redis://redis.example.com:6379"
 ```
 
 To run bundled local Postgres/Redis containers instead:
 
 ```bash
-taskforge init --with-local-datastores
+lune init --with-local-datastores
 ```
 
 ```bash
-taskforge start
-taskforge start server worker
-taskforge start --foreground
-taskforge status
-taskforge logs --follow
-taskforge stop
+lune start
+lune start server worker
+lune start --foreground
+lune status
+lune logs --follow
+lune stop
 ```
 
 ## Workflows
 
 ```bash
-taskforge workflow list
-taskforge workflow get <workflow-id>
-taskforge workflow create --name "My Workflow" --definition definition.json
-taskforge workflow update <workflow-id> --name "New Name"
-taskforge workflow update <workflow-id> --is-active=false
-taskforge workflow delete <workflow-id>
-taskforge workflow run <workflow-id> --input input.json --overrides overrides.json
-taskforge workflow validate <workflow-id> --definition definition.json
+lune workflow list
+lune workflow get <workflow-id>
+lune workflow create --name "My Workflow" --definition definition.json
+lune workflow update <workflow-id> --name "New Name"
+lune workflow update <workflow-id> --is-active=false
+lune workflow delete <workflow-id>
+lune workflow run <workflow-id> --input input.json --overrides overrides.json
+lune workflow validate <workflow-id> --definition definition.json
 ```
 
 Notes:
@@ -191,21 +191,21 @@ Notes:
 ## Workflow Versions
 
 ```bash
-taskforge workflow version list <workflow-id>
-taskforge workflow version get <workflow-id> <version>
-taskforge workflow version create <workflow-id> --definition definition.json
+lune workflow version list <workflow-id>
+lune workflow version get <workflow-id> <version>
+lune workflow version create <workflow-id> --definition definition.json
 ```
 
 ## Triggers
 
 ```bash
-taskforge trigger list <workflow-id>
-taskforge trigger get <workflow-id> <trigger-id>
-taskforge trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
-taskforge trigger create <workflow-id> --type WEBHOOK --name "Inbound"
-taskforge trigger webhook rotate-key <workflow-id> <trigger-id>
-taskforge trigger update <workflow-id> <trigger-id> --is-active=false
-taskforge trigger delete <workflow-id> <trigger-id>
+lune trigger list <workflow-id>
+lune trigger get <workflow-id> <trigger-id>
+lune trigger create <workflow-id> --type CRON --name "Nightly" --config cron.json
+lune trigger create <workflow-id> --type WEBHOOK --name "Inbound"
+lune trigger webhook rotate-key <workflow-id> <trigger-id>
+lune trigger update <workflow-id> <trigger-id> --is-active=false
+lune trigger delete <workflow-id> <trigger-id>
 ```
 
 Sample `cron.json`:
@@ -220,25 +220,25 @@ Sample `cron.json`:
 ## Runs
 
 ```bash
-taskforge run list <workflow-id>
-taskforge run get <workflow-id> <run-id>
+lune run list <workflow-id>
+lune run get <workflow-id> <run-id>
 ```
 
 ## Steps
 
 ```bash
-taskforge step list <workflow-id> <run-id>
-taskforge step get <workflow-id> <run-id> <step-run-id>
+lune step list <workflow-id> <run-id>
+lune step get <workflow-id> <run-id> <step-run-id>
 ```
 
 ## Secrets
 
 ```bash
-taskforge secret list
-taskforge secret get <secret-id>
-taskforge secret create --name API_KEY --value "my-secret"
-taskforge secret update <secret-id> --description "Rotated"
-taskforge secret delete <secret-id>
+lune secret list
+lune secret get <secret-id>
+lune secret create --name API_KEY --value "my-secret"
+lune secret update <secret-id> --description "Rotated"
+lune secret delete <secret-id>
 ```
 
 Secrets are not printed in table output. Use `--output json` if you need raw JSON.
@@ -251,5 +251,5 @@ Secrets are not printed in table output. Use `--output json` if you need raw JSO
 
 ## Troubleshooting
 
-- **Token not set**: run `taskforge auth login`
+- **Token not set**: run `lune auth login`
 - **Validation errors**: verify JSON files match the server schema (e.g., CRON uses `cron`, not `expression`)

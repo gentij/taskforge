@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/components"
+	"github.com/gentij/lune/apps/cli/internal/tui/components"
 )
 
 func Render(m Model) string {
@@ -57,7 +57,7 @@ func renderSidebar(m Model) string {
 		border = m.styles.PanelBorderFocus
 	}
 
-	brand := m.styles.SidebarTitle.Render("TASKFORGE")
+	brand := m.styles.SidebarTitle.Render("LUNE")
 	workspace := m.styles.SidebarMuted.Render("WS: " + m.workspaceName)
 	focus := paneFocusTag(m, FocusSidebar, "SIDEBAR")
 	section := m.styles.SidebarSection.Render("Navigation")

@@ -1,4 +1,4 @@
-import { PrismaService } from '@taskforge/db-access';
+import { PrismaService } from '@lune/db-access';
 import {
   createPrismaServiceMock,
   PrismaServiceMock,

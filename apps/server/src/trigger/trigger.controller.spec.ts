@@ -135,10 +135,10 @@ describe('TriggerController', () => {
   it('rotateWebhookKey() calls TriggerService.rotateWebhookKey()', async () => {
     const rotateSpy = jest
       .spyOn(service, 'rotateWebhookKey')
-      .mockResolvedValue({ webhookKey: 'tf_key' });
+      .mockResolvedValue({ webhookKey: 'lune_key' });
 
     await expect(controller.rotateWebhookKey('wf_1', 'tr_1')).resolves.toEqual({
-      webhookKey: 'tf_key',
+      webhookKey: 'lune_key',
     });
     expect(rotateSpy).toHaveBeenCalledWith('wf_1', 'tr_1');
   });

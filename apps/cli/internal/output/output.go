@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/gentij/taskforge/apps/cli/internal/api"
+	"github.com/gentij/lune/apps/cli/internal/api"
 	"golang.org/x/term"
 )
 

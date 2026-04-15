@@ -1,20 +1,20 @@
 ---
 id: architecture-overview
 title: Architecture Overview
-description: System architecture for Taskforge server, worker, CLI, and data stores.
+description: System architecture for Lune server, worker, CLI, and data stores.
 slug: /architecture
 ---
 
 # Architecture Overview
 
-Taskforge is a self-hosted workflow automation system built as a monorepo.
+Lune is a self-hosted workflow automation system built as a monorepo.
 
 ## System Components
 
 ```text
-Taskforge
+Lune
 |- CLI/TUI (Go)
-|  \- Calls Taskforge HTTP API
+|  \- Calls Lune HTTP API
 |- Server (NestJS + Fastify)
 |  |- Auth, workflows, triggers, runs, steps, secrets
 |  \- Enqueues step-run jobs
@@ -38,7 +38,7 @@ Taskforge
 
 - `packages/contracts`: shared schemas/contracts
 - `packages/db-access`: Prisma service and repositories
-- `packages/queue`: queue configuration package (`@taskforge/queue-config`)
+- `packages/queue`: queue configuration package (`@lune/queue-config`)
 
 ## API Shape
 
@@ -92,7 +92,7 @@ When contracts or Prisma types change, build in this order:
 
 ## Runtime Requirements
 
-Taskforge server/worker can run with either:
+Lune server/worker can run with either:
 
 - external managed Postgres + Redis services, or
 - bundled local Postgres + Redis containers (CLI opt-in).
@@ -101,8 +101,8 @@ Required server env vars:
 
 - `DATABASE_URL`
 - `REDIS_URL`
-- `TASKFORGE_ADMIN_TOKEN`
-- `TASKFORGE_SECRET_KEY`
+- `LUNE_ADMIN_TOKEN`
+- `LUNE_SECRET_KEY`
 
 Optional:
 
@@ -117,4 +117,4 @@ Optional:
 - CLI usage: `docs/CLI-Usage.md`
 - Development setup: `docs/Development.md`
 - CLI commands: `apps/cli/README.md`
-- TUI usage and internals: `docs/Taskforge - TUI.md`
+- TUI usage and internals: `docs/Lune - TUI.md`

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gentij/taskforge/apps/cli/internal/api"
-	"github.com/gentij/taskforge/apps/cli/internal/output"
+	"github.com/gentij/lune/apps/cli/internal/api"
+	"github.com/gentij/lune/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -21,9 +21,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "taskforge",
-	Short: "Taskforge CLI",
-	Long:  "Taskforge CLI for managing workflows, runs, triggers, and secrets.",
+	Use:   "lune",
+	Short: "Lune CLI",
+	Long:  "Lune CLI for managing workflows, runs, triggers, and secrets.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg, _, err := loadConfig(cmd.Flags().Changed("server"))
 		if err != nil {

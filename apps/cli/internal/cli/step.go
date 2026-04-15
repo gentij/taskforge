@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gentij/taskforge/apps/cli/internal/output"
+	"github.com/gentij/lune/apps/cli/internal/output"
 	"github.com/spf13/cobra"
 )
 

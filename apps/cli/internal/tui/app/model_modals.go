@@ -237,11 +237,11 @@ func (m *Model) openCLIHandoffModalCmd(topic string) tea.Cmd {
 	case "workflow-version-create":
 		title = "Create Workflow Version"
 		description = "Workflow versions stay CLI-first for JSON authoring and validation"
-		command = "taskforge workflow version create " + workflowTarget + " --definition ./workflow-definition.json"
+		command = "lune workflow version create " + workflowTarget + " --definition ./workflow-definition.json"
 	default:
 		title = "Create Workflow"
 		description = "Workflow creation stays CLI-first for JSON authoring and validation"
-		command = "taskforge workflow create --name \"my-workflow\" --definition ./workflow-definition.json"
+		command = "lune workflow create --name \"my-workflow\" --definition ./workflow-definition.json"
 	}
 	m.action = actionModalState{
 		Active:      true,

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/data"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/styles"
+	"github.com/gentij/lune/apps/cli/internal/tui/data"
+	"github.com/gentij/lune/apps/cli/internal/tui/styles"
 )
 
 func BuildRowsForView(view ViewID, store *data.Store, styleSet styles.StyleSet, width int) ([]table.Column, []table.Row, []string) {

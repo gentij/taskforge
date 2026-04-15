@@ -10,14 +10,14 @@ import (
 )
 
 var (
-	logsFollow bool
-	logsTail   int
+	logsFollow      bool
+	logsTail        int
 	startForeground bool
 )
 
 var startCmd = &cobra.Command{
 	Use:   "start [service...]",
-	Short: "Start the local Taskforge stack",
+	Short: "Start the local Lune stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		baseDir, composePath, envPath, err := resolveInitPaths()
 		if err != nil {
@@ -36,7 +36,7 @@ var startCmd = &cobra.Command{
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show local Taskforge stack status",
+	Short: "Show local Lune stack status",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		baseDir, composePath, envPath, err := resolveInitPaths()
 		if err != nil {
@@ -48,7 +48,7 @@ var statusCmd = &cobra.Command{
 
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop the local Taskforge stack",
+	Short: "Stop the local Lune stack",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		baseDir, composePath, envPath, err := resolveInitPaths()
 		if err != nil {
@@ -60,7 +60,7 @@ var stopCmd = &cobra.Command{
 
 var logsCmd = &cobra.Command{
 	Use:   "logs [service...]",
-	Short: "Show Taskforge stack logs",
+	Short: "Show Lune stack logs",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		baseDir, composePath, envPath, err := resolveInitPaths()
 		if err != nil {
@@ -95,13 +95,13 @@ func resolveInitPaths() (string, string, string, error) {
 
 	if _, err := os.Stat(composePath); err != nil {
 		if os.IsNotExist(err) {
-			return "", "", "", fmt.Errorf("taskforge not initialized; run 'taskforge init'")
+			return "", "", "", fmt.Errorf("lune not initialized; run 'lune init'")
 		}
 		return "", "", "", err
 	}
 	if _, err := os.Stat(envPath); err != nil {
 		if os.IsNotExist(err) {
-			return "", "", "", fmt.Errorf("missing env file; run 'taskforge init'")
+			return "", "", "", fmt.Errorf("missing env file; run 'lune init'")
 		}
 		return "", "", "", err
 	}

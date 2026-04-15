@@ -40,7 +40,7 @@ import {
   EventRepository,
   TriggerRepository,
   WorkflowRepository,
-} from '@taskforge/db-access';
+} from '@lune/db-access';
 
 describe('Event (e2e)', () => {
   let app: NestFastifyApplication;

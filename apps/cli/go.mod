@@ -1,4 +1,4 @@
-module github.com/gentij/taskforge/apps/cli
+module github.com/gentij/lune/apps/cli
 
 go 1.25.0
 

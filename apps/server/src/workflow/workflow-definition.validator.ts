@@ -3,7 +3,7 @@ import * as jmespathImport from 'jmespath';
 const jmespath = jmespathImport as unknown as {
   compile: (expression: string) => unknown;
 };
-import type { WorkflowDefinition } from '@taskforge/contracts';
+import type { WorkflowDefinition } from '@lune/contracts';
 
 export type ValidationIssue = {
   field?: string;

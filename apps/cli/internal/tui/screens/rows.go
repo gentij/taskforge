@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/data"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/styles"
-	"github.com/gentij/taskforge/apps/cli/internal/tui/utils"
+	"github.com/gentij/lune/apps/cli/internal/tui/data"
+	"github.com/gentij/lune/apps/cli/internal/tui/styles"
+	"github.com/gentij/lune/apps/cli/internal/tui/utils"
 )
 
 func recentRunRows(store *data.Store, now time.Time, limit int) ([]table.Row, []string) {

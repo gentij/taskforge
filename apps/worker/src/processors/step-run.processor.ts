@@ -6,12 +6,12 @@ import {
   WorkflowRunRepository,
   WorkflowVersionRepository,
   SecretRepository,
-} from '@taskforge/db-access';
+} from '@lune/db-access';
 import {
   StepRunJobPayload,
   type NotificationEvent,
   type WorkflowNotification,
-} from '@taskforge/contracts';
+} from '@lune/contracts';
 import { ExecutorRegistry } from '../executors/executor-registry';
 import { TemplateResolver } from '../utils/template-resolver';
 import { wrapForDb } from '../utils/persisted-json';
@@ -480,7 +480,7 @@ export class StepRunProcessor extends WorkerHost {
 function unwrapExecutorOutput(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   // Unwrap HttpExecutor body helper wrapper.
-  if ('_taskforgeHttp' in (value as any) && 'data' in (value as any)) {
+  if ('_luneHttp' in (value as any) && 'data' in (value as any)) {
     return (value as any).data;
   }
   return value;

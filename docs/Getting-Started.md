@@ -1,32 +1,32 @@
 ---
 id: getting-started
 title: Getting Started
-description: Install Taskforge and run your first workflow in minutes.
+description: Install Lune and run your first workflow in minutes.
 slug: /getting-started
 ---
 
 # Getting Started
 
-This guide is for operators and users who want to install Taskforge and run workflows.
+This guide is for operators and users who want to install Lune and run workflows.
 
-If you want to contribute to Taskforge itself, use `docs/Development.md`.
+If you want to contribute to Lune itself, use `docs/Development.md`.
 
 ## 10-Minute Path
 
-If `taskforge` is already installed, this is the fastest path from zero to first run.
+If `lune` is already installed, this is the fastest path from zero to first run.
 
 ```bash
 # 1) Initialize and start stack (external datastores)
-taskforge init \
-  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+lune init \
+  --database-url "postgresql://user:pass@db.example.com:5432/lune" \
   --redis-url "redis://redis.example.com:6379"
-taskforge status
+lune status
 
 # 2) Verify auth works
-taskforge auth whoami
+lune auth whoami
 
 # 3) Create a minimal workflow definition
-cat > /tmp/tf-definition.json <<'JSON'
+cat > /tmp/lune-definition.json <<'JSON'
 {
   "input": {
     "apiBase": "https://jsonplaceholder.typicode.com"
@@ -45,20 +45,20 @@ cat > /tmp/tf-definition.json <<'JSON'
 JSON
 
 # 4) Create workflow and run it
-taskforge workflow create --name "First Workflow" --definition /tmp/tf-definition.json
-taskforge workflow list
+lune workflow create --name "First Workflow" --definition /tmp/lune-definition.json
+lune workflow list
 # copy workflow ID from list output
-taskforge workflow run <workflow-id>
+lune workflow run <workflow-id>
 
 # 5) Inspect execution
-taskforge run list <workflow-id>
-taskforge step list <workflow-id> <run-id>
+lune run list <workflow-id>
+lune step list <workflow-id> <run-id>
 ```
 
 ## What You Need
 
 - Docker + Docker Compose
-- A Taskforge CLI binary
+- A Lune CLI binary
 
 ## Install the CLI
 
@@ -67,50 +67,50 @@ Choose one method.
 ### Homebrew
 
 ```bash
-brew tap gentij/taskforge
-brew install taskforge
+brew tap gentij/lune
+brew install lune
 ```
 
 ### AUR (Arch Linux)
 
 ```bash
-yay -S taskforge-bin
+yay -S lune-bin
 ```
 
 ### GitHub Release Binary
 
 Download the matching release artifact from:
 
-- `https://github.com/gentij/taskforge/releases`
+- `https://github.com/gentij/lune/releases`
 
-Extract `taskforge` and put it on your `PATH`.
+Extract `lune` and put it on your `PATH`.
 
 ## Initialize Stack
 
 ```bash
-taskforge init \
-  --database-url "postgresql://user:pass@db.example.com:5432/taskforge" \
+lune init \
+  --database-url "postgresql://user:pass@db.example.com:5432/lune" \
   --redis-url "redis://redis.example.com:6379"
 ```
 
-This creates local config and starts the Taskforge stack (server, worker).
+This creates local config and starts the Lune stack (server, worker).
 
-If you want Taskforge to run bundled local Postgres and Redis instead, use:
+If you want Lune to run bundled local Postgres and Redis instead, use:
 
 ```bash
-taskforge init --with-local-datastores
+lune init --with-local-datastores
 ```
 
 Check status:
 
 ```bash
-taskforge status
+lune status
 ```
 
 Verify auth:
 
 ```bash
-taskforge auth whoami
+lune auth whoami
 ```
 
 ## Run Your First Workflow
@@ -118,7 +118,7 @@ taskforge auth whoami
 Create a minimal definition:
 
 ```bash
-cat > /tmp/tf-definition.json <<'JSON'
+cat > /tmp/lune-definition.json <<'JSON'
 {
   "input": {
     "apiBase": "https://jsonplaceholder.typicode.com"
@@ -140,17 +140,17 @@ JSON
 Create and run:
 
 ```bash
-taskforge workflow create --name "First Workflow" --definition /tmp/tf-definition.json
-taskforge workflow list
+lune workflow create --name "First Workflow" --definition /tmp/lune-definition.json
+lune workflow list
 # use workflow id from list output
-taskforge workflow run <workflow-id>
+lune workflow run <workflow-id>
 ```
 
 Inspect run details:
 
 ```bash
-taskforge run list <workflow-id>
-taskforge step list <workflow-id> <run-id>
+lune run list <workflow-id>
+lune step list <workflow-id> <run-id>
 ```
 
 ## Optional: Configure Public Webhook Ingress
@@ -158,8 +158,8 @@ taskforge step list <workflow-id> <run-id>
 Create a webhook trigger and rotate a path key:
 
 ```bash
-taskforge trigger create <workflow-id> --type WEBHOOK --name "Inbound"
-taskforge trigger webhook rotate-key <workflow-id> <trigger-id>
+lune trigger create <workflow-id> --type WEBHOOK --name "Inbound"
+lune trigger webhook rotate-key <workflow-id> <trigger-id>
 ```
 
 This prints a URL in the format:
@@ -168,18 +168,18 @@ This prints a URL in the format:
 
 Use that URL in your webhook provider. For reverse proxy starters, see:
 
-- `deploy/ingress/nginx.taskforge.conf.example`
+- `deploy/ingress/nginx.lune.conf.example`
 - `deploy/ingress/Caddyfile.example`
 
 ## Optional: Open the TUI
 
 ```bash
-taskforge tui
+lune tui
 ```
 
 ## Next Steps
 
 - [CLI Usage](./CLI-Usage.md)
-- [Workflow Definitions](./Taskforge%20-%20Workflow%20Definitions.md)
-- [TUI Guide](./Taskforge%20-%20TUI.md)
+- [Workflow Definitions](./Lune%20-%20Workflow%20Definitions.md)
+- [TUI Guide](./Lune%20-%20TUI.md)
 - Full CLI reference: `apps/cli/README.md`

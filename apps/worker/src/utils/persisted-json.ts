@@ -8,7 +8,7 @@ export type PersistPolicy = {
 };
 
 export type PersistEnvelope = {
-  _taskforge: {
+  _lune: {
     truncated: boolean;
     bytesEstimate: number;
     originalBytesEstimate?: number;
@@ -31,7 +31,7 @@ export function wrapForDb(value: unknown, policy: PersistPolicy): PersistEnvelop
 
   if (!policy.truncate || bytes <= policy.maxBytes) {
     return {
-      _taskforge: {
+      _lune: {
         truncated: false,
         bytesEstimate: bytes,
         maxBytes: policy.maxBytes,
@@ -46,7 +46,7 @@ export function wrapForDb(value: unknown, policy: PersistPolicy): PersistEnvelop
   const truncatedBytes = estimateBytes(truncatedData);
 
   return {
-    _taskforge: {
+    _lune: {
       truncated: true,
       bytesEstimate: truncatedBytes,
       originalBytesEstimate: bytes,
@@ -119,7 +119,7 @@ function simplify(
       out[k] = simplify(obj[k], depth + 1, maxDepth, opts);
     }
     if (typeof maxObjectKeys === 'number' && keys.length > maxObjectKeys) {
-      out._taskforge_truncatedKeys = keys.length - maxObjectKeys;
+      out._lune_truncatedKeys = keys.length - maxObjectKeys;
     }
     return out;
   }

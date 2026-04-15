@@ -1,8 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  WorkflowVersionRepository,
-  WorkflowRepository,
-} from '@taskforge/db-access';
+import { WorkflowVersionRepository, WorkflowRepository } from '@lune/db-access';
 import { ErrorDefinitions } from 'src/common/http/errors/error-codes';
 import { AppError } from 'src/common/http/errors/app-error';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';

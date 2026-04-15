@@ -7,9 +7,9 @@ slug: /development
 
 # Development Guide
 
-This guide covers local development for Taskforge (server, worker, CLI, and TUI).
+This guide covers local development for Lune (server, worker, CLI, and TUI).
 
-Use this page when contributing to Taskforge itself. If you only want to install and run Taskforge, start with `docs/Getting-Started.md`.
+Use this page when contributing to Lune itself. If you only want to install and run Lune, start with `docs/Getting-Started.md`.
 
 ## Prerequisites
 
@@ -22,8 +22,8 @@ Use this page when contributing to Taskforge itself. If you only want to install
 ## Clone and Install
 
 ```bash
-git clone https://github.com/taskforge/taskforge.git
-cd taskforge
+git clone https://github.com/gentij/lune.git
+cd lune
 pnpm install
 ```
 
@@ -59,16 +59,16 @@ Set required values in `apps/server/.env`:
 
 - `DATABASE_URL`
 - `REDIS_URL`
-- `TASKFORGE_ADMIN_TOKEN` (minimum 32 characters)
-- `TASKFORGE_SECRET_KEY` (64-char hex or base64 for 32 bytes)
+- `LUNE_ADMIN_TOKEN` (minimum 32 characters)
+- `LUNE_SECRET_KEY` (64-char hex or base64 for 32 bytes)
 
 Optional helper commands for secure values:
 
 ```bash
-# 64-char hex (good for TASKFORGE_SECRET_KEY)
+# 64-char hex (good for LUNE_SECRET_KEY)
 openssl rand -hex 32
 
-# 64-char token (good for TASKFORGE_ADMIN_TOKEN)
+# 64-char token (good for LUNE_ADMIN_TOKEN)
 openssl rand -hex 32
 ```
 
@@ -119,10 +119,10 @@ Then use `--server http://localhost:3100/v1/api` in CLI commands.
 
 Swagger UI is served at `/api` and uses bearer token auth.
 
-Use your `TASKFORGE_ADMIN_TOKEN` to call the API directly:
+Use your `LUNE_ADMIN_TOKEN` to call the API directly:
 
 ```bash
-TOKEN="<TASKFORGE_ADMIN_TOKEN>"
+TOKEN="<LUNE_ADMIN_TOKEN>"
 
 # Health (public)
 curl -sS "http://localhost:3000/v1/api/health"
@@ -138,17 +138,17 @@ Build CLI binary from source:
 
 ```bash
 cd apps/cli
-go build -o ../../taskforge ./cmd/taskforge
+go build -o ../../lune ./cmd/lune
 cd ../..
 ```
 
 Common commands:
 
 ```bash
-./taskforge auth login --token "<TASKFORGE_ADMIN_TOKEN>"
-./taskforge auth whoami
-./taskforge workflow list
-./taskforge tui
+./lune auth login --token "<LUNE_ADMIN_TOKEN>"
+./lune auth whoami
+./lune workflow list
+./lune tui
 ```
 
 ## Testing
@@ -196,7 +196,7 @@ pnpm -C apps/worker format
 
 ## Documentation Site
 
-Taskforge docs are served by Docusaurus from `apps/docs`, using markdown source files in `docs/`.
+Lune docs are served by Docusaurus from `apps/docs`, using markdown source files in `docs/`.
 
 ```bash
 pnpm docs:dev
@@ -205,14 +205,14 @@ pnpm docs:build
 
 ## Environment Variable Reference
 
-Taskforge server variables (from runtime validation):
+Lune server variables (from runtime validation):
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string (`postgres://` or `postgresql://`) |
 | `REDIS_URL` | Yes | Redis connection string (`redis://`) |
-| `TASKFORGE_ADMIN_TOKEN` | Yes | Admin bearer token used by CLI/TUI and API clients |
-| `TASKFORGE_SECRET_KEY` | Yes | Encryption key for secrets (64-char hex or base64 for 32 bytes) |
+| `LUNE_ADMIN_TOKEN` | Yes | Admin bearer token used by CLI/TUI and API clients |
+| `LUNE_SECRET_KEY` | Yes | Encryption key for secrets (64-char hex or base64 for 32 bytes) |
 | `PORT` | No | API server port (default `3000`) |
 | `CACHE_TTL_SECONDS` | No | Cache TTL in seconds (default `60`) |
 | `CACHE_REDIS_PREFIX` | No | Cache key namespace prefix |
@@ -239,8 +239,8 @@ Taskforge server variables (from runtime validation):
 
 ### API returns unauthorized
 
-- Verify `TASKFORGE_ADMIN_TOKEN` in `apps/server/.env`
-- Re-run `./taskforge auth login --token "<token>"`
+- Verify `LUNE_ADMIN_TOKEN` in `apps/server/.env`
+- Re-run `./lune auth login --token "<token>"`
 
 ### Worker is not processing runs
 
@@ -262,5 +262,5 @@ pnpm -C apps/worker build
 - [Getting Started](./Getting-Started.md)
 - [CLI Usage](./CLI-Usage.md)
 - [Architecture Overview](./Architecture.md)
-- [Taskforge TUI Guide](./Taskforge%20-%20TUI.md)
-- [Workflow Engine Concepts](./Taskforge%20-%20Workflow%20Engine.md)
+- [Lune TUI Guide](./Lune%20-%20TUI.md)
+- [Workflow Engine Concepts](./Lune%20-%20Workflow%20Engine.md)

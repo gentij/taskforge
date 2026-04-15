@@ -32,10 +32,7 @@ import {
   type WorkflowRepositoryMock,
 } from 'test/workflow/workflow.repository.mock';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
-import {
-  WorkflowRepository,
-  WorkflowVersionRepository,
-} from '@taskforge/db-access';
+import { WorkflowRepository, WorkflowVersionRepository } from '@lune/db-access';
 import { createCacheManagerMock } from 'test/utils/cache-manager.mock';
 
 describe('WorkflowVersion (e2e)', () => {

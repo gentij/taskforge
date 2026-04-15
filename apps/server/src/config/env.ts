@@ -52,18 +52,17 @@ const envSchema = z.object({
   CACHE_REDIS_PREFIX: z
     .string()
     .optional()
-    .transform((val) => val ?? 'tf:server:'),
+    .transform((val) => val ?? 'lune:server:'),
 
-  TASKFORGE_ADMIN_TOKEN: z
+  LUNE_ADMIN_TOKEN: z
     .string()
-    .min(32, 'TASKFORGE_ADMIN_TOKEN must be at least 32 characters'),
+    .min(32, 'LUNE_ADMIN_TOKEN must be at least 32 characters'),
 
-  TASKFORGE_SECRET_KEY: z
+  LUNE_SECRET_KEY: z
     .string()
-    .min(1, 'TASKFORGE_SECRET_KEY is required')
+    .min(1, 'LUNE_SECRET_KEY is required')
     .refine((v) => /^[0-9a-fA-F]{64}$/.test(v) || isBase64Key32(v), {
-      message:
-        'TASKFORGE_SECRET_KEY must be 64-char hex or base64 for 32 bytes',
+      message: 'LUNE_SECRET_KEY must be 64-char hex or base64 for 32 bytes',
     }),
 
   VERSION: z.string().default('1'),

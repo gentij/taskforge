@@ -1,4 +1,4 @@
-import { ApiTokenRepository } from '@taskforge/db-access';
+import { ApiTokenRepository } from '@lune/db-access';
 
 export type ApiTokenRepositoryMock = jest.Mocked<
   Pick<

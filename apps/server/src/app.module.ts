@@ -28,10 +28,10 @@ import { PrismaModule } from './prisma/prisma.module';
         stores: new Keyv({
           store: new KeyvRedis(config.get<string>('REDIS_URL') ?? ''),
           ttl: (config.get<number>('CACHE_TTL_SECONDS') ?? 60) * 1000,
-          namespace: config.get<string>('CACHE_REDIS_PREFIX') ?? 'tf:server:',
+          namespace: config.get<string>('CACHE_REDIS_PREFIX') ?? 'lune:server:',
         }),
         ttl: (config.get<number>('CACHE_TTL_SECONDS') ?? 60) * 1000,
-        namespace: config.get<string>('CACHE_REDIS_PREFIX') ?? 'tf:server:',
+        namespace: config.get<string>('CACHE_REDIS_PREFIX') ?? 'lune:server:',
       }),
     }),
     ScheduleModule.forRoot(),

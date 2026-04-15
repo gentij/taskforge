@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SecretRepository } from '@taskforge/db-access';
+import { SecretRepository } from '@lune/db-access';
 import type {
   NotificationEvent,
   NotificationProvider,
   WorkflowNotification,
-} from '@taskforge/contracts';
+} from '@lune/contracts';
 import type { WorkflowRun } from '@prisma/client';
 import { CryptoService } from '../crypto/crypto.service';
 import { WorkerCacheService } from '../cache/worker-cache.service';
@@ -94,7 +94,7 @@ export class RunNotifierService {
     const triggerId = workflowRun.triggerId ?? '-';
 
     const lines = [
-      `Taskforge run ${finalStatus}`,
+      `Lune run ${finalStatus}`,
       `workflowRunId: ${workflowRun.id}`,
       `workflowId: ${workflowRun.workflowId}`,
       `workflowVersionId: ${workflowRun.workflowVersionId}`,
@@ -107,7 +107,7 @@ export class RunNotifierService {
 
     if (provider === 'discord') {
       return {
-        content: `${statusEmoji} Taskforge run ${finalStatus}`,
+        content: `${statusEmoji} Lune run ${finalStatus}`,
         embeds: [
           {
             title: `${statusEmoji} Workflow Run ${finalStatus}`,
@@ -151,7 +151,7 @@ export class RunNotifierService {
             ],
             timestamp: workflowRun.finishedAt?.toISOString() ?? new Date().toISOString(),
             footer: {
-              text: 'Taskforge Notifications',
+              text: 'Lune Notifications',
             },
           },
         ],

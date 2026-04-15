@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { SecretService } from './secret.service';
-import { SecretRepository } from '@taskforge/db-access';
+import { SecretRepository } from '@lune/db-access';
 import {
   createSecretRepositoryMock,
   type SecretRepositoryMock,
@@ -51,7 +51,7 @@ describe('SecretService', () => {
       expect.objectContaining({
         name: 'API_KEY',
         description: undefined,
-        value: expect.stringMatching(/^tfsec:v1:/) as unknown as string,
+        value: expect.stringMatching(/^lunesec:v1:/) as unknown as string,
       }),
     );
   });

@@ -1,5 +1,5 @@
 {
-  "name": "@taskforge/contracts",
+  "name": "@lune/contracts",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",

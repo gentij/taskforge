@@ -29,7 +29,7 @@ import {
   createWorkflowRepositoryMock,
   type WorkflowRepositoryMock,
 } from 'test/workflow/workflow.repository.mock';
-import { TriggerRepository, WorkflowRepository } from '@taskforge/db-access';
+import { TriggerRepository, WorkflowRepository } from '@lune/db-access';
 import { createTriggerFixture } from 'test/trigger/trigger.fixtures';
 import { createWorkflowFixture } from 'test/workflow/workflow.fixtures';
 
@@ -51,7 +51,9 @@ describe('Trigger Webhook (integration e2e)', () => {
     orchestration = { startWorkflow: jest.fn() };
     workflowService = { get: jest.fn() };
     crypto = {
-      generateApiToken: jest.fn<string, []>().mockReturnValue('tf_rotated_key'),
+      generateApiToken: jest
+        .fn<string, []>()
+        .mockReturnValue('lune_rotated_key'),
       hashApiToken: jest
         .fn<string, [string]>()
         .mockImplementation((value: string) => `hash:${value}`),
@@ -153,7 +155,7 @@ describe('Trigger Webhook (integration e2e)', () => {
         config: {
           webhookAuth: {
             mode: 'path-key',
-            keyHash: 'hash:tf_valid_key',
+            keyHash: 'hash:lune_valid_key',
           },
         },
       }),
@@ -168,9 +170,9 @@ describe('Trigger Webhook (integration e2e)', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: '/hooks/wf_1/tr_1/tf_valid_key',
+      url: '/hooks/wf_1/tr_1/lune_valid_key',
       payload: {
-        repository: 'taskforge',
+        repository: 'lune',
         event: 'push',
       },
     });
@@ -185,7 +187,7 @@ describe('Trigger Webhook (integration e2e)', () => {
         triggerId: 'tr_1',
         eventType: 'WEBHOOK',
         input: {
-          repository: 'taskforge',
+          repository: 'lune',
           event: 'push',
         },
         overrides: {},
@@ -206,7 +208,7 @@ describe('Trigger Webhook (integration e2e)', () => {
         config: {
           webhookAuth: {
             mode: 'path-key',
-            keyHash: 'hash:tf_valid_key',
+            keyHash: 'hash:lune_valid_key',
           },
         },
       }),
@@ -214,7 +216,7 @@ describe('Trigger Webhook (integration e2e)', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: '/hooks/wf_1/tr_1/tf_invalid_key',
+      url: '/hooks/wf_1/tr_1/lune_invalid_key',
       payload: { hello: 'world' },
     });
 
@@ -253,7 +255,7 @@ describe('Trigger Webhook (integration e2e)', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.ok).toBe(true);
-    expect(body.data.webhookKey).toBe('tf_rotated_key');
+    expect(body.data.webhookKey).toBe('lune_rotated_key');
     expect(triggerRepo.update).toHaveBeenCalledWith(
       'tr_1',
       expect.objectContaining({
@@ -261,7 +263,7 @@ describe('Trigger Webhook (integration e2e)', () => {
           source: 'github',
           webhookAuth: expect.objectContaining({
             mode: 'path-key',
-            keyHash: 'hash:tf_rotated_key',
+            keyHash: 'hash:lune_rotated_key',
           }),
         }),
       }),

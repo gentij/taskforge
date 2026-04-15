@@ -1,6 +1,6 @@
-# Taskforge Docs Site
+# Lune Docs Site
 
-This app hosts the Taskforge documentation website using Docusaurus.
+This app hosts the Lune documentation website using Docusaurus.
 
 The content source is the repository-level `docs/` directory.
 

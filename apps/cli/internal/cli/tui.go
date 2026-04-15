@@ -3,14 +3,14 @@ package cli
 import (
 	"fmt"
 
-	"github.com/gentij/taskforge/apps/cli/internal/config"
-	"github.com/gentij/taskforge/apps/cli/internal/tui"
+	"github.com/gentij/lune/apps/cli/internal/config"
+	"github.com/gentij/lune/apps/cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
-	Short: "Launch the Taskforge TUI",
+	Short: "Launch the Lune TUI",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := GetContext(cmd.Context())
 		if ctx == nil {
