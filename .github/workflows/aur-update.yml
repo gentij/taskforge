@@ -50,7 +50,7 @@ jobs:
       - name: Clone AUR repo
         run: |
           set -euo pipefail
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur" git clone ssh://aur@aur.archlinux.org/lune-bin.git aur
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur" git clone ssh://aur@aur.archlinux.org/lune-cli-bin.git aur
 
       - name: Update PKGBUILD and .SRCINFO
         run: |

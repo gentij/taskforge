@@ -20,7 +20,6 @@ func renderMainHeader(m Model, width int) string {
 	line1 := joinLeftRight(left, filter, width)
 	chips := []string{
 		chip(m, "API "+m.apiStatus, m.apiStatus == "CONNECTED"),
-		chip(m, "Workers "+itoa(m.workerCount), false),
 		chip(m, refreshChip(m), false),
 		chip(m, "Net "+networkProfileLabel(m.networkProfile), m.networkProfile == NetworkFlaky),
 	}

@@ -127,11 +127,6 @@ Run the terminal UI:
 ./lune tui
 ```
 
-## Current Limitations
-
-- TUI API token revoke/manage actions are not fully wired yet.
-- Some TUI header indicators are static placeholders.
-
 ## Documentation
 
 - [Getting Started](./docs/Getting-Started.md)

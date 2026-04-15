@@ -74,7 +74,7 @@ brew install lune
 ### AUR (Arch Linux)
 
 ```bash
-yay -S lune-bin
+yay -S lune-cli-bin
 ```
 
 ### GitHub Release Binary

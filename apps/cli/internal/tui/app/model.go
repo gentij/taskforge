@@ -278,7 +278,6 @@ type Model struct {
 	mutationPending bool
 	networkProfile  NetworkProfile
 	workspaceName   string
-	workerCount     int
 	apiStatus       string
 	paletteRecent   []paletteAction
 
@@ -362,7 +361,6 @@ func NewModel(client *api.Client, serverURL string, tokenSet bool, cfg config.Co
 		mutationPending:    false,
 		networkProfile:     NetworkNormal,
 		workspaceName:      "personal",
-		workerCount:        0,
 		apiStatus:          apiStatus(tokenSet),
 		paginator:          pager,
 		inspector:          NewInspector(styleSet, keys),

@@ -66,7 +66,6 @@ func renderSidebar(m Model) string {
 	status := []string{
 		m.styles.SidebarSection.Render("Status"),
 		chip(m, "API "+m.apiStatus, m.apiStatus == "CONNECTED"),
-		chip(m, "Workers "+itoa(m.workerCount), false),
 		chip(m, refreshChip(m), false),
 		chip(m, "Net "+networkProfileLabel(m.networkProfile), m.networkProfile == NetworkFlaky),
 		chip(m, "Theme "+strings.Title(strings.ReplaceAll(m.themeName, "-", " ")), false),

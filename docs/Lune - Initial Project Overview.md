@@ -109,7 +109,7 @@ The CLI owns:
 
 ### Installation (example on Arch Linux)
 ```bash
-yay -S lune-bin
+yay -S lune-cli-bin
 ```
 
 This installs:
