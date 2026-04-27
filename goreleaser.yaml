@@ -7,6 +7,12 @@ builds:
     dir: apps/cli
     main: ./cmd/lunie
     binary: lunie
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/gentij/lunie/apps/cli/internal/cli.version={{ .Version }}
+        -X github.com/gentij/lunie/apps/cli/internal/cli.commit={{ .Commit }}
+        -X github.com/gentij/lunie/apps/cli/internal/cli.date={{ .Date }}
     env:
       - CGO_ENABLED=0
     goos:
